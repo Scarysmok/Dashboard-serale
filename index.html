@@ -487,7 +487,11 @@ async function parsePDF(ab,fname){
   let txt='';
   for(let i=1;i<=pdf.numPages;i++){
     const pg=await pdf.getPage(i);
-    txt+=(await pg.getTextContent()).items.map(s=>s.str).join(' ')+'\n';
+    const items=(await pg.getTextContent()).items;
+    let raw=items.map(s=>s.str).join(' ');
+    raw=raw.replace(/(\d)\s+\.\s*(\d)/g,'\.');
+    raw=raw.replace(/(\d)\s+,\s*(\d)/g,'\,');
+    txt+=raw+'\n';
   }
   const months={january:1,february:2,march:3,april:4,may:5,june:6,july:7,august:8,september:9,october:10,november:11,december:12,gennaio:1,febbraio:2,marzo:3,aprile:4,maggio:5,giugno:6,luglio:7,agosto:8,settembre:9,ottobre:10,novembre:11,dicembre:12};
   const sm=txt.match(/Adidas\s*[-–]\s*([^\|]+)\|/i)||txt.match(/ADIDAS\s*[-–]\s*([A-Z ]+\b)/i);
@@ -538,19 +542,29 @@ async function parsePDF(ab,fname){
     annull  = /s[iì]/i.test(rv(8));
     sconti  = /s[iì]/i.test(rv(11));
   } else {
-    // ── FORMATO B: label e valore sulla stessa riga, cercabili per nome ──
-    // Ogni campo appare come "NomeCampo <valore>" nel flusso di testo
-    corrispettivo = gn(/Corrispettivo\s+([\d.,]+)/);
-    contanti      = gn(/Contanti\s+([\d.,]+)/);
-    posTml1 = gn(/POS TML 1\s+([\d.,]+)/);
-    posTml2 = gn(/POS TML 2\s+([\d.,]+)/);
-    posTml3 = gn(/POS TML 3\s+([\d.,]+)/);
-    posTml4 = gn(/POS TML 4\s+([\d.,]+)/);
-    cambi   = gn(/Cambi\s+([\d.,]+)/);
-    buonoE  = gn(/Buono [Ee]messo\s+([\d.,]+)/);
-    buonoR  = gn(/Buono [Rr]itirato\s+([\d.,]+)/);
-    annull  = /Annullamenti\s+([1-9]|S[iì])/i.test(txt);
-    sconti  = /Sconti su vendite\s+([1-9]|S[iì])/i.test(txt);
+    // ── FORMATO B: ogni campo appare come "NomeCampo valore \d+\." ──
+    // La regex cattura il valore tra il nome e il successivo numero-domanda o fine stringa
+    // Usa lookahead per fermarsi prima di "\d+." (prossima domanda) o parola chiave
+    const gf = (label, def=0) => {
+      // Cerca: NomeCampo <spazi> VALORE dove valore termina prima di \d+\. o FATTURE ecc.
+      const esc = label.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+      const m = txt.match(new RegExp(esc+'\\s+([\\d.,]+)'));
+      return m ? toNum(m[1]) : def;
+    };
+    corrispettivo = gf('Corrispettivo');
+    contanti      = gf('Contanti');
+    posTml1 = gf('POS TML 1');
+    posTml2 = gf('POS TML 2');
+    posTml3 = gf('POS TML 3');
+    posTml4 = gf('POS TML 4');
+    cambi   = gf('Cambi');
+    buonoE  = gf('Buono Emesso');
+    buonoR  = gf('Buono ritirato');
+    // Annullamenti e Sconti: valore > 0 oppure "Sì" significa attivo
+    const annullVal = gf('Annullamenti');
+    annull = annullVal > 0 || /Annullamenti\s+S[iì]/i.test(txt);
+    const scontiVal = gf('Sconti su vendite');
+    sconti = scontiVal > 0 || /Sconti su vendite\s+S[iì]/i.test(txt);
   }
 
   const pos     = posTml1 + posTml2 + posTml3 + posTml4;
