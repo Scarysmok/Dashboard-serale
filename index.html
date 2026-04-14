@@ -496,41 +496,64 @@ async function parsePDF(ab,fname){
   const dm=txt.match(/(\d{1,2})\s+(January|February|March|April|May|June|July|August|September|October|November|December|Gennaio|Febbraio|Marzo|Aprile|Maggio|Giugno|Luglio|Agosto|Settembre|Ottobre|Novembre|Dicembre)\s+(\d{2,4})/i);
   if(dm){const y=dm[3].length===2?'20'+dm[3]:dm[3];const mo=String(months[dm[2].toLowerCase()]).padStart(2,'0');date=`${dm[1].padStart(2,'0')}/${mo}/${y}`;}
 
-  // Il PDF GoAudits ha le label in una colonna e i valori in un'altra.
-  // pdf.js li unisce in una stringa dove label e valori sono separati.
-  // Strategia: estrarre il blocco RESPONSE della sezione CASSA e leggere
-  // i valori numerici in ordine posizionale (Q1=corrispettivo, Q2=contanti, ecc.)
   const toNum = s => parseFloat(String(s).replace(',','.')) || 0;
-  const gn=(p,d=0)=>{const m=txt.match(p);return m?toNum(m[1]):d;};
+  const gn = (p,d=0) => { const m=txt.match(p); return m ? toNum(m[1]) : d; };
+  const gs = (p,d='') => { const m=txt.match(p); return m ? m[1].trim() : d; };
 
-  // Estrai il blocco tra "RESPONSE" (prima occorrenza, sezione CASSA) e "FATTURE"
-  const respMatch = txt.match(/RESPONSE\s*([\s\S]*?)(?:FATTURE|DISTINTA)/i);
-  let vals = [];
-  if(respMatch){
-    // Estrai tutti i token che sono numeri o "Non utilizzato" o "No"/"Si"/"Sì"
-    const tokens = respMatch[1].match(/[\d]+[.,][\d]+|[\d]+(?:\s|$)|Non utilizzato|S[iì]|No/gi) || [];
-    vals = tokens.map(t => t.trim());
+  // GoAudits genera due layout diversi a seconda del template del negozio:
+  //
+  // FORMATO A (vecchio, es. Lecce): colonne separate — tutte le label a sinistra,
+  //   tutti i valori nel blocco "RESPONSE" a destra. pdf.js li restituisce
+  //   come: "... RESPONSE 1077.10 340.60 736.50 Non utilizzato ..."
+  //
+  // FORMATO B (nuovo, es. Bariblu): label e valore inline, riga per riga:
+  //   "1. Corrispettivo 1234.1  2. Contanti 1200  3. POS TML 1 34.1 ..."
+  //
+  // Rilevazione formato: se esiste il token "RESPONSE" nel testo → Formato A,
+  // altrimenti → Formato B (label+valore sulla stessa riga).
+
+  let corrispettivo, contanti, posTml1, posTml2, posTml3, posTml4, cambi, buonoE, buonoR, annull, sconti;
+
+  const isFormatoA = /RESPONSE/i.test(txt);
+
+  if (isFormatoA) {
+    // ── FORMATO A: legge i valori per posizione nel blocco RESPONSE ──
+    // Ordine: 0=corrispettivo 1=contanti 2=POSTML1 3=POSTML2 4=POSTML3 5=POSTML4
+    //         6=Giftcard 7=cambi 8=annullamenti 9=buonoEmesso 10=buonoRitirato 11=sconti
+    const respMatch = txt.match(/RESPONSE\s*([\s\S]*?)(?:FATTURE|DISTINTA)/i);
+    const vals = respMatch
+      ? (respMatch[1].match(/[\d]+[.,][\d]+|[\d]+(?=\s)|Non utilizzato|S[iì]|No\b/gi)||[]).map(t=>t.trim())
+      : [];
+    const rv  = i => vals[i] || '';
+    const rvn = i => toNum(rv(i));
+    corrispettivo = rvn(0);
+    contanti      = rvn(1);
+    posTml1 = /non utilizzato/i.test(rv(2)) ? 0 : rvn(2);
+    posTml2 = /non utilizzato/i.test(rv(3)) ? 0 : rvn(3);
+    posTml3 = /non utilizzato/i.test(rv(4)) ? 0 : rvn(4);
+    posTml4 = /non utilizzato/i.test(rv(5)) ? 0 : rvn(5);
+    cambi   = /non utilizzato/i.test(rv(7)) ? 0 : rvn(7);
+    buonoE  = /non utilizzato/i.test(rv(9))  ? 0 : rvn(9);
+    buonoR  = /non utilizzato/i.test(rv(10)) ? 0 : rvn(10);
+    annull  = /s[iì]/i.test(rv(8));
+    sconti  = /s[iì]/i.test(rv(11));
+  } else {
+    // ── FORMATO B: label e valore sulla stessa riga, cercabili per nome ──
+    // Ogni campo appare come "NomeCampo <valore>" nel flusso di testo
+    corrispettivo = gn(/Corrispettivo\s+([\d.,]+)/);
+    contanti      = gn(/Contanti\s+([\d.,]+)/);
+    posTml1 = gn(/POS TML 1\s+([\d.,]+)/);
+    posTml2 = gn(/POS TML 2\s+([\d.,]+)/);
+    posTml3 = gn(/POS TML 3\s+([\d.,]+)/);
+    posTml4 = gn(/POS TML 4\s+([\d.,]+)/);
+    cambi   = gn(/Cambi\s+([\d.,]+)/);
+    buonoE  = gn(/Buono [Ee]messo\s+([\d.,]+)/);
+    buonoR  = gn(/Buono [Rr]itirato\s+([\d.,]+)/);
+    annull  = /Annullamenti\s+([1-9]|S[iì])/i.test(txt);
+    sconti  = /Sconti su vendite\s+([1-9]|S[iì])/i.test(txt);
   }
-  // Posizioni nel blocco RESPONSE sezione CASSA (GoAudits standard):
-  // 0=corrispettivo, 1=contanti, 2=POS TML1, 3=POS TML2, 4=POS TML3, 5=POS TML4
-  // 6=Giftcard, 7=cambi, 8=annullamenti, 9=buonoEmesso, 10=buonoRitirato, 11=sconti
-  const rv = (i) => vals[i] || '';
-  const rvn = (i) => toNum(rv(i));
 
-  const corrispettivo = rvn(0);
-  const contanti      = rvn(1);
-  const posTml1       = /non utilizzato/i.test(rv(2)) ? 0 : rvn(2);
-  const posTml2       = /non utilizzato/i.test(rv(3)) ? 0 : rvn(3);
-  const posTml3       = /non utilizzato/i.test(rv(4)) ? 0 : rvn(4);
-  const posTml4       = /non utilizzato/i.test(rv(5)) ? 0 : rvn(5);
-  const pos           = posTml1 + posTml2 + posTml3 + posTml4;
-  const cambi         = /non utilizzato/i.test(rv(7)) ? 0 : rvn(7);
-  const buonoE        = /non utilizzato/i.test(rv(9))  ? 0 : rvn(9);
-  const buonoR        = /non utilizzato/i.test(rv(10)) ? 0 : rvn(10);
-  const annull        = /s[iì]/i.test(rv(8));
-  const sconti        = /s[iì]/i.test(rv(11));
-
-  // Fondo cassa e versato: fuori dal blocco CASSA, cercabili per label
+  const pos     = posTml1 + posTml2 + posTml3 + posTml4;
   const fondo   = gn(/Fondo cassa\s+([\d.,]+)/);
   const versato = gn(/Importo [Vv]ersato\s+([\d.,]+)/);
   const diff=Math.abs(corrispettivo-contanti-pos);
