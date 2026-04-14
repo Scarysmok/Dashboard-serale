@@ -487,59 +487,55 @@ async function parsePDF(ab,fname){
   let txt='';
   for(let i=1;i<=pdf.numPages;i++){
     const pg=await pdf.getPage(i);
-    txt+=(await pg.getTextContent()).items.map(s=>s.str).join(' ')+'
-';
+    txt+=(await pg.getTextContent()).items.map(s=>s.str).join(' ')+'\n';
   }
-
-  const extractNum=(label)=>{
-    const safe=label.replace(/[.*+?^${}()|[\]\]/g,'\$&');
-    const rx=new RegExp(safe + String.raw`\s*\d{0,2}\.?\s*([\d.,]+)`, 'i');
-    const m=txt.match(rx);
-    return m ? (parseFloat(m[1].replace(',','.')) || 0) : 0;
-  };
-
-  const months={
-    january:'01',february:'02',march:'03',april:'04',may:'05',june:'06',july:'07',august:'08',september:'09',october:'10',november:'11',december:'12',
-    gennaio:'01',febbraio:'02',marzo:'03',aprile:'04',maggio:'05',giugno:'06',luglio:'07',agosto:'08',settembre:'09',ottobre:'10',novembre:'11',dicembre:'12',
-    jan:'01',feb:'02',mar:'03',apr:'04',may:'05',jun:'06',jul:'07',aug:'08',sep:'09',oct:'10',nov:'11',dec:'12'
-  };
-
-  const sm=txt.match(/Adidas\s*[-–]\s*([^|\n]+)\|/i) || txt.match(/ADIDAS\s*[-–]\s*([A-Z ]+?)\s+\d{1,2}\s+[A-Z]{3}\s+\d{2}/i);
-  const store=sm ? ('Adidas - ' + sm[1].trim().replace(/\s+/g,' ')) : fname.replace(/\.pdf$/i,'');
-
+  const months={january:1,february:2,march:3,april:4,may:5,june:6,july:7,august:8,september:9,october:10,november:11,december:12,gennaio:1,febbraio:2,marzo:3,aprile:4,maggio:5,giugno:6,luglio:7,agosto:8,settembre:9,ottobre:10,novembre:11,dicembre:12};
+  const sm=txt.match(/Adidas\s*[-–]\s*([^\|]+)\|/i)||txt.match(/ADIDAS\s*[-–]\s*([A-Z ]+\b)/i);
+  const store=sm?'Adidas - '+sm[1].trim().replace(/\s+/g,' '):fname.replace('.pdf','');
   let date='—';
-  let dm=txt.match(/(\d{1,2})(?:ST|ND|RD|TH)?\s+(January|February|March|April|May|June|July|August|September|October|November|December|Gennaio|Febbraio|Marzo|Aprile|Maggio|Giugno|Luglio|Agosto|Settembre|Ottobre|Novembre|Dicembre)\s+(\d{2,4})/i);
-  if(!dm){
-    dm=txt.match(/(\d{1,2})\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{2,4})/i);
+  const dm=txt.match(/(\d{1,2})\s+(January|February|March|April|May|June|July|August|September|October|November|December|Gennaio|Febbraio|Marzo|Aprile|Maggio|Giugno|Luglio|Agosto|Settembre|Ottobre|Novembre|Dicembre)\s+(\d{2,4})/i);
+  if(dm){const y=dm[3].length===2?'20'+dm[3]:dm[3];const mo=String(months[dm[2].toLowerCase()]).padStart(2,'0');date=`${dm[1].padStart(2,'0')}/${mo}/${y}`;}
+
+  // Il PDF GoAudits ha le label in una colonna e i valori in un'altra.
+  // pdf.js li unisce in una stringa dove label e valori sono separati.
+  // Strategia: estrarre il blocco RESPONSE della sezione CASSA e leggere
+  // i valori numerici in ordine posizionale (Q1=corrispettivo, Q2=contanti, ecc.)
+  const toNum = s => parseFloat(String(s).replace(',','.')) || 0;
+  const gn=(p,d=0)=>{const m=txt.match(p);return m?toNum(m[1]):d;};
+
+  // Estrai il blocco tra "RESPONSE" (prima occorrenza, sezione CASSA) e "FATTURE"
+  const respMatch = txt.match(/RESPONSE\s*([\s\S]*?)(?:FATTURE|DISTINTA)/i);
+  let vals = [];
+  if(respMatch){
+    // Estrai tutti i token che sono numeri o "Non utilizzato" o "No"/"Si"/"Sì"
+    const tokens = respMatch[1].match(/[\d]+[.,][\d]+|[\d]+(?:\s|$)|Non utilizzato|S[iì]|No/gi) || [];
+    vals = tokens.map(t => t.trim());
   }
-  if(dm){
-    const y=dm[3].length===2 ? '20'+dm[3] : dm[3];
-    const mo=months[dm[2].toLowerCase()];
-    date=`${String(dm[1]).padStart(2,'0')}/${mo}/${y}`;
-  }
+  // Posizioni nel blocco RESPONSE sezione CASSA (GoAudits standard):
+  // 0=corrispettivo, 1=contanti, 2=POS TML1, 3=POS TML2, 4=POS TML3, 5=POS TML4
+  // 6=Giftcard, 7=cambi, 8=annullamenti, 9=buonoEmesso, 10=buonoRitirato, 11=sconti
+  const rv = (i) => vals[i] || '';
+  const rvn = (i) => toNum(rv(i));
 
-  const corrispettivo=extractNum('Corrispettivo');
-  const contanti=extractNum('Contanti');
-  const pos1=extractNum('POS TML 1');
-  const pos2=extractNum('POS TML 2');
-  const pos3=extractNum('POS TML 3');
-  const pos4=extractNum('POS TML 4');
-  const pos=pos1+pos2+pos3+pos4;
-  const fondo=extractNum('Fondo cassa');
-  const versato=extractNum('Importo Versato') || extractNum('Importo versato');
-  const cambi=extractNum('Cambi');
-  const buonoE=extractNum('Buono Emesso') || extractNum('Buono emesso');
-  const buonoR=extractNum('Buono ritirato') || extractNum('Buono Ritirato');
+  const corrispettivo = rvn(0);
+  const contanti      = rvn(1);
+  const posTml1       = /non utilizzato/i.test(rv(2)) ? 0 : rvn(2);
+  const posTml2       = /non utilizzato/i.test(rv(3)) ? 0 : rvn(3);
+  const posTml3       = /non utilizzato/i.test(rv(4)) ? 0 : rvn(4);
+  const posTml4       = /non utilizzato/i.test(rv(5)) ? 0 : rvn(5);
+  const pos           = posTml1 + posTml2 + posTml3 + posTml4;
+  const cambi         = /non utilizzato/i.test(rv(7)) ? 0 : rvn(7);
+  const buonoE        = /non utilizzato/i.test(rv(9))  ? 0 : rvn(9);
+  const buonoR        = /non utilizzato/i.test(rv(10)) ? 0 : rvn(10);
+  const annull        = /s[iì]/i.test(rv(8));
+  const sconti        = /s[iì]/i.test(rv(11));
 
-  const sconti=/Sconti su vendite\s*\d{0,2}\.?\s*(S[iì])/i.test(txt);
-  const annull=/Annullamenti\s*\d{0,2}\.?\s*(S[iì])/i.test(txt);
-
+  // Fondo cassa e versato: fuori dal blocco CASSA, cercabili per label
+  const fondo   = gn(/Fondo cassa\s+([\d.,]+)/);
+  const versato = gn(/Importo [Vv]ersato\s+([\d.,]+)/);
   const diff=Math.abs(corrispettivo-contanti-pos);
   const anomaly=diff>1&&corrispettivo>0;
-
-  console.log('PDF parsed:', {fname, store, date, corrispettivo, contanti, pos, fondo, versato, cambi, buonoE, buonoR, sconti, annull, diff});
-
-  return{store,date,corrispettivo,contanti,pos,pos1,pos2,pos3,pos4,fondo,versato,cambi,buonoE,buonoR,sconti,annull,anomaly,diff};
+  return{store,date,corrispettivo,contanti,pos,fondo,versato,cambi,buonoE,buonoR,sconti,annull,anomaly,diff};
 }
 
 // ── RENDER ──
@@ -655,10 +651,7 @@ function openSheet(idx){
     ['Corrispettivo',fmt(r.corrispettivo),'g'],
     ['Contanti',fmt(r.contanti),'b'],
     ['POS totale',fmt(r.pos),''],
-    ['POS TML 1',fmt(r.pos1||0),''],
-    ['POS TML 2',fmt(r.pos2||0),''],
-    ['POS TML 3',fmt(r.pos3||0),''],
-    ['POS TML 4',fmt(r.pos4||0),''],
+    ['POS TML 1',fmt(r.pos),''],
     ['Versato',fmt(r.versato),''],
     ['Fondo cassa',fmt(r.fondo),''],
     ['Cambi',fmt(r.cambi),''],
