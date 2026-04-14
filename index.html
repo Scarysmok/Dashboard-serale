@@ -488,11 +488,24 @@ async function parsePDF(ab,fname){
   for(let i=1;i<=pdf.numPages;i++){
     const pg=await pdf.getPage(i);
     const items=(await pg.getTextContent()).items;
-    let raw=items.map(s=>s.str).join(' ');
-    raw=raw.replace(/(\d)\s+\.\s*(\d)/g,'\.');
-    raw=raw.replace(/(\d)\s+,\s*(\d)/g,'\,');
-    txt+=raw+'\n';
+    // Raggruppa item per riga fisica (coordinata Y) per non confondere
+    // il numero di domanda "1." con il valore del campo
+    const lineMap={};
+    for(const it of items){
+      if(!it.str.trim()) continue;
+      const y=Math.round(it.transform[5]/2)*2;
+      if(!lineMap[y]) lineMap[y]=[];
+      lineMap[y].push({x:it.transform[4],str:it.str});
+    }
+    const ys=Object.keys(lineMap).map(Number).sort((a,b)=>b-a);
+    for(const y of ys){
+      const line=lineMap[y].sort((a,b)=>a.x-b.x).map(i=>i.str).join(' ').trim();
+      if(line) txt+=line+'\n';
+    }
   }
+  // Ricollega numeri spezzati su righe adiacenti tipo "1234" / ".10"
+  txt=txt.replace(/(\d)\n\.(\d)/g,'$1.$2');
+  txt=txt.replace(/(\d)\n,(\d)/g,'$1,$2');
   const months={january:1,february:2,march:3,april:4,may:5,june:6,july:7,august:8,september:9,october:10,november:11,december:12,gennaio:1,febbraio:2,marzo:3,aprile:4,maggio:5,giugno:6,luglio:7,agosto:8,settembre:9,ottobre:10,novembre:11,dicembre:12};
   const sm=txt.match(/Adidas\s*[-–]\s*([^\|]+)\|/i)||txt.match(/ADIDAS\s*[-–]\s*([A-Z ]+\b)/i);
   const store=sm?'Adidas - '+sm[1].trim().replace(/\s+/g,' '):fname.replace('.pdf','');
@@ -542,13 +555,13 @@ async function parsePDF(ab,fname){
     annull  = /s[iì]/i.test(rv(8));
     sconti  = /s[iì]/i.test(rv(11));
   } else {
-    // ── FORMATO B: ogni campo appare come "NomeCampo valore \d+\." ──
-    // La regex cattura il valore tra il nome e il successivo numero-domanda o fine stringa
-    // Usa lookahead per fermarsi prima di "\d+." (prossima domanda) o parola chiave
+    // ── FORMATO B: il testo è ora per righe fisiche, ogni campo è su una riga
+    // e il suo valore è sulla riga immediatamente successiva.
+    // Cerca "NomeCampo\nVALORE" nel testo multiriga.
     const gf = (label, def=0) => {
-      // Cerca: NomeCampo <spazi> VALORE dove valore termina prima di \d+\. o FATTURE ecc.
       const esc = label.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-      const m = txt.match(new RegExp(esc+'\\s+([\\d.,]+)'));
+      // Valore = prima riga numerica subito dopo la label
+      const m = txt.match(new RegExp(esc+'\\s*\\n\\s*([\\d.,]+)'));
       return m ? toNum(m[1]) : def;
     };
     corrispettivo = gf('Corrispettivo');
@@ -560,11 +573,10 @@ async function parsePDF(ab,fname){
     cambi   = gf('Cambi');
     buonoE  = gf('Buono Emesso');
     buonoR  = gf('Buono ritirato');
-    // Annullamenti e Sconti: valore > 0 oppure "Sì" significa attivo
     const annullVal = gf('Annullamenti');
-    annull = annullVal > 0 || /Annullamenti\s+S[iì]/i.test(txt);
+    annull = annullVal > 0 || /Annullamenti\s*\n\s*S[iì]/i.test(txt);
     const scontiVal = gf('Sconti su vendite');
-    sconti = scontiVal > 0 || /Sconti su vendite\s+S[iì]/i.test(txt);
+    sconti = scontiVal > 0 || /Sconti su vendite\s*\n\s*S[iì]/i.test(txt);
   }
 
   const pos     = posTml1 + posTml2 + posTml3 + posTml4;
