@@ -158,6 +158,35 @@ body{display:flex;flex-direction:column}
   overflow:hidden;transition:background .1s
 }
 .store-card:active{background:var(--s2)}
+.brand-header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 16px 6px;margin-top:8px
+}
+.brand-label{font-size:11px;font-weight:700;color:var(--acc);text-transform:uppercase;letter-spacing:1px}
+.brand-count{font-size:11px;color:var(--t3)}
+.subtotal-card{
+  background:var(--s1);border:1px solid #e8ff4725;border-radius:12px;
+  margin:4px 0 12px;padding:12px 16px;
+  display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px
+}
+.subtotal-cell-l{font-size:10px;color:var(--acc);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;font-weight:600}
+.subtotal-cell-v{font-family:var(--mono);font-size:13px;font-weight:500}
+.subtotal-cell-v.g{color:var(--green)} .subtotal-cell-v.b{color:var(--blue)}
+.net-badge{
+  font-size:10px;font-family:var(--mono);color:var(--blue);
+  background:#47c8ff12;border:1px solid #47c8ff25;
+  padding:1px 6px;border-radius:4px;margin-left:6px
+}
+.grand-total{
+  background:var(--s1);border:2px solid #e8ff4740;border-radius:14px;
+  padding:16px;margin:8px 0 4px
+}
+.grand-label{font-size:10px;font-weight:700;color:var(--acc);text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px}
+.grand-row{display:flex;justify-content:space-between;align-items:baseline;padding:6px 0;border-bottom:1px solid var(--bd)}
+.grand-row:last-child{border-bottom:none;padding-top:10px;margin-top:4px}
+.grand-row-l{font-size:13px;color:var(--t2)}
+.grand-row-v{font-family:var(--mono);font-size:14px;font-weight:500}
+.grand-row-v.g{color:var(--green)} .grand-row-v.b{color:var(--blue)} .grand-row-v.y{color:var(--acc)}
 .store-card.anomaly{border-color:#ff5a5a30;background:#ff5a5a05}
 .card-head{
   display:flex;align-items:center;justify-content:space-between;
@@ -507,8 +536,10 @@ async function parsePDF(ab,fname){
   txt=txt.replace(/(\d)\n\.(\d)/g,'$1.$2');
   txt=txt.replace(/(\d)\n,(\d)/g,'$1,$2');
   const months={january:1,february:2,march:3,april:4,may:5,june:6,july:7,august:8,september:9,october:10,november:11,december:12,gennaio:1,febbraio:2,marzo:3,aprile:4,maggio:5,giugno:6,luglio:7,agosto:8,settembre:9,ottobre:10,novembre:11,dicembre:12};
-  const sm=txt.match(/Adidas\s*[-–]\s*([^\|]+)\|/i)||txt.match(/ADIDAS\s*[-–]\s*([A-Z ]+\b)/i);
-  const store=sm?'Adidas - '+sm[1].trim().replace(/\s+/g,' '):fname.replace('.pdf','');
+  const sm=txt.match(/([A-Za-z0-9 &]+?)\s*[-–]\s*([^\|]+)\|/i);
+  const brand = sm ? sm[1].trim() : 'Sconosciuto';
+  const location = sm ? sm[2].trim().replace(/\s+/g,' ') : fname.replace('.pdf','');
+  const store = brand + ' - ' + location;
   let date='—';
   const dm=txt.match(/(\d{1,2})\s+(January|February|March|April|May|June|July|August|September|October|November|December|Gennaio|Febbraio|Marzo|Aprile|Maggio|Giugno|Luglio|Agosto|Settembre|Ottobre|Novembre|Dicembre)\s+(\d{2,4})/i);
   if(dm){const y=dm[3].length===2?'20'+dm[3]:dm[3];const mo=String(months[dm[2].toLowerCase()]).padStart(2,'0');date=`${dm[1].padStart(2,'0')}/${mo}/${y}`;}
@@ -584,7 +615,8 @@ async function parsePDF(ab,fname){
   const versato = gn(/Importo [Vv]ersato\s+([\d.,]+)/);
   const diff=Math.abs(corrispettivo-contanti-pos);
   const anomaly=diff>1&&corrispettivo>0;
-  return{store,date,corrispettivo,contanti,pos,fondo,versato,cambi,buonoE,buonoR,sconti,annull,anomaly,diff};
+  const netSales = corrispettivo / 1.22;
+  return{store,brand,location,date,corrispettivo,netSales,contanti,pos,fondo,versato,cambi,buonoE,buonoR,sconti,annull,anomaly,diff};
 }
 
 // ── RENDER ──
@@ -592,11 +624,13 @@ function renderAll(){renderKPI();renderAlerts();renderCards();renderStats();}
 
 function renderKPI(){
   const d=allData;
+  const totCorr=d.reduce((a,r)=>a+r.corrispettivo,0);
+  const totNet=totCorr/1.22;
   const kpis=[
     {l:'Negozi',v:d.length,cls:'y',s:'ricevuti oggi'},
-    {l:'Corrispettivo',v:fmt(d.reduce((a,r)=>a+r.corrispettivo,0)),cls:'g',s:'totale'},
-    {l:'Contanti',v:fmt(d.reduce((a,r)=>a+r.contanti,0)),cls:'b',s:'incassato'},
-    {l:'POS',v:fmt(d.reduce((a,r)=>a+r.pos,0)),cls:'',s:'elettronico'},
+    {l:'Corrispettivo',v:fmt(totCorr),cls:'g',s:'ivato (22%)'},
+    {l:'Net Sales',v:fmt(totNet),cls:'b',s:'al netto IVA'},
+    {l:'Contanti',v:fmt(d.reduce((a,r)=>a+r.contanti,0)),cls:'',s:'incassato'},
     {l:'Anomalie',v:d.filter(r=>r.anomaly||r.annull).length,cls:'r',s:'da verificare'},
   ];
   document.getElementById('kpi-scroll').innerHTML=kpis.map(k=>`
@@ -615,7 +649,7 @@ function renderAlerts(){
   aw.innerHTML=an.map(r=>`
     <div class="alert-pill">
       <div class="a-dot"></div>
-      <div class="a-text"><strong>${r.store}</strong><br/>
+      <div class="a-text"><strong>${r.location}</strong> <span style="color:var(--t3);font-size:11px">${r.brand}</span><br/>
         ${r.anomaly?`Differenza cassa: ${fmt(r.diff)}`:''} ${r.annull?'· Annullamenti registrati':''}
       </div>
     </div>`).join('');
@@ -627,39 +661,112 @@ function renderCards(){
   if(filter==='anomalie')rows=rows.filter(r=>r.anomaly||r.annull);
   if(filter==='sconti')  rows=rows.filter(r=>r.sconti);
   if(filter==='annull')  rows=rows.filter(r=>r.annull);
-  if(q)rows=rows.filter(r=>r.store.toLowerCase().includes(q));
+  if(q)rows=rows.filter(r=>r.store.toLowerCase().includes(q)||r.brand.toLowerCase().includes(q)||r.location.toLowerCase().includes(q));
   const cl=document.getElementById('cards-list');
   if(!rows.length){
     cl.innerHTML='<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-text">Nessun dato · sincronizza o controlla Config</div></div>';
     return;
   }
-  cl.innerHTML=rows.map((r,i)=>`
-    <div class="store-card${r.anomaly?' anomaly':''}" onclick="openSheet(${allData.indexOf(r)})">
-      <div class="card-head">
-        <div class="card-name">${r.store}</div>
-        <div class="card-date">${r.date}</div>
-      </div>
-      <div class="card-body">
-        <div class="card-cell">
-          <div class="card-cell-l">Corrispettivo</div>
-          <div class="card-cell-v g">${fmt(r.corrispettivo)}</div>
+
+  // Raggruppa per brand
+  const brands={};
+  for(const r of rows){
+    if(!brands[r.brand]) brands[r.brand]=[];
+    brands[r.brand].push(r);
+  }
+
+  // Calcola totali giornata
+  const totCorr=rows.reduce((a,r)=>a+r.corrispettivo,0);
+  const totNet=totCorr/1.22;
+  const totCash=rows.reduce((a,r)=>a+r.contanti,0);
+  const totPOS=rows.reduce((a,r)=>a+r.pos,0);
+
+  let html='';
+
+  // Sezione per ogni brand
+  for(const [brand,stores] of Object.entries(brands)){
+    const bCorr=stores.reduce((a,r)=>a+r.corrispettivo,0);
+    const bNet=bCorr/1.22;
+    const bCash=stores.reduce((a,r)=>a+r.contanti,0);
+    const bPOS=stores.reduce((a,r)=>a+r.pos,0);
+
+    html+=`<div class="brand-header">
+      <span class="brand-label">${brand}</span>
+      <span class="brand-count">${stores.length} negoz${stores.length===1?'io':'i'}</span>
+    </div>`;
+
+    // Card per ogni negozio del brand
+    for(const r of stores){
+      html+=`<div class="store-card${r.anomaly?' anomaly':''}" onclick="openSheet(${allData.indexOf(r)})">
+        <div class="card-head">
+          <div class="card-name">${r.location}</div>
+          <div class="card-date">${r.date}</div>
         </div>
-        <div class="card-cell">
-          <div class="card-cell-l">Contanti</div>
-          <div class="card-cell-v b">${fmt(r.contanti)}</div>
+        <div class="card-body">
+          <div class="card-cell">
+            <div class="card-cell-l">Corrispettivo</div>
+            <div class="card-cell-v g">${fmt(r.corrispettivo)}</div>
+          </div>
+          <div class="card-cell">
+            <div class="card-cell-l">Net Sales</div>
+            <div class="card-cell-v b">${fmt(r.netSales)}</div>
+          </div>
+          <div class="card-cell">
+            <div class="card-cell-l">Contanti</div>
+            <div class="card-cell-v">${fmt(r.contanti)}</div>
+          </div>
         </div>
-        <div class="card-cell">
-          <div class="card-cell-l">POS</div>
-          <div class="card-cell-v">${fmt(r.pos)}</div>
+        <div class="card-footer">
+          ${r.sconti?'<span class="tag tag-warn">Sconti</span>':''}
+          ${r.annull?'<span class="tag tag-warn">Annullamenti</span>':''}
+          ${!r.sconti&&!r.annull?'<span class="tag tag-neutral">Nessuna nota</span>':''}
+          ${r.anomaly?`<span class="verify-bad">Δ ${fmt(r.diff)}</span>`:'<span class="verify-ok">✓ ok</span>'}
         </div>
+      </div>`;
+    }
+
+    // Sub-totale brand
+    html+=`<div class="subtotal-card">
+      <div>
+        <div class="subtotal-cell-l">Sub-totale ${brand}</div>
+        <div class="subtotal-cell-v g">${fmt(bCorr)}</div>
+        <div style="font-size:10px;color:var(--blue);font-family:var(--mono);margin-top:2px">NET ${fmt(bNet)}</div>
       </div>
-      <div class="card-footer">
-        ${r.sconti?'<span class="tag tag-warn">Sconti</span>':''}
-        ${r.annull?'<span class="tag tag-warn">Annullamenti</span>':''}
-        ${!r.sconti&&!r.annull?'<span class="tag tag-neutral">Nessuna nota</span>':''}
-        ${r.anomaly?`<span class="verify-bad">Δ ${fmt(r.diff)}</span>`:'<span class="verify-ok">✓ ok</span>'}
+      <div>
+        <div class="subtotal-cell-l">Contanti</div>
+        <div class="subtotal-cell-v">${fmt(bCash)}</div>
       </div>
-    </div>`).join('');
+      <div>
+        <div class="subtotal-cell-l">POS</div>
+        <div class="subtotal-cell-v">${fmt(bPOS)}</div>
+      </div>
+    </div>`;
+  }
+
+  // Totalone giornata (solo se più di un brand o più di un negozio)
+  if(rows.length>1){
+    html+=`<div class="grand-total">
+      <div class="grand-label">Totale giornata · ${rows.length} negozi</div>
+      <div class="grand-row">
+        <span class="grand-row-l">Corrispettivo totale</span>
+        <span class="grand-row-v g">${fmt(totCorr)}</span>
+      </div>
+      <div class="grand-row">
+        <span class="grand-row-l">Net Sales totali</span>
+        <span class="grand-row-v b">${fmt(totNet)}</span>
+      </div>
+      <div class="grand-row">
+        <span class="grand-row-l">Totale contanti</span>
+        <span class="grand-row-v">${fmt(totCash)}</span>
+      </div>
+      <div class="grand-row">
+        <span class="grand-row-l">Totale POS</span>
+        <span class="grand-row-v">${fmt(totPOS)}</span>
+      </div>
+    </div>`;
+  }
+
+  cl.innerHTML=html;
 }
 
 function renderStats(){
@@ -668,39 +775,64 @@ function renderStats(){
   const sorted=[...d].sort((a,b)=>b.corrispettivo-a.corrispettivo);
   const max=sorted[0].corrispettivo||1;
   const totCorr=d.reduce((a,r)=>a+r.corrispettivo,0);
+  const totNet=totCorr/1.22;
+
+  // Raggruppa per brand
+  const brands={};
+  for(const r of d){if(!brands[r.brand])brands[r.brand]=[];brands[r.brand].push(r);}
+
+  const brandRows=Object.entries(brands).map(([brand,stores])=>{
+    const bCorr=stores.reduce((a,r)=>a+r.corrispettivo,0);
+    const bNet=bCorr/1.22;
+    return `<div class="settings-row">
+      <span class="settings-label">${brand} (${stores.length})</span>
+      <span style="text-align:right">
+        <span class="settings-value" style="color:var(--green)">${fmt(bCorr)}</span>
+        <span class="settings-value" style="color:var(--blue);display:block">NET ${fmt(bNet)}</span>
+      </span>
+    </div>`;
+  }).join('');
+
   document.getElementById('stats-content').innerHTML=`
     <div class="stat-section-title">Corrispettivo per negozio</div>
     ${sorted.map(r=>`
       <div class="stat-bar-item">
         <div class="bar-header">
-          <div class="bar-name">${r.store.replace('Adidas - ','')}</div>
-          <div class="bar-val">${fmt(r.corrispettivo)}</div>
+          <div class="bar-name">${r.location}<span style="font-size:10px;color:var(--t3);margin-left:6px">${r.brand}</span></div>
+          <div style="text-align:right">
+            <div class="bar-val">${fmt(r.corrispettivo)}</div>
+            <div style="font-size:11px;color:var(--blue);font-family:var(--mono)">NET ${fmt(r.netSales)}</div>
+          </div>
         </div>
         <div class="bar-track"><div class="bar-fill" style="width:${Math.round(r.corrispettivo/max*100)}%"></div></div>
       </div>`).join('')}
-    <div class="stat-section-title" style="margin-top:8px">Riepilogo giornata</div>
+    <div class="stat-section-title" style="margin-top:8px">Per brand</div>
+    <div class="settings-section">${brandRows}</div>
+    <div class="stat-section-title" style="margin-top:8px">Totale giornata</div>
     <div class="settings-section">
       ${[
-        ['Corrispettivo totale', fmt(totCorr)],
-        ['Totale contanti', fmt(d.reduce((a,r)=>a+r.contanti,0))],
-        ['Totale POS', fmt(d.reduce((a,r)=>a+r.pos,0))],
-        ['Totale versato', fmt(d.reduce((a,r)=>a+r.versato,0))],
-        ['Negozi con sconti', d.filter(r=>r.sconti).length],
-        ['Negozi con anomalie', d.filter(r=>r.anomaly).length],
-      ].map(([l,v])=>`<div class="settings-row"><span class="settings-label">${l}</span><span class="settings-value" style="color:var(--t1)">${v}</span></div>`).join('')}
+        ['Corrispettivo totale', fmt(totCorr), 'var(--green)'],
+        ['Net Sales totali', fmt(totNet), 'var(--blue)'],
+        ['Totale contanti', fmt(d.reduce((a,r)=>a+r.contanti,0)), 'var(--t1)'],
+        ['Totale POS', fmt(d.reduce((a,r)=>a+r.pos,0)), 'var(--t1)'],
+        ['Totale versato', fmt(d.reduce((a,r)=>a+r.versato,0)), 'var(--t1)'],
+        ['Negozi con sconti', d.filter(r=>r.sconti).length, 'var(--t1)'],
+        ['Negozi con anomalie', d.filter(r=>r.anomaly).length, d.filter(r=>r.anomaly).length>0?'var(--red)':'var(--t1)'],
+      ].map(([l,v,c])=>`<div class="settings-row"><span class="settings-label">${l}</span><span class="settings-value" style="color:${c}">${v}</span></div>`).join('')}
     </div>`;
 }
 
 // ── SHEET ──
 function openSheet(idx){
   const r=allData[idx];
-  document.getElementById('sheet-title').textContent=r.store.replace('Adidas - ','');
+  document.getElementById('sheet-title').textContent=r.location;
   document.getElementById('sheet-rows').innerHTML=[
+    ['Brand',r.brand,''],
     ['Data',r.date,''],
     ['Corrispettivo',fmt(r.corrispettivo),'g'],
-    ['Contanti',fmt(r.contanti),'b'],
+    ['Net Sales (÷1.22)',fmt(r.netSales),'b'],
+    ['Contanti',fmt(r.contanti),''],
     ['POS totale',fmt(r.pos),''],
-    ['POS TML 1',fmt(r.pos),''],
     ['Versato',fmt(r.versato),''],
     ['Fondo cassa',fmt(r.fondo),''],
     ['Cambi',fmt(r.cambi),''],
@@ -751,8 +883,8 @@ function setPip(s,t){
 }
 function exportCSV(){
   if(!allData.length){alert('Nessun dato da esportare.');return;}
-  const H=['Negozio','Data','Corrispettivo','Contanti','POS','Versato','Fondo Cassa','Sconti','Annullamenti','Anomalia'];
-  const rows=allData.map(r=>[r.store,r.date,r.corrispettivo,r.contanti,r.pos,r.versato,r.fondo,r.sconti?'Sì':'No',r.annull?'Sì':'No',r.anomaly?'Sì':'No']);
+  const H=['Brand','Location','Data','Corrispettivo','Net Sales','Contanti','POS','Versato','Fondo Cassa','Sconti','Annullamenti','Anomalia'];
+  const rows=allData.map(r=>[r.brand,r.location,r.date,r.corrispettivo.toFixed(2),(r.corrispettivo/1.22).toFixed(2),r.contanti,r.pos,r.versato,r.fondo,r.sconti?'Sì':'No',r.annull?'Sì':'No',r.anomaly?'Sì':'No']);
   const csv=[H,...rows].map(r=>r.map(v=>`"${v}"`).join(';')).join('\n');
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'}));
