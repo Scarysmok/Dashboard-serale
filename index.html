@@ -326,10 +326,7 @@ function saveCache(c){
   try{localStorage.setItem(CACHE_KEY,JSON.stringify(c));}
   catch(e){console.warn('Cache save fallita',e);}
 }
-function clearCache(){
-  localStorage.removeItem(CACHE_KEY);
-  localStorage.removeItem('rp_cache_v1');
-}
+function clearCache(){localStorage.removeItem(CACHE_KEY);localStorage.removeItem('rp_cache_v1');}
 function forceResync(){clearCache();syncNow();}
 
 function showErrors(){
@@ -378,22 +375,16 @@ async function syncNow(){
   try{
     const files=await listFiles();
     if(!files.length){setPip('','Nessun PDF');load(false);allData=[];renderAll();return;}
-
     const cache=loadCache();
     const results=new Array(files.length);
     const toFetch=[];
     let fromCache=0;
-
     files.forEach((f,i)=>{
       const key=f.id+'_'+f.modifiedTime;
       if(cache[key]){results[i]=cache[key];fromCache++;}
       else toFetch.push({i,f,key});
     });
-
-    load(true, toFetch.length===0
-      ? `${fromCache} file dalla cache…`
-      : `Cache: ${fromCache}/${files.length} · scarico ${toFetch.length}…`);
-
+    load(true, toFetch.length===0 ? `${fromCache} file dalla cache…` : `Cache: ${fromCache}/${files.length} · scarico ${toFetch.length}…`);
     let done=fromCache, cursor=0;
     const worker=async()=>{
       while(cursor<toFetch.length){
@@ -401,20 +392,15 @@ async function syncNow(){
         try{
           const d=await fetchAndParse(job.f);
           if(d){results[job.i]=d;cache[job.key]=d;}
-        }catch(e){
-          console.warn(job.f.name,e);
-          lastErrors.push({name:job.f.name,msg:e.message||String(e)});
-        }
+        }catch(e){console.warn(job.f.name,e);lastErrors.push({name:job.f.name,msg:e.message||String(e)});}
         done++;
         load(true,`PDF ${done}/${files.length}…`);
       }
     };
     await Promise.all(Array.from({length:Math.min(CONCURRENCY,toFetch.length)},worker));
-
     const validKeys=new Set(files.map(f=>f.id+'_'+f.modifiedTime));
     for(const k of Object.keys(cache)) if(!validKeys.has(k)) delete cache[k];
     saveCache(cache);
-
     allData=results.filter(Boolean);
     const t=new Date().toLocaleTimeString('it-IT');
     document.getElementById('last-sync-disp').textContent=t;
@@ -445,11 +431,11 @@ async function fetchAndParse(file){
     try{const e=await r.json();if(e.error)msg=e.error+(e.hint?' · '+e.hint:'');}catch(_){}
     throw new Error(msg);
   }
-  return parsePDF(await r.arrayBuffer(),file.name,file.modifiedTime);
+  return parsePDF(await r.arrayBuffer(),file.name,file.modifiedTime,file.id);
 }
 
 // ── PDF PARSER ──
-async function parsePDF(ab,fname,modifiedTime){
+async function parsePDF(ab,fname,modifiedTime,fileId){
   const pdf=await pdfjsLib.getDocument({data:ab}).promise;
   let txt='';
   for(let i=1;i<=pdf.numPages;i++){
@@ -473,7 +459,7 @@ async function parsePDF(ab,fname,modifiedTime){
   txt=txt.replace(/(\d)\n\.(\d)/g,'$1.$2');
   txt=txt.replace(/(\d)\n,(\d)/g,'$1,$2');
 
-  // Formato italiano: "2.969,78" → 2969.78 (punto=migliaia, virgola=decimale).
+  // Formato italiano: "2.969,78" → 2969.78 (punto=migliaia, virgola=decimale)
   const toNum=s=>{
     if(s==null||s==='')return 0;
     const str=String(s).trim();
@@ -517,7 +503,6 @@ async function parsePDF(ab,fname,modifiedTime){
   const isFormatoA=/RESPONSE/i.test(txt);
 
   if(isFormatoA){
-    // Formato A: blocco RESPONSE separato dalle label.
     const respMatch=txt.match(/RESPONSE\s*([\s\S]*?)(?:FATTURE|DISTINTA)/i);
     const vals=respMatch
       ?(respMatch[1].match(/\d+(?:\.\d{3})*(?:,\d+)?|\d+|Non utilizzato|S[iì]|No\b/gi)||[]).map(t=>t.trim())
@@ -535,9 +520,7 @@ async function parsePDF(ab,fname,modifiedTime){
     annull=/s[iì]/i.test(rv(8));
     sconti=/s[iì]/i.test(rv(11));
   }else{
-    // Formato B: label e valore su righe consecutive. pdf.js restituisce tipo
-    // "1. Corrispettivo\n€1180,20" (Adidas) o "1. Corrispettivo\n2.969,78€" (Mango).
-    // NUM cattura numeri italiani con separatore migliaia e decimali.
+    // Formato B: "1. Corrispettivo\n€1180,20" (Adidas) o "1. Corrispettivo\n2.969,78€" (Mango)
     const NUM='\\d+(?:\\.\\d{3})*(?:,\\d+)?';
     const gf=(label,def=0)=>{
       const esc=label.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
@@ -561,7 +544,7 @@ async function parsePDF(ab,fname,modifiedTime){
   const diff=Math.abs(corrispettivo-contanti-pos);
   const anomaly=diff>1&&corrispettivo>0;
 
-  return{store,brand,location,dateISO,dateDisplay,
+  return{fileId,store,brand,location,dateISO,dateDisplay,
     corrispettivo,netSales,contanti,pos,fondo,versato,
     cambi,buonoE,buonoR,sconti,annull,anomaly,diff};
 }
@@ -588,8 +571,6 @@ function setChip(el,f){
 function switchTab(t){
   ['negozi','tempo','settings'].forEach(n=>{
     const el=document.getElementById('tab-'+n);
-    // Usa 'block' invece di 'flex' altrimenti i figli del tab (kpi, alert,
-    // filtri, lista) vengono allineati in riga rompendo il layout verticale.
     if(el)el.style.display=n===t?'block':'none';
     const nav=document.getElementById('nav-'+n);
     if(nav)nav.classList.toggle('active',n===t);
@@ -829,7 +810,7 @@ function openSheet(idx){
   const r=allData[idx];
   document.getElementById('sheet-title').textContent=r.location;
   document.getElementById('sheet-sub').textContent=r.brand+' · '+r.dateDisplay;
-  document.getElementById('sheet-rows').innerHTML=[
+  const rowsHtml=[
     ['divider','Dati giornata',''],
     ['row','Data incasso',r.dateDisplay,''],
     ['row','Corrispettivo (lordo)',fmt(r.corrispettivo),'g'],
@@ -850,7 +831,79 @@ function openSheet(idx){
     if(row[0]==='divider')return`<div class="sheet-row divider"><span>${row[1]}</span></div>`;
     return`<div class="sheet-row"><span class="row-l">${row[1]}</span><span class="row-v ${row[3]}">${row[2]}</span></div>`;
   }).join('');
+  const attachBtn=r.fileId
+    ? `<div style="padding:16px"><button class="settings-btn" onclick="openAttachments(${idx})">📎 Vedi allegati PDF</button></div>`
+    : '';
+  document.getElementById('sheet-rows').innerHTML=rowsHtml+attachBtn;
   document.getElementById('sheet').classList.add('show');
+}
+
+// ── VISUALIZZATORE ALLEGATI ──
+// Scarica il PDF via proxy, renderizza ogni pagina come immagine direttamente
+// in pagina. Nessun salvataggio su filesystem, tutto effimero in memoria.
+async function openAttachments(idx){
+  const r=allData[idx];
+  if(!r||!r.fileId){alert('File ID non disponibile per questo record.');return;}
+  document.getElementById('sheet-title').textContent=r.location+' · Allegati';
+  document.getElementById('sheet-sub').textContent=r.brand+' · '+r.dateDisplay;
+  document.getElementById('sheet-rows').innerHTML=
+    `<div style="padding:40px 20px;text-align:center;color:var(--t2)">
+      <div class="spinner" style="margin:0 auto 14px"></div>
+      <div class="loading-msg">Carico il PDF…</div>
+    </div>`;
+  try{
+    const resp=await fetch(`${PROXY_BASE}/api/drive?id=${encodeURIComponent(r.fileId)}`);
+    if(!resp.ok)throw new Error('Download '+resp.status);
+    const ab=await resp.arrayBuffer();
+    const pdf=await pdfjsLib.getDocument({data:ab}).promise;
+
+    // Renderizza tutte le pagine in sequenza
+    const container=document.createElement('div');
+    container.style.cssText='padding:14px 14px 20px;display:flex;flex-direction:column;gap:12px';
+    for(let i=1;i<=pdf.numPages;i++){
+      document.getElementById('sheet-rows').innerHTML=
+        `<div style="padding:20px;text-align:center;color:var(--t2)">
+          <div class="spinner" style="margin:0 auto 10px"></div>
+          <div class="loading-msg">Pagina ${i}/${pdf.numPages}…</div>
+        </div>`;
+      const page=await pdf.getPage(i);
+      // scale 1.6 = buon compromesso tra leggibilità foto e peso dell'immagine
+      const viewport=page.getViewport({scale:1.6});
+      const canvas=document.createElement('canvas');
+      canvas.width=viewport.width;canvas.height=viewport.height;
+      await page.render({canvasContext:canvas.getContext('2d'),viewport}).promise;
+      const img=document.createElement('img');
+      img.src=canvas.toDataURL('image/jpeg',0.82);
+      img.style.cssText='width:100%;border-radius:10px;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.3)';
+      img.loading='lazy';
+      img.alt=`Pagina ${i}`;
+      const wrap=document.createElement('div');
+      const caption=document.createElement('div');
+      caption.style.cssText='font-size:11px;color:var(--t3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px';
+      caption.textContent=`Pagina ${i} di ${pdf.numPages}`;
+      wrap.appendChild(caption);
+      wrap.appendChild(img);
+      container.appendChild(wrap);
+    }
+    const backBtn=document.createElement('button');
+    backBtn.className='settings-btn';
+    backBtn.style.marginTop='6px';
+    backBtn.textContent='← Torna ai dati';
+    backBtn.onclick=()=>openSheet(idx);
+    container.appendChild(backBtn);
+
+    const rowsEl=document.getElementById('sheet-rows');
+    rowsEl.innerHTML='';
+    rowsEl.appendChild(container);
+  }catch(e){
+    console.error(e);
+    document.getElementById('sheet-rows').innerHTML=
+      `<div style="padding:40px 24px;text-align:center;color:var(--red)">
+        <div style="font-size:32px;margin-bottom:10px">⚠</div>
+        <div style="font-size:13px">Errore nel caricamento del PDF<br/><span style="color:var(--t3)">${e.message}</span></div>
+        <button class="settings-btn" style="margin-top:16px" onclick="openSheet(${idx})">← Torna ai dati</button>
+      </div>`;
+  }
 }
 
 // ── EXPORT CSV ──
