@@ -288,10 +288,12 @@ body{display:flex;flex-direction:column}
         <div class="settings-row"><span class="settings-label">Cartella Drive</span><span class="settings-value" id="cfg-disp">—</span></div>
         <div class="settings-row"><span class="settings-label">Ultimo sync</span><span class="settings-value" id="last-sync-disp">—</span></div>
         <div class="settings-row"><span class="settings-label">PDF caricati</span><span class="settings-value" id="pdf-count-disp">—</span></div>
+        <div class="settings-row"><span class="settings-label">Errori ultimo sync</span><span class="settings-value" id="err-count-disp">0</span></div>
         <div class="settings-row"><span class="settings-label">Auto-sync</span><span class="settings-value">ogni 5 minuti</span></div>
       </div>
       <button class="settings-btn" onclick="syncNow()">↺ Sincronizza ora</button>
       <button class="settings-btn" onclick="forceResync()">⟳ Ricarica tutto (svuota cache)</button>
+      <button class="settings-btn" onclick="showErrors()">🔍 Mostra errori sync</button>
       <button class="settings-btn" onclick="exportCSV()">↓ Esporta CSV</button>
       <button class="settings-btn danger" onclick="resetConfig()">⚙ Riconfigura connessione</button>
     </div>
@@ -313,6 +315,7 @@ const LS='rp_cfg_v3';
 const CACHE_KEY='rp_cache_v1';
 const CONCURRENCY=6;
 let cfg=null, allData=[], filter='all', tempoView='giorno', syncTimer=null;
+let lastErrors=[]; // diagnostica errori ultimo sync
 
 // ── CACHE ──
 function loadCache(){
@@ -321,10 +324,18 @@ function loadCache(){
 }
 function saveCache(c){
   try{localStorage.setItem(CACHE_KEY,JSON.stringify(c));}
-  catch(e){console.warn('Cache save fallita (quota?)',e);}
+  catch(e){console.warn('Cache save fallita',e);}
 }
 function clearCache(){localStorage.removeItem(CACHE_KEY);}
 function forceResync(){clearCache();syncNow();}
+
+// ── DIAGNOSTICA ──
+function showErrors(){
+  if(!lastErrors.length){alert('Nessun errore registrato nell\'ultimo sync.');return;}
+  const sample=lastErrors.slice(0,10).map((e,i)=>`${i+1}. ${e.name}\n   → ${e.msg}`).join('\n\n');
+  const more=lastErrors.length>10?`\n\n(…e altri ${lastErrors.length-10} errori simili)`:'';
+  alert(`Errori ultimo sync (${lastErrors.length}):\n\n${sample}${more}`);
+}
 
 // ── MESI IT ──
 const MESI=['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
@@ -357,10 +368,11 @@ function showDash(){
   syncTimer=setInterval(syncNow,5*60*1000);
 }
 
-// ── SYNC (parallelo + cache) ──
+// ── SYNC (parallelo + cache + diagnostica) ──
 async function syncNow(){
   setPip('spin','Sincronizzazione…');
   load(true,'Lettura Google Drive…');
+  lastErrors=[];
   try{
     const files=await listFiles();
     if(!files.length){setPip('','Nessun PDF');load(false);allData=[];renderAll();return;}
@@ -370,46 +382,36 @@ async function syncNow(){
     const toFetch=[];
     let fromCache=0;
 
-    // Fase 1: riempi dalla cache dove possibile
+    // Fase 1: cache
     files.forEach((f,i)=>{
       const key=f.id+'_'+f.modifiedTime;
-      if(cache[key]){
-        results[i]=cache[key];
-        fromCache++;
-      }else{
-        toFetch.push({i,f,key});
-      }
+      if(cache[key]){results[i]=cache[key];fromCache++;}
+      else toFetch.push({i,f,key});
     });
 
-    if(toFetch.length===0){
-      load(true,`${fromCache} file dalla cache…`);
-    }else{
-      load(true,`Cache: ${fromCache}/${files.length} · scarico ${toFetch.length}…`);
-    }
+    load(true, toFetch.length===0
+      ? `${fromCache} file dalla cache…`
+      : `Cache: ${fromCache}/${files.length} · scarico ${toFetch.length}…`);
 
-    // Fase 2: scarica e parsifica i mancanti in parallelo (pool di worker)
-    let done=fromCache, errs=0, cursor=0;
+    // Fase 2: download + parse in parallelo
+    let done=fromCache, cursor=0;
     const worker=async()=>{
       while(cursor<toFetch.length){
         const job=toFetch[cursor++];
         try{
           const d=await fetchAndParse(job.f);
-          if(d){
-            results[job.i]=d;
-            cache[job.key]=d;
-          }
+          if(d){results[job.i]=d;cache[job.key]=d;}
         }catch(e){
           console.warn(job.f.name,e);
-          errs++;
+          lastErrors.push({name:job.f.name,msg:e.message||String(e)});
         }
         done++;
         load(true,`PDF ${done}/${files.length}…`);
       }
     };
-    const pool=Math.min(CONCURRENCY,toFetch.length);
-    await Promise.all(Array.from({length:pool},worker));
+    await Promise.all(Array.from({length:Math.min(CONCURRENCY,toFetch.length)},worker));
 
-    // Fase 3: pulizia cache — rimuovi entry non più presenti/aggiornate
+    // Fase 3: pulizia cache
     const validKeys=new Set(files.map(f=>f.id+'_'+f.modifiedTime));
     for(const k of Object.keys(cache)) if(!validKeys.has(k)) delete cache[k];
     saveCache(cache);
@@ -418,7 +420,8 @@ async function syncNow(){
     const t=new Date().toLocaleTimeString('it-IT');
     document.getElementById('last-sync-disp').textContent=t;
     document.getElementById('pdf-count-disp').textContent=allData.length+' file';
-    const suffix=errs?` · ${errs} errori`:'';
+    document.getElementById('err-count-disp').textContent=lastErrors.length;
+    const suffix=lastErrors.length?` · ${lastErrors.length} errori`:'';
     setPip('live',`${allData.length} negozi${suffix}`);
     renderAll();
   }catch(e){
@@ -517,11 +520,10 @@ async function parsePDF(ab,fname,modifiedTime){
     sconti=/s[iì]/i.test(rv(11));
   }else{
     // Formato B: label e valore su righe consecutive.
-    // pdf.js può restituire "1. Corrispettivo\n€1180,20" (valore preceduto da €).
+    // pdf.js spesso restituisce "1. Corrispettivo\n€1180,20" — la fix tollera
+    // Q# fra label e valore ed eventuale simbolo valuta.
     const gf=(label,def=0)=>{
       const esc=label.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-      // (?![A-Za-z]) evita match dentro altre parole; fino a 30 char non-digit tra
-      // label e valore (copre Q#, punti, \n); consuma eventuale simbolo valuta.
       const re=new RegExp(esc+'(?![A-Za-z])[^\\d\\n]{0,30}\\n?\\s*(?:€|EUR)?\\s*([\\d]+(?:[.,]\\d+)?)','i');
       const m=txt.match(re);
       return m?toNum(m[1]):def;
