@@ -314,8 +314,10 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
 const LS='rp_cfg_v3';
 const CACHE_KEY='rp_cache_v1';
 const CONCURRENCY=6;
+// Endpoint proxy Vercel (bypass 403 CORS). Stringa vuota = stesso origin.
+const PROXY_BASE='';
 let cfg=null, allData=[], filter='all', tempoView='giorno', syncTimer=null;
-let lastErrors=[]; // diagnostica errori ultimo sync
+let lastErrors=[];
 
 // ── CACHE ──
 function loadCache(){
@@ -368,7 +370,7 @@ function showDash(){
   syncTimer=setInterval(syncNow,5*60*1000);
 }
 
-// ── SYNC (parallelo + cache + diagnostica) ──
+// ── SYNC (parallelo + cache + diagnostica + proxy) ──
 async function syncNow(){
   setPip('spin','Sincronizzazione…');
   load(true,'Lettura Google Drive…');
@@ -382,7 +384,6 @@ async function syncNow(){
     const toFetch=[];
     let fromCache=0;
 
-    // Fase 1: cache
     files.forEach((f,i)=>{
       const key=f.id+'_'+f.modifiedTime;
       if(cache[key]){results[i]=cache[key];fromCache++;}
@@ -393,7 +394,6 @@ async function syncNow(){
       ? `${fromCache} file dalla cache…`
       : `Cache: ${fromCache}/${files.length} · scarico ${toFetch.length}…`);
 
-    // Fase 2: download + parse in parallelo
     let done=fromCache, cursor=0;
     const worker=async()=>{
       while(cursor<toFetch.length){
@@ -411,7 +411,6 @@ async function syncNow(){
     };
     await Promise.all(Array.from({length:Math.min(CONCURRENCY,toFetch.length)},worker));
 
-    // Fase 3: pulizia cache
     const validKeys=new Set(files.map(f=>f.id+'_'+f.modifiedTime));
     for(const k of Object.keys(cache)) if(!validKeys.has(k)) delete cache[k];
     saveCache(cache);
@@ -420,7 +419,8 @@ async function syncNow(){
     const t=new Date().toLocaleTimeString('it-IT');
     document.getElementById('last-sync-disp').textContent=t;
     document.getElementById('pdf-count-disp').textContent=allData.length+' file';
-    document.getElementById('err-count-disp').textContent=lastErrors.length;
+    const errEl=document.getElementById('err-count-disp');
+    if(errEl)errEl.textContent=lastErrors.length;
     const suffix=lastErrors.length?` · ${lastErrors.length} errori`:'';
     setPip('live',`${allData.length} negozi${suffix}`);
     renderAll();
@@ -437,9 +437,16 @@ async function listFiles(){
   if(!r.ok){const e=await r.json();throw new Error(e.error?.message||'API '+r.status);}
   return(await r.json()).files||[];
 }
+
+// Download via proxy serverless: aggira il 403 CORS dell'endpoint alt=media
 async function fetchAndParse(file){
-  const r=await fetch(`https://www.googleapis.com/drive/v3/files/${file.id}?alt=media&key=${cfg.apikey}`);
-  if(!r.ok)throw new Error('Download '+r.status);
+  const r=await fetch(`${PROXY_BASE}/api/drive?id=${encodeURIComponent(file.id)}`);
+  if(!r.ok){
+    // Prova a leggere il corpo JSON di errore dal proxy per diagnostica precisa
+    let msg='Download '+r.status;
+    try{const e=await r.json();if(e.error)msg=e.error+(e.hint?' · '+e.hint:'');}catch(_){}
+    throw new Error(msg);
+  }
   return parsePDF(await r.arrayBuffer(),file.name,file.modifiedTime);
 }
 
@@ -520,8 +527,8 @@ async function parsePDF(ab,fname,modifiedTime){
     sconti=/s[iì]/i.test(rv(11));
   }else{
     // Formato B: label e valore su righe consecutive.
-    // pdf.js spesso restituisce "1. Corrispettivo\n€1180,20" — la fix tollera
-    // Q# fra label e valore ed eventuale simbolo valuta.
+    // pdf.js restituisce spesso "1. Corrispettivo\n€1180,20" — la fix tollera
+    // Q# in mezzo ed eventuale simbolo valuta (€/EUR) prima del numero.
     const gf=(label,def=0)=>{
       const esc=label.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
       const re=new RegExp(esc+'(?![A-Za-z])[^\\d\\n]{0,30}\\n?\\s*(?:€|EUR)?\\s*([\\d]+(?:[.,]\\d+)?)','i');
