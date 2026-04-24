@@ -258,6 +258,7 @@ body{display:flex;flex-direction:column}
     <div class="kpi-scroll" id="kpi-scroll"></div>
     <div class="alerts-wrap" id="alerts-wrap" style="display:none"></div>
     <div class="filter-bar">
+      <button class="chip" id="chip-date" onclick="openDateFilter()">📅 Tutte le date</button>
       <button class="chip on" onclick="setChip(this,'all')">Tutti</button>
       <button class="chip" onclick="setChip(this,'anomalie')">⚠ Anomalie</button>
       <button class="chip" onclick="setChip(this,'sconti')">Sconti</button>
@@ -320,7 +321,7 @@ const PROXY_BASE='';
 // Le foto scontrino/documento da smartphone sono sempre >= 200px per lato
 // anche dopo la compressione JPEG applicata dal generatore di PDF.
 const ATTACH_MIN_SIDE=200;
-let cfg=null, allData=[], filter='all', tempoView='giorno', syncTimer=null;
+let cfg=null, allData=[], filter='all', filterDate=null, tempoView='giorno', syncTimer=null;
 let lastErrors=[];
 
 function loadCache(){try{return JSON.parse(localStorage.getItem(CACHE_KEY)||'{}');}catch(e){return {};}}
@@ -574,13 +575,69 @@ function setTempo(v,el){
 // ── RENDER ALL ──
 function renderAll(){renderKPI();renderAlerts();renderCards();}
 
+// Restituisce i record filtrati per la data selezionata (o tutti)
+function getFilteredData(){
+  return filterDate ? allData.filter(r=>r.dateISO===filterDate) : allData;
+}
+
+// Apre il menu di selezione data: mostra solo le date effettivamente presenti
+// nei PDF caricati, più l'opzione "Tutte le date" per resettare.
+function openDateFilter(){
+  const dates=[...new Set(allData.map(r=>r.dateISO).filter(Boolean))].sort().reverse();
+  const overlay=document.createElement('div');
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:400;display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(4px)';
+  overlay.onclick=(e)=>{if(e.target===overlay)overlay.remove();};
+  const panel=document.createElement('div');
+  panel.style.cssText='background:var(--s1);border-radius:20px 20px 0 0;width:100%;max-width:560px;max-height:70vh;overflow-y:auto;padding-bottom:var(--safe-bot);animation:slideup .25s cubic-bezier(.32,1,.57,1)';
+  const handle=document.createElement('div');
+  handle.className='sheet-handle';
+  panel.appendChild(handle);
+  const title=document.createElement('div');
+  title.style.cssText='padding:14px 20px;border-bottom:1px solid var(--bd);font-size:15px;font-weight:600';
+  title.textContent='Filtra per data';
+  panel.appendChild(title);
+  const options=[{label:'📅 Tutte le date',value:null,sub:`${allData.length} negozi totali`}];
+  for(const d of dates){
+    const [y,m,dd]=d.split('-');
+    const count=allData.filter(r=>r.dateISO===d).length;
+    options.push({label:`${dd}/${m}/${y}`,value:d,sub:`${count} negoz${count===1?'io':'i'}`});
+  }
+  for(const opt of options){
+    const row=document.createElement('div');
+    const isSel=filterDate===opt.value;
+    row.className='sheet-row';
+    row.style.cssText='cursor:pointer'+(isSel?';background:var(--s2)':'');
+    row.innerHTML=`<div><div class="row-l" style="color:${isSel?'var(--acc)':'var(--t1)'};font-size:14px">${opt.label}</div>
+      <div style="font-size:11px;color:var(--t3);margin-top:2px">${opt.sub}</div></div>
+      ${isSel?'<span class="row-v y">✓</span>':''}`;
+    row.onclick=()=>{setDateFilter(opt.value);overlay.remove();};
+    panel.appendChild(row);
+  }
+  overlay.appendChild(panel);
+  document.body.appendChild(overlay);
+}
+
+function setDateFilter(date){
+  filterDate=date;
+  const chip=document.getElementById('chip-date');
+  if(date){
+    const [y,m,dd]=date.split('-');
+    chip.textContent=`📅 ${dd}/${m}/${y}`;
+    chip.classList.add('on');
+  }else{
+    chip.textContent='📅 Tutte le date';
+    chip.classList.remove('on');
+  }
+  renderAll();
+}
+
 // ── KPI ──
 function renderKPI(){
-  const d=allData;
+  const d=getFilteredData();
   const totCorr=d.reduce((a,r)=>a+r.corrispettivo,0);
   const totNet=totCorr/1.22;
   document.getElementById('kpi-scroll').innerHTML=[
-    {l:'Negozi',v:d.length,cls:'y',s:'PDF caricati'},
+    {l:'Negozi',v:d.length,cls:'y',s:filterDate?'filtrati':'PDF caricati'},
     {l:'Corrispettivo',v:fmt(totCorr),cls:'g',s:'lordo IVA 22%'},
     {l:'Net Sales',v:fmt(totNet),cls:'b',s:'al netto IVA'},
     {l:'Contanti',v:fmt(d.reduce((a,r)=>a+r.contanti,0)),cls:'',s:'incassato'},
@@ -595,7 +652,7 @@ function renderKPI(){
 // ── ALERTS ──
 function renderAlerts(){
   const aw=document.getElementById('alerts-wrap');
-  const an=allData.filter(r=>r.anomaly||r.annull);
+  const an=getFilteredData().filter(r=>r.anomaly||r.annull);
   if(!an.length){aw.style.display='none';return;}
   aw.style.display='flex';
   aw.innerHTML=an.map(r=>`<div class="alert-pill">
@@ -608,7 +665,8 @@ function renderAlerts(){
 // ── CARDS (TAB NEGOZI) ──
 function renderCards(){
   const q=document.getElementById('search').value.toLowerCase();
-  let rows=[...allData];
+  // Applica prima il filtro data (se attivo), poi i filtri chip, poi la ricerca
+  let rows=[...getFilteredData()];
   if(filter==='anomalie')rows=rows.filter(r=>r.anomaly||r.annull);
   if(filter==='sconti')  rows=rows.filter(r=>r.sconti);
   if(filter==='annull')  rows=rows.filter(r=>r.annull);
