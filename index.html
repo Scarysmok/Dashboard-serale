@@ -315,20 +315,14 @@ const LS='rp_cfg_v3';
 const CACHE_KEY='rp_cache_v2';
 const CONCURRENCY=6;
 const PROXY_BASE='';
+const LOGO_MIN_PIXELS=40000;
 let cfg=null, allData=[], filter='all', tempoView='giorno', syncTimer=null;
 let lastErrors=[];
 
-function loadCache(){
-  try{return JSON.parse(localStorage.getItem(CACHE_KEY)||'{}');}
-  catch(e){return {};}
-}
-function saveCache(c){
-  try{localStorage.setItem(CACHE_KEY,JSON.stringify(c));}
-  catch(e){console.warn('Cache save fallita',e);}
-}
+function loadCache(){try{return JSON.parse(localStorage.getItem(CACHE_KEY)||'{}');}catch(e){return {};}}
+function saveCache(c){try{localStorage.setItem(CACHE_KEY,JSON.stringify(c));}catch(e){console.warn('Cache save fallita',e);}}
 function clearCache(){localStorage.removeItem(CACHE_KEY);localStorage.removeItem('rp_cache_v1');}
 function forceResync(){clearCache();syncNow();}
-
 function showErrors(){
   if(!lastErrors.length){alert('Nessun errore registrato nell\'ultimo sync.');return;}
   const sample=lastErrors.slice(0,10).map((e,i)=>`${i+1}. ${e.name}\n   → ${e.msg}`).join('\n\n');
@@ -379,22 +373,15 @@ async function syncNow(){
     const results=new Array(files.length);
     const toFetch=[];
     let fromCache=0;
-    files.forEach((f,i)=>{
-      const key=f.id+'_'+f.modifiedTime;
-      if(cache[key]){results[i]=cache[key];fromCache++;}
-      else toFetch.push({i,f,key});
-    });
+    files.forEach((f,i)=>{const key=f.id+'_'+f.modifiedTime;if(cache[key]){results[i]=cache[key];fromCache++;}else toFetch.push({i,f,key});});
     load(true, toFetch.length===0 ? `${fromCache} file dalla cache…` : `Cache: ${fromCache}/${files.length} · scarico ${toFetch.length}…`);
     let done=fromCache, cursor=0;
     const worker=async()=>{
       while(cursor<toFetch.length){
         const job=toFetch[cursor++];
-        try{
-          const d=await fetchAndParse(job.f);
-          if(d){results[job.i]=d;cache[job.key]=d;}
-        }catch(e){console.warn(job.f.name,e);lastErrors.push({name:job.f.name,msg:e.message||String(e)});}
-        done++;
-        load(true,`PDF ${done}/${files.length}…`);
+        try{const d=await fetchAndParse(job.f);if(d){results[job.i]=d;cache[job.key]=d;}}
+        catch(e){console.warn(job.f.name,e);lastErrors.push({name:job.f.name,msg:e.message||String(e)});}
+        done++;load(true,`PDF ${done}/${files.length}…`);
       }
     };
     await Promise.all(Array.from({length:Math.min(CONCURRENCY,toFetch.length)},worker));
@@ -407,8 +394,7 @@ async function syncNow(){
     document.getElementById('pdf-count-disp').textContent=allData.length+' file';
     const errEl=document.getElementById('err-count-disp');
     if(errEl)errEl.textContent=lastErrors.length;
-    const suffix=lastErrors.length?` · ${lastErrors.length} errori`:'';
-    setPip('live',`${allData.length} negozi${suffix}`);
+    setPip('live',`${allData.length} negozi${lastErrors.length?` · ${lastErrors.length} errori`:''}`);
     renderAll();
   }catch(e){
     console.error(e);setPip('','Errore');
@@ -423,14 +409,9 @@ async function listFiles(){
   if(!r.ok){const e=await r.json();throw new Error(e.error?.message||'API '+r.status);}
   return(await r.json()).files||[];
 }
-
 async function fetchAndParse(file){
   const r=await fetch(`${PROXY_BASE}/api/drive?id=${encodeURIComponent(file.id)}`);
-  if(!r.ok){
-    let msg='Download '+r.status;
-    try{const e=await r.json();if(e.error)msg=e.error+(e.hint?' · '+e.hint:'');}catch(_){}
-    throw new Error(msg);
-  }
+  if(!r.ok){let msg='Download '+r.status;try{const e=await r.json();if(e.error)msg=e.error+(e.hint?' · '+e.hint:'');}catch(_){}throw new Error(msg);}
   return parsePDF(await r.arrayBuffer(),file.name,file.modifiedTime,file.id);
 }
 
@@ -832,78 +813,128 @@ function openSheet(idx){
     return`<div class="sheet-row"><span class="row-l">${row[1]}</span><span class="row-v ${row[3]}">${row[2]}</span></div>`;
   }).join('');
   const attachBtn=r.fileId
-    ? `<div style="padding:16px"><button class="settings-btn" onclick="openAttachments(${idx})">📎 Vedi allegati PDF</button></div>`
+    ? `<div style="padding:16px"><button class="settings-btn" onclick="openAttachments(${idx})">📎 Vedi foto allegate</button></div>`
     : '';
   document.getElementById('sheet-rows').innerHTML=rowsHtml+attachBtn;
   document.getElementById('sheet').classList.add('show');
 }
 
-// ── VISUALIZZATORE ALLEGATI ──
-// Scarica il PDF via proxy, renderizza ogni pagina come immagine direttamente
-// in pagina. Nessun salvataggio su filesystem, tutto effimero in memoria.
+// ── VISUALIZZATORE ALLEGATI (foto incorporate nel PDF) ──
+// Estrae le vere immagini (scontrini/foto documentazione) dal PDF, deduplica
+// e scarta i loghi piccoli ricorrenti. Tutto in memoria, zero download su disco.
 async function openAttachments(idx){
   const r=allData[idx];
   if(!r||!r.fileId){alert('File ID non disponibile per questo record.');return;}
   document.getElementById('sheet-title').textContent=r.location+' · Allegati';
   document.getElementById('sheet-sub').textContent=r.brand+' · '+r.dateDisplay;
-  document.getElementById('sheet-rows').innerHTML=
-    `<div style="padding:40px 20px;text-align:center;color:var(--t2)">
+  const rowsEl=document.getElementById('sheet-rows');
+  const setStatus=(msg)=>{
+    rowsEl.innerHTML=`<div style="padding:40px 20px;text-align:center;color:var(--t2)">
       <div class="spinner" style="margin:0 auto 14px"></div>
-      <div class="loading-msg">Carico il PDF…</div>
+      <div class="loading-msg">${msg}</div>
     </div>`;
+  };
+  setStatus('Carico il PDF…');
   try{
     const resp=await fetch(`${PROXY_BASE}/api/drive?id=${encodeURIComponent(r.fileId)}`);
     if(!resp.ok)throw new Error('Download '+resp.status);
     const ab=await resp.arrayBuffer();
     const pdf=await pdfjsLib.getDocument({data:ab}).promise;
 
-    // Renderizza tutte le pagine in sequenza
-    const container=document.createElement('div');
-    container.style.cssText='padding:14px 14px 20px;display:flex;flex-direction:column;gap:12px';
-    for(let i=1;i<=pdf.numPages;i++){
-      document.getElementById('sheet-rows').innerHTML=
-        `<div style="padding:20px;text-align:center;color:var(--t2)">
-          <div class="spinner" style="margin:0 auto 10px"></div>
-          <div class="loading-msg">Pagina ${i}/${pdf.numPages}…</div>
-        </div>`;
-      const page=await pdf.getPage(i);
-      // scale 1.6 = buon compromesso tra leggibilità foto e peso dell'immagine
-      const viewport=page.getViewport({scale:1.6});
-      const canvas=document.createElement('canvas');
-      canvas.width=viewport.width;canvas.height=viewport.height;
-      await page.render({canvasContext:canvas.getContext('2d'),viewport}).promise;
-      const img=document.createElement('img');
-      img.src=canvas.toDataURL('image/jpeg',0.82);
-      img.style.cssText='width:100%;border-radius:10px;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.3)';
-      img.loading='lazy';
-      img.alt=`Pagina ${i}`;
-      const wrap=document.createElement('div');
-      const caption=document.createElement('div');
-      caption.style.cssText='font-size:11px;color:var(--t3);margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px';
-      caption.textContent=`Pagina ${i} di ${pdf.numPages}`;
-      wrap.appendChild(caption);
-      wrap.appendChild(img);
-      container.appendChild(wrap);
+    const OPS=pdfjsLib.OPS;
+    const imgOps=[OPS.paintImageXObject,OPS.paintJpegXObject,OPS.paintInlineImageXObject].filter(x=>x!==undefined);
+    const found=[]; const seen=new Set();
+
+    for(let p=1;p<=pdf.numPages;p++){
+      setStatus(`Cerco foto (pagina ${p}/${pdf.numPages})…`);
+      const page=await pdf.getPage(p);
+      const ops=await page.getOperatorList();
+      for(let i=0;i<ops.fnArray.length;i++){
+        if(!imgOps.includes(ops.fnArray[i]))continue;
+        const name=ops.argsArray[i][0];
+        if(!name||seen.has(name))continue;
+        seen.add(name);
+        const obj=await new Promise(res=>{try{page.objs.get(name,res);}catch(_){res(null);}}).catch(()=>null);
+        if(!obj||!obj.width||!obj.height)continue;
+        // Scarta loghi/icone (es. < 200x200)
+        if(obj.width*obj.height<LOGO_MIN_PIXELS)continue;
+        try{
+          const cv=document.createElement('canvas');
+          cv.width=obj.width;cv.height=obj.height;
+          const ctx=cv.getContext('2d');
+          if(obj.bitmap){
+            ctx.drawImage(obj.bitmap,0,0);
+          }else if(obj.data){
+            const id=ctx.createImageData(obj.width,obj.height);
+            const src=obj.data, dst=id.data, pix=obj.width*obj.height;
+            if(src.length===pix*4){dst.set(src);}
+            else if(src.length===pix*3){for(let a=0,b=0;a<src.length;a+=3,b+=4){dst[b]=src[a];dst[b+1]=src[a+1];dst[b+2]=src[a+2];dst[b+3]=255;}}
+            else if(src.length===pix){for(let a=0,b=0;a<pix;a++,b+=4){dst[b]=dst[b+1]=dst[b+2]=src[a];dst[b+3]=255;}}
+            else continue;
+            ctx.putImageData(id,0,0);
+          }else continue;
+          found.push({page:p,width:obj.width,height:obj.height,dataUrl:cv.toDataURL('image/jpeg',0.88)});
+        }catch(e){console.warn('Image decode fail',name,e);}
+      }
     }
+
+    if(!found.length){
+      rowsEl.innerHTML=`<div style="padding:40px 24px;text-align:center;color:var(--t3)">
+        <div style="font-size:32px;margin-bottom:10px">📭</div>
+        <div style="font-size:13px">Nessun allegato immagine trovato in questo PDF</div>
+        <button class="settings-btn" style="margin-top:16px" onclick="openSheet(${idx})">← Torna ai dati</button>
+      </div>`;
+      return;
+    }
+
+    // Galleria (1 colonna su mobile, 2 su schermi più larghi)
+    const container=document.createElement('div');
+    container.style.cssText='padding:14px 14px 20px';
+    const grid=document.createElement('div');
+    grid.style.cssText='display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px';
+    found.forEach((im,k)=>{
+      const cell=document.createElement('div');
+      cell.style.cssText='display:flex;flex-direction:column;gap:6px';
+      const cap=document.createElement('div');
+      cap.style.cssText='font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px';
+      cap.textContent=`Allegato ${k+1} · ${im.width}×${im.height}`;
+      const img=document.createElement('img');
+      img.src=im.dataUrl;
+      img.style.cssText='width:100%;border-radius:10px;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.3);cursor:zoom-in';
+      img.loading='lazy';img.alt=`Allegato ${k+1}`;
+      img.onclick=()=>zoomImage(im.dataUrl);
+      cell.appendChild(cap);cell.appendChild(img);
+      grid.appendChild(cell);
+    });
+    container.appendChild(grid);
     const backBtn=document.createElement('button');
     backBtn.className='settings-btn';
-    backBtn.style.marginTop='6px';
+    backBtn.style.marginTop='14px';
     backBtn.textContent='← Torna ai dati';
     backBtn.onclick=()=>openSheet(idx);
     container.appendChild(backBtn);
-
-    const rowsEl=document.getElementById('sheet-rows');
     rowsEl.innerHTML='';
     rowsEl.appendChild(container);
   }catch(e){
     console.error(e);
-    document.getElementById('sheet-rows').innerHTML=
-      `<div style="padding:40px 24px;text-align:center;color:var(--red)">
-        <div style="font-size:32px;margin-bottom:10px">⚠</div>
-        <div style="font-size:13px">Errore nel caricamento del PDF<br/><span style="color:var(--t3)">${e.message}</span></div>
-        <button class="settings-btn" style="margin-top:16px" onclick="openSheet(${idx})">← Torna ai dati</button>
-      </div>`;
+    rowsEl.innerHTML=`<div style="padding:40px 24px;text-align:center;color:var(--red)">
+      <div style="font-size:32px;margin-bottom:10px">⚠</div>
+      <div style="font-size:13px">Errore nel caricamento delle foto<br/><span style="color:var(--t3)">${e.message}</span></div>
+      <button class="settings-btn" style="margin-top:16px" onclick="openSheet(${idx})">← Torna ai dati</button>
+    </div>`;
   }
+}
+
+// Overlay full-screen di un'immagine (click per chiudere)
+function zoomImage(dataUrl){
+  const overlay=document.createElement('div');
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px;cursor:zoom-out';
+  overlay.onclick=()=>overlay.remove();
+  const img=document.createElement('img');
+  img.src=dataUrl;
+  img.style.cssText='max-width:100%;max-height:100%;object-fit:contain;border-radius:6px';
+  overlay.appendChild(img);
+  document.body.appendChild(overlay);
 }
 
 // ── EXPORT CSV ──
