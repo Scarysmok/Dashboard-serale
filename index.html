@@ -5,16 +5,28 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-<meta name="theme-color" content="#0f0f11"/>
+<meta name="theme-color" content="#fafbfc"/>
 <title>Chiusure · Rino Petino</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
 <style>
 :root{
-  --bg:#0f0f11;--s1:#18181c;--s2:#1e1e24;--s3:#252530;
-  --bd:#2a2a34;--bd2:#333340;
-  --acc:#e8ff47;--blue:#47c8ff;--green:#4ade80;
-  --red:#ff5a5a;--warn:#ffb547;
-  --t1:#f0f0f4;--t2:#9a9aaa;--t3:#5a5a6a;
+  /* Tema chiaro: bianco pulito con grigi delicati per la gerarchia visiva */
+  --bg:#fafbfc;
+  --s1:#ffffff;
+  --s2:#f4f5f7;
+  --s3:#eaecef;
+  --bd:#e1e4e8;
+  --bd2:#d1d5da;
+  /* Accenti: blu brand-neutrale + colori di stato ben visibili su bianco */
+  --acc:#2563eb;
+  --blue:#0969da;
+  --green:#16a34a;
+  --red:#dc2626;
+  --warn:#ea580c;
+  /* Testo: gerarchia t1 > t2 > t3 con contrasti AA */
+  --t1:#1f2328;
+  --t2:#57606a;
+  --t3:#8c959f;
   --font:'DM Sans',sans-serif;--mono:'DM Mono',monospace;
   --safe-top:env(safe-area-inset-top,0px);
   --safe-bot:env(safe-area-inset-bottom,0px);
@@ -40,14 +52,14 @@ body{display:flex;flex-direction:column}
 .field{width:100%;padding:12px 14px;background:var(--s2);border:1px solid var(--bd2);border-radius:10px;color:var(--t1);font-family:var(--font);font-size:14px;outline:none;-webkit-appearance:none;transition:border-color .15s}
 .field:focus{border-color:#555}
 .field::placeholder{color:var(--t3)}
-.cta{width:100%;padding:15px;background:var(--acc);color:#0f0f11;border:none;border-radius:12px;font-family:var(--font);font-size:15px;font-weight:600;cursor:pointer;-webkit-appearance:none;transition:transform .1s,background .15s}
-.cta:active{transform:scale(.98);background:#d4eb30}
+.cta{width:100%;padding:15px;background:var(--acc);color:#ffffff;border:none;border-radius:12px;font-family:var(--font);font-size:15px;font-weight:600;cursor:pointer;-webkit-appearance:none;transition:transform .1s,background .15s}
+.cta:active{transform:scale(.98);background:#1d4ed8}
 .setup-note{font-size:11px;color:var(--t3);text-align:center;line-height:1.5;padding:0 8px}
 
 /* ── HEADER ── */
-.app-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;flex-shrink:0;border-bottom:1px solid var(--bd);background:rgba(15,15,17,.95);backdrop-filter:blur(20px)}
+.app-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;flex-shrink:0;border-bottom:1px solid var(--bd);background:rgba(255,255,255,.92);backdrop-filter:blur(20px)}
 .app-title{font-size:16px;font-weight:600}
-.app-badge{font-family:var(--mono);font-size:10px;color:var(--acc);background:#e8ff4712;padding:2px 7px;border-radius:4px;border:1px solid #e8ff4725;margin-left:8px}
+.app-badge{font-family:var(--mono);font-size:10px;color:var(--acc);background:#2563eb14;padding:2px 7px;border-radius:4px;border:1px solid #2563eb28;margin-left:8px}
 .header-actions{display:flex;align-items:center;gap:8px}
 .sync-pill{display:flex;align-items:center;gap:5px;padding:6px 10px;border-radius:20px;background:var(--s2);border:1px solid var(--bd2);font-size:11px;color:var(--t2)}
 .pip{width:6px;height:6px;border-radius:50%;background:var(--t3)}
@@ -61,7 +73,7 @@ body{display:flex;flex-direction:column}
 .kpi-scroll{display:flex;gap:10px;padding:16px;overflow-x:auto;-webkit-overflow-scrolling:touch;flex-shrink:0;scrollbar-width:none}
 .kpi-scroll::-webkit-scrollbar{display:none}
 .kpi-card{flex-shrink:0;background:var(--s1);border:1px solid var(--bd);border-radius:14px;padding:14px 16px;min-width:130px}
-.kpi-card.acc{border-color:#e8ff4730;background:#e8ff4708}
+.kpi-card.acc{border-color:#2563eb40;background:#2563eb0a}
 .kpi-l{font-size:10px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px}
 .kpi-v{font-family:var(--mono);font-size:22px;font-weight:500;line-height:1}
 .kpi-v.y{color:var(--acc)}.kpi-v.g{color:var(--green)}.kpi-v.b{color:var(--blue)}.kpi-v.r{color:var(--red)}
@@ -77,12 +89,12 @@ body{display:flex;flex-direction:column}
 .filter-bar{display:flex;gap:8px;padding:0 16px 12px;overflow-x:auto;-webkit-overflow-scrolling:touch;flex-shrink:0;scrollbar-width:none}
 .filter-bar::-webkit-scrollbar{display:none}
 .chip{flex-shrink:0;padding:7px 14px;border-radius:20px;font-size:12px;font-weight:500;border:1px solid var(--bd2);background:var(--s2);color:var(--t2);cursor:pointer;-webkit-appearance:none;font-family:var(--font);transition:all .15s}
-.chip.on{border-color:var(--acc);color:var(--acc);background:#e8ff4710}
+.chip.on{border-color:var(--acc);color:var(--acc);background:#2563eb10}
 .chip:active{opacity:.7}
 
 /* ── SEARCH ── */
 .search-wrap{padding:0 16px 12px}
-.search-field{width:100%;padding:11px 14px 11px 38px;background:var(--s1);border:1px solid var(--bd);border-radius:10px;color:var(--t1);font-family:var(--font);font-size:14px;outline:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%235a5a6a' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:12px center}
+.search-field{width:100%;padding:11px 14px 11px 38px;background:var(--s1);border:1px solid var(--bd);border-radius:10px;color:var(--t1);font-family:var(--font);font-size:14px;outline:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238c959f' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:12px center}
 .search-field::placeholder{color:var(--t3)}
 .search-field:focus{border-color:#444}
 
@@ -90,7 +102,7 @@ body{display:flex;flex-direction:column}
 .cards-list{padding:0 16px;display:flex;flex-direction:column;gap:10px;padding-bottom:32px}
 .store-card{background:var(--s1);border:1px solid var(--bd);border-radius:14px;overflow:hidden;transition:background .1s}
 .store-card:active{background:var(--s2)}
-.store-card.anomaly{border-color:#ff5a5a30;background:#ff5a5a05}
+.store-card.anomaly{border-color:#dc262640;background:#fef2f2}
 .card-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 10px}
 .card-name{font-size:14px;font-weight:600;flex:1;margin-right:8px}
 .card-date{font-family:var(--mono);font-size:11px;color:var(--t3)}
@@ -101,7 +113,7 @@ body{display:flex;flex-direction:column}
 .card-cell-v.g{color:var(--green)}.card-cell-v.b{color:var(--blue)}.card-cell-v.r{color:var(--red)}
 .card-footer{display:flex;align-items:center;gap:8px;padding:10px 16px;border-top:1px solid var(--bd);flex-wrap:wrap}
 .tag{display:inline-flex;align-items:center;font-size:11px;font-weight:500;padding:3px 9px;border-radius:6px}
-.tag-warn{background:#ff5a5a15;color:var(--red);border:1px solid #ff5a5a25}
+.tag-warn{background:#fef2f2;color:var(--red);border:1px solid #fecaca}
 .tag-neutral{background:var(--s2);color:var(--t2);border:1px solid var(--bd)}
 .verify-ok{font-size:11px;color:var(--green);margin-left:auto;font-family:var(--mono)}
 .verify-bad{font-size:11px;color:var(--red);margin-left:auto;font-family:var(--mono)}
@@ -110,13 +122,13 @@ body{display:flex;flex-direction:column}
 .brand-header{display:flex;align-items:center;justify-content:space-between;padding:10px 16px 6px;margin-top:8px}
 .brand-label{font-size:11px;font-weight:700;color:var(--acc);text-transform:uppercase;letter-spacing:1px}
 .brand-count{font-size:11px;color:var(--t3)}
-.subtotal-card{background:var(--s1);border:1px solid #e8ff4725;border-radius:12px;margin:4px 0 12px;padding:12px 16px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.subtotal-card{background:var(--s1);border:1px solid var(--bd);border-radius:12px;margin:4px 0 12px;padding:12px 16px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .sub-cell-l{font-size:10px;color:var(--acc);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;font-weight:600}
 .sub-cell-v{font-family:var(--mono);font-size:13px;font-weight:500}
 .sub-cell-net{font-family:var(--mono);font-size:11px;color:var(--blue);margin-top:2px}
 
 /* ── GRAND TOTAL ── */
-.grand-total{background:var(--s1);border:2px solid #e8ff4740;border-radius:14px;padding:16px;margin:8px 0 4px}
+.grand-total{background:var(--s1);border:2px solid var(--bd2);border-radius:14px;padding:16px;margin:8px 0 4px}
 .grand-label{font-size:10px;font-weight:700;color:var(--acc);text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px}
 .grand-row{display:flex;justify-content:space-between;align-items:baseline;padding:7px 0;border-bottom:1px solid var(--bd)}
 .grand-row:last-child{border-bottom:none}
@@ -154,7 +166,7 @@ body{display:flex;flex-direction:column}
 .empty-text{font-size:14px}
 
 /* ── BOTTOM NAV ── */
-.bottom-nav{display:flex;align-items:center;background:rgba(15,15,17,.95);backdrop-filter:blur(20px);border-top:1px solid var(--bd);flex-shrink:0;padding-bottom:var(--safe-bot)}
+.bottom-nav{display:flex;align-items:center;background:rgba(255,255,255,.92);backdrop-filter:blur(20px);border-top:1px solid var(--bd);flex-shrink:0;padding-bottom:var(--safe-bot)}
 .nav-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:10px 4px;cursor:pointer;color:var(--t3);transition:color .15s;font-size:10px;font-weight:500}
 .nav-item.active{color:var(--acc)}
 .nav-icon{font-size:20px;line-height:1}
@@ -168,10 +180,10 @@ body{display:flex;flex-direction:column}
 .settings-value{font-size:12px;color:var(--t3);font-family:var(--mono);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .settings-btn{width:100%;padding:14px;border-radius:12px;border:1px solid var(--bd2);background:var(--s2);color:var(--t1);font-family:var(--font);font-size:14px;cursor:pointer;-webkit-appearance:none;transition:background .15s}
 .settings-btn:active{background:var(--s3)}
-.settings-btn.danger{border-color:#ff5a5a30;color:var(--red);background:#ff5a5a08}
+.settings-btn.danger{border-color:#fecaca;color:var(--red);background:#fef2f2}
 
 /* ── LOADING + SHEET ── */
-#loading{position:fixed;inset:0;background:rgba(15,15,17,.9);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;z-index:300;flex-direction:column;gap:14px}
+#loading{position:fixed;inset:0;background:rgba(250,251,252,.88);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;z-index:300;flex-direction:column;gap:14px}
 #loading.show{display:flex}
 .spinner{width:28px;height:28px;border:2px solid var(--bd2);border-top-color:var(--acc);border-radius:50%;animation:spin .7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -648,6 +660,20 @@ function renderKPI(){
   </div>`).join('');
 }
 
+// ── COLORI BRAND ──
+// Ogni brand ha un colore distintivo per etichetta, bordo card e subtotale.
+// Brand sconosciuti ricadono sul default grigio-blu neutro.
+const BRAND_COLORS={
+  adidas:  {text:'#1e40af', tint:'#dbeafe', strong:'#3b82f6'}, // blu
+  mango:   {text:'#c2410c', tint:'#ffedd5', strong:'#f97316'}, // arancione
+  carpisa: {text:'#be185d', tint:'#fce7f3', strong:'#ec4899'}, // rosa
+  yamamay: {text:'#a16207', tint:'#fef3c7', strong:'#eab308'}, // giallo/ambra
+};
+const DEFAULT_BRAND_COLOR={text:'#475569', tint:'#f1f5f9', strong:'#64748b'};
+function brandColor(name){
+  return BRAND_COLORS[String(name||'').toLowerCase().trim()]||DEFAULT_BRAND_COLOR;
+}
+
 // ── CARDS (TAB NEGOZI) ──
 function renderCards(){
   const q=document.getElementById('search').value.toLowerCase();
@@ -677,12 +703,13 @@ function renderCards(){
     const bNet=bCorr/1.22;
     const bCash=stores.reduce((a,r)=>a+r.contanti,0);
     const bPOS=stores.reduce((a,r)=>a+r.pos,0);
-    html+=`<div class="brand-header">
-      <span class="brand-label">${brand}</span>
-      <span class="brand-count">${stores.length} negoz${stores.length===1?'io':'i'}</span>
+    const bc=brandColor(brand);
+    html+=`<div class="brand-header" style="background:${bc.tint};border-radius:8px;padding:8px 12px">
+      <span class="brand-label" style="color:${bc.text}">${brand}</span>
+      <span class="brand-count" style="color:${bc.text};opacity:.7">${stores.length} negoz${stores.length===1?'io':'i'}</span>
     </div>`;
     for(const r of stores){
-      html+=`<div class="store-card${r.anomaly?' anomaly':''}" onclick="openSheet(${allData.indexOf(r)})">
+      html+=`<div class="store-card${r.anomaly?' anomaly':''}" style="border-left:3px solid ${bc.strong}" onclick="openSheet(${allData.indexOf(r)})">
         <div class="card-head">
           <div class="card-name">${r.location}</div>
           <div class="card-date">${r.dateDisplay}</div>
@@ -709,14 +736,14 @@ function renderCards(){
         </div>
       </div>`;
     }
-    html+=`<div class="subtotal-card">
+    html+=`<div class="subtotal-card" style="border-color:${bc.strong}40;background:${bc.tint}80">
       <div>
-        <div class="sub-cell-l">Sub-totale ${brand}</div>
+        <div class="sub-cell-l" style="color:${bc.text}">Sub-totale ${brand}</div>
         <div class="sub-cell-v" style="color:var(--green)">${fmt(bCorr)}</div>
         <div class="sub-cell-net">NET ${fmt(bNet)}</div>
       </div>
       <div>
-        <div class="sub-cell-l">Contanti + POS</div>
+        <div class="sub-cell-l" style="color:${bc.text}">Contanti + POS</div>
         <div class="sub-cell-v">${fmt(bCash)}</div>
         <div class="sub-cell-net">POS ${fmt(bPOS)}</div>
       </div>
@@ -785,8 +812,9 @@ function renderTempo(){
     const brandRows=Object.entries(p.brands).map(([brand,recs])=>{
       const bCorr=recs.reduce((a,r)=>a+r.corrispettivo,0);
       const bNet=bCorr/1.22;
-      return `<div class="brand-row">
-        <span class="brand-row-name">${brand} <span style="font-size:11px;color:var(--t3)">(${recs.length})</span></span>
+      const bc=brandColor(brand);
+      return `<div class="brand-row" style="border-left:3px solid ${bc.strong};padding-left:13px">
+        <span class="brand-row-name" style="color:${bc.text}">${brand} <span style="font-size:11px;color:var(--t3);font-weight:normal">(${recs.length})</span></span>
         <div class="brand-row-right">
           <div class="brand-row-corr">${fmt(bCorr)}</div>
           <div class="brand-row-net">NET ${fmt(bNet)}</div>
