@@ -454,10 +454,17 @@ async function parsePDF(ab,fname,modifiedTime){
     annull=/s[iì]/i.test(rv(8));
     sconti=/s[iì]/i.test(rv(11));
   }else{
-    // Formato B: label e valore su righe consecutive
+    // Formato B: label e valore su righe consecutive.
+    // Nota: pdf.js restituisce spesso "1. Corrispettivo\n€1180,20" e in alcuni
+    // casi il Q# può comparire sulla stessa riga della label. Il valore può essere
+    // preceduto dal simbolo € (o da "EUR"/spazi). Gestiamo tutto.
     const gf=(label,def=0)=>{
       const esc=label.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-      const m=txt.match(new RegExp(esc+'\\s*\\n\\s*([\\d.,]+)'));
+      // Permette fino a 30 char non-digit fra label e valore (Q#, punti, spazi, \n, €)
+      // e consuma eventuale simbolo valuta prima del numero.
+      // (?![A-Za-z]) evita che "POS" matchi dentro "POSITIVO" ecc.
+      const re=new RegExp(esc+'(?![A-Za-z])[^\\d\\n]{0,30}\\n?\\s*(?:€|EUR)?\\s*([\\d]+(?:[.,]\\d+)?)','i');
+      const m=txt.match(re);
       return m?toNum(m[1]):def;
     };
     corrispettivo=gf('Corrispettivo');
@@ -465,13 +472,14 @@ async function parsePDF(ab,fname,modifiedTime){
     posTml1=gf('POS TML 1');posTml2=gf('POS TML 2');
     posTml3=gf('POS TML 3');posTml4=gf('POS TML 4');
     cambi=gf('Cambi');buonoE=gf('Buono Emesso');buonoR=gf('Buono ritirato');
-    annull=gf('Annullamenti')>0||/Annullamenti\s*\n\s*S[iì]/i.test(txt);
-    sconti=gf('Sconti su vendite')>0||/Sconti su vendite\s*\n\s*S[iì]/i.test(txt);
+    annull=gf('Annullamenti')>0||/Annullamenti[^\n]{0,30}\n\s*S[iì]/i.test(txt);
+    sconti=gf('Sconti su vendite')>0||/Sconti su vendite[^\n]{0,30}\n\s*S[iì]/i.test(txt);
   }
 
   const pos=posTml1+posTml2+posTml3+posTml4;
-  const fondo=gn(/Fondo cassa\s*\n\s*([\d.,]+)/)||gn(/Fondo cassa\s+([\d.,]+)/);
-  const versato=gn(/Importo [Vv]ersato\s*\n\s*([\d.,]+)/)||gn(/Importo [Vv]ersato\s+([\d.,]+)/);
+  // Fondo cassa e Importo versato possono essere preceduti da € (es. "€298,04")
+  const fondo=gn(/Fondo cassa[^\d\n]{0,30}\n?\s*(?:€|EUR)?\s*([\d]+(?:[.,]\d+)?)/i);
+  const versato=gn(/Importo [Vv]ersato[^\d\n]{0,30}\n?\s*(?:€|EUR)?\s*([\d]+(?:[.,]\d+)?)/i);
   const netSales=corrispettivo/1.22;
   const diff=Math.abs(corrispettivo-contanti-pos);
   const anomaly=diff>1&&corrispettivo>0;
