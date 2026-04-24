@@ -821,10 +821,14 @@ function openSheet(idx){
   document.getElementById('sheet').classList.add('show');
 }
 
-// ── VISUALIZZATORE ALLEGATI (foto incorporate nel PDF) ──
-// Pre-renderizza ogni pagina per forzare il caricamento delle immagini, poi
-// estrae gli oggetti immagine deduplicati, scartando loghi/icone piccole.
-// Timeout di sicurezza su ogni singola get per evitare hang infiniti.
+// ── VISUALIZZATORE ALLEGATI ──
+// Strategia:
+//  1) Prima scansione: cerca LINK ANNOTATIONS nel PDF. GoAudits incorpora le
+//     thumbnail in bassa risoluzione nel PDF ma salva gli originali ad alta
+//     risoluzione sul proprio CDN. Le annotazioni contengono l'URL originale.
+//     Se troviamo link → li serviamo via /api/image (bypass CORS + download).
+//  2) Fallback: se non ci sono link annotations (PDF non-GoAudits), estrae
+//     le immagini embedded dal PDF direttamente.
 async function openAttachments(idx){
   const r=allData[idx];
   if(!r||!r.fileId){alert('File ID non disponibile per questo record.');return;}
@@ -844,6 +848,34 @@ async function openAttachments(idx){
     const ab=await resp.arrayBuffer();
     const pdf=await pdfjsLib.getDocument({data:ab}).promise;
 
+    // Strategia 1: link annotations (foto originali alta risoluzione)
+    setStatus('Cerco foto originali nel PDF…');
+    const linkUrls=[];
+    const seenLinks=new Set();
+    for(let p=1;p<=pdf.numPages;p++){
+      try{
+        const page=await pdf.getPage(p);
+        const annots=await page.getAnnotations();
+        for(const a of annots){
+          if(a.subtype==='Link' && a.url){
+            const isImg=/\.(jpe?g|png|webp)(\?|$|\/)/i.test(a.url) ||
+                        /assets\.goaudits\.com/i.test(a.url);
+            if(isImg && !seenLinks.has(a.url)){
+              seenLinks.add(a.url);
+              linkUrls.push({url:a.url,page:p});
+            }
+          }
+        }
+      }catch(e){console.warn('Annotations pagina',p,e);}
+    }
+
+    if(linkUrls.length>0){
+      renderLinkGallery(linkUrls,idx,r);
+      return;
+    }
+
+    // Strategia 2: fallback a estrazione immagini embedded
+    setStatus('Estraggo foto incorporate (fallback)…');
     const OPS=pdfjsLib.OPS;
     const imgOps=[OPS.paintImageXObject,OPS.paintJpegXObject,OPS.paintInlineImageXObject].filter(x=>x!==undefined);
     const found=[]; const seen=new Set();
@@ -966,6 +998,67 @@ async function openAttachments(idx){
       <button class="settings-btn" style="margin-top:16px" onclick="openSheet(${idx})">← Torna ai dati</button>
     </div>`;
   }
+}
+
+// Galleria con le foto originali dal CDN GoAudits (via proxy /api/image).
+function renderLinkGallery(links,idx,r){
+  const rowsEl=document.getElementById('sheet-rows');
+  const safe=s=>String(s||'').replace(/[^\w\-]+/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'');
+  const fileBase=`${safe(r.brand)}_${safe(r.location)}_${r.dateISO||'senza-data'}`;
+
+  const container=document.createElement('div');
+  container.style.cssText='padding:14px 14px 20px';
+
+  const banner=document.createElement('div');
+  banner.style.cssText='padding:10px 12px;margin-bottom:14px;background:#4ade8012;border:1px solid #4ade8030;border-radius:8px;font-size:11px;color:var(--green);line-height:1.5';
+  banner.innerHTML=`✓ <strong>${links.length}</strong> foto originali ad alta risoluzione`;
+  container.appendChild(banner);
+
+  const grid=document.createElement('div');
+  grid.style.cssText='display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px';
+
+  links.forEach((link,k)=>{
+    const cell=document.createElement('div');
+    cell.style.cssText='display:flex;flex-direction:column;gap:6px';
+    const cap=document.createElement('div');
+    cap.style.cssText='font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px';
+    cap.textContent=`Allegato ${k+1} · originale`;
+
+    // URL sempre via /api/image (CORS-safe, Content-Disposition per download)
+    const displayUrl=`${PROXY_BASE}/api/image?url=${encodeURIComponent(link.url)}`;
+    const extMatch=link.url.match(/\.(jpe?g|png|webp)(?:\?|$|\/)/i);
+    const ext=extMatch?extMatch[1].toLowerCase():'jpg';
+    const fname=`${fileBase}_allegato_${k+1}.${ext}`;
+    const downloadUrl=`${PROXY_BASE}/api/image?url=${encodeURIComponent(link.url)}&download=${encodeURIComponent(fname)}`;
+
+    const img=document.createElement('img');
+    img.src=displayUrl;
+    img.style.cssText='width:100%;border-radius:10px;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.3);cursor:zoom-in;min-height:140px';
+    img.loading='lazy';img.alt=`Allegato ${k+1}`;
+    img.onclick=()=>zoomImage(displayUrl);
+    img.onerror=()=>{img.alt='Errore caricamento';img.style.minHeight='60px';cap.textContent+=' · errore';};
+
+    const dl=document.createElement('a');
+    dl.href=downloadUrl;
+    dl.textContent='↓ Scarica originale';
+    dl.style.cssText='display:inline-flex;align-items:center;justify-content:center;padding:8px 12px;background:var(--s2);border:1px solid var(--bd2);border-radius:8px;color:var(--t1);font-family:var(--font);font-size:12px;font-weight:500;text-decoration:none;cursor:pointer;transition:background .15s';
+    dl.onmouseover=()=>dl.style.background='var(--s3)';
+    dl.onmouseout=()=>dl.style.background='var(--s2)';
+
+    cell.appendChild(cap);cell.appendChild(img);cell.appendChild(dl);
+    grid.appendChild(cell);
+  });
+  container.appendChild(grid);
+
+  const backBtn=document.createElement('button');
+  backBtn.className='settings-btn';
+  backBtn.style.marginTop='14px';
+  backBtn.textContent='← Torna ai dati';
+  backBtn.onclick=()=>openSheet(idx);
+  container.appendChild(backBtn);
+
+  rowsEl.innerHTML='';
+  rowsEl.appendChild(container);
 }
 
 // Overlay fullscreen per leggere i dettagli degli scontrini.
