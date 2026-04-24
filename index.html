@@ -900,7 +900,10 @@ async function openAttachments(idx){
             else continue;
             ctx.putImageData(id,0,0);
           }else continue;
-          found.push({page:p,width:obj.width,height:obj.height,dataUrl:cv.toDataURL('image/jpeg',0.88)});
+          // PNG lossless: evita la doppia compressione JPEG che degrada leggibilità
+          // delle scritte piccole (scontrini, codici, timbri). Peso maggiore ma
+          // le foto sono temporanee in memoria e il browser mobile le gestisce bene.
+          found.push({page:p,width:obj.width,height:obj.height,dataUrl:cv.toDataURL('image/png')});
         }catch(e){console.warn('Image decode fail',name,e);}
       }
     }
@@ -951,15 +954,39 @@ async function openAttachments(idx){
   }
 }
 
+// Overlay fullscreen con due modalità: "fit" (default, intera immagine a schermo)
+// e "actual" (risoluzione originale, scrollable per vedere i dettagli).
+// Tap sull'immagine → toggle tra le due modalità. Tap fuori → chiudi.
 function zoomImage(dataUrl){
   const overlay=document.createElement('div');
-  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px;cursor:zoom-out';
-  overlay.onclick=()=>overlay.remove();
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:500;overflow:auto;-webkit-overflow-scrolling:touch;cursor:zoom-out;touch-action:pinch-zoom';
+  overlay.onclick=(e)=>{if(e.target===overlay)overlay.remove();};
+  const inner=document.createElement('div');
+  inner.style.cssText='min-height:100%;display:flex;align-items:center;justify-content:center;padding:20px';
   const img=document.createElement('img');
   img.src=dataUrl;
-  img.style.cssText='max-width:100%;max-height:100%;object-fit:contain;border-radius:6px';
-  overlay.appendChild(img);
+  // Stato iniziale: fit-to-screen. Click sull'immagine → risoluzione reale (scrolla).
+  let zoomed=false;
+  const fit='max-width:100%;max-height:calc(100vh - 40px);object-fit:contain;border-radius:6px;cursor:zoom-in;user-select:none';
+  const actual='max-width:none;max-height:none;width:auto;height:auto;border-radius:6px;cursor:zoom-in;user-select:none';
+  img.style.cssText=fit;
+  img.onclick=(e)=>{
+    e.stopPropagation();
+    zoomed=!zoomed;
+    img.style.cssText=zoomed?actual:fit;
+    // Scroll all'inizio quando si passa a risoluzione reale
+    if(zoomed){overlay.scrollTop=0;overlay.scrollLeft=0;}
+  };
+  // Hint visivo
+  const hint=document.createElement('div');
+  hint.style.cssText='position:fixed;top:14px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.7);color:#fff;padding:6px 14px;border-radius:16px;font-size:11px;font-family:var(--mono);pointer-events:none;letter-spacing:.3px';
+  hint.textContent='Tap foto: zoom · Tap sfondo: chiudi';
+  inner.appendChild(img);
+  overlay.appendChild(inner);
+  overlay.appendChild(hint);
   document.body.appendChild(overlay);
+  setTimeout(()=>hint.style.opacity='0',2500);
+  hint.style.transition='opacity .4s';
 }
 
 // ── EXPORT CSV ──
