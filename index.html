@@ -315,10 +315,7 @@ const LS='rp_cfg_v3';
 const CACHE_KEY='rp_cache_v2';
 const CONCURRENCY=6;
 const PROXY_BASE='';
-// Lato minimo per considerare un'immagine "foto": scarta loghi a banner
-// (es. 572x82) e icone quadrate piccole (es. 64x64). Una ricevuta/scontrino
-// reale è sempre almeno ~200px sia in larghezza che in altezza.
-const ATTACH_MIN_SIDE=120;
+const LOGO_MIN_PIXELS=40000;
 let cfg=null, allData=[], filter='all', tempoView='giorno', syncTimer=null;
 let lastErrors=[];
 
@@ -443,6 +440,7 @@ async function parsePDF(ab,fname,modifiedTime,fileId){
   txt=txt.replace(/(\d)\n\.(\d)/g,'$1.$2');
   txt=txt.replace(/(\d)\n,(\d)/g,'$1,$2');
 
+  // Formato italiano: "2.969,78" → 2969.78 (punto=migliaia, virgola=decimale)
   const toNum=s=>{
     if(s==null||s==='')return 0;
     const str=String(s).trim();
@@ -503,6 +501,7 @@ async function parsePDF(ab,fname,modifiedTime,fileId){
     annull=/s[iì]/i.test(rv(8));
     sconti=/s[iì]/i.test(rv(11));
   }else{
+    // Formato B: "1. Corrispettivo\n€1180,20" (Adidas) o "1. Corrispettivo\n2.969,78€" (Mango)
     const NUM='\\d+(?:\\.\\d{3})*(?:,\\d+)?';
     const gf=(label,def=0)=>{
       const esc=label.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
@@ -821,9 +820,8 @@ function openSheet(idx){
 }
 
 // ── VISUALIZZATORE ALLEGATI (foto incorporate nel PDF) ──
-// Pre-renderizza ogni pagina per forzare il caricamento delle immagini, poi
-// estrae gli oggetti immagine deduplicati, scartando loghi/icone piccole.
-// Timeout di sicurezza su ogni singola get per evitare hang infiniti.
+// Estrae le vere immagini (scontrini/foto documentazione) dal PDF, deduplica
+// e scarta i loghi piccoli ricorrenti. Tutto in memoria, zero download su disco.
 async function openAttachments(idx){
   const r=allData[idx];
   if(!r||!r.fileId){alert('File ID non disponibile per questo record.');return;}
@@ -850,34 +848,16 @@ async function openAttachments(idx){
     for(let p=1;p<=pdf.numPages;p++){
       setStatus(`Cerco foto (pagina ${p}/${pdf.numPages})…`);
       const page=await pdf.getPage(p);
-      // Pre-render a bassa risoluzione: costringe pdf.js a risolvere gli
-      // oggetti immagine. Senza, objs.get() può restare sospeso all'infinito.
-      try{
-        const tinyVp=page.getViewport({scale:0.3});
-        const tinyCv=document.createElement('canvas');
-        tinyCv.width=tinyVp.width;tinyCv.height=tinyVp.height;
-        await page.render({canvasContext:tinyCv.getContext('2d'),viewport:tinyVp}).promise;
-      }catch(e){console.warn('Pre-render pagina',p,'fallito',e);}
-
       const ops=await page.getOperatorList();
       for(let i=0;i<ops.fnArray.length;i++){
         if(!imgOps.includes(ops.fnArray[i]))continue;
         const name=ops.argsArray[i][0];
         if(!name||seen.has(name))continue;
         seen.add(name);
-        // Dopo il pre-render l'oggetto è quasi sempre già pronto (sync).
-        // Fallback async con timeout 2s per evitare hang su immagini non
-        // decodificabili (JPEG2000, JBIG2, ecc.).
-        let obj=null;
-        try{obj=page.objs.get(name);}
-        catch(_){
-          obj=await Promise.race([
-            new Promise(res=>{try{page.objs.get(name,res);}catch(_){res(null);}}),
-            new Promise(res=>setTimeout(()=>res(null),2000))
-          ]);
-        }
-        if(!obj||!obj.width||!obj.height){console.warn('Skip immagine',name);continue;}
-        if(Math.min(obj.width,obj.height)<ATTACH_MIN_SIDE)continue;
+        const obj=await new Promise(res=>{try{page.objs.get(name,res);}catch(_){res(null);}}).catch(()=>null);
+        if(!obj||!obj.width||!obj.height)continue;
+        // Scarta loghi/icone (es. < 200x200)
+        if(obj.width*obj.height<LOGO_MIN_PIXELS)continue;
         try{
           const cv=document.createElement('canvas');
           cv.width=obj.width;cv.height=obj.height;
@@ -907,6 +887,7 @@ async function openAttachments(idx){
       return;
     }
 
+    // Galleria (1 colonna su mobile, 2 su schermi più larghi)
     const container=document.createElement('div');
     container.style.cssText='padding:14px 14px 20px';
     const grid=document.createElement('div');
@@ -944,6 +925,7 @@ async function openAttachments(idx){
   }
 }
 
+// Overlay full-screen di un'immagine (click per chiudere)
 function zoomImage(dataUrl){
   const overlay=document.createElement('div');
   overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px;cursor:zoom-out';
