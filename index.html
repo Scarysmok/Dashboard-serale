@@ -954,39 +954,56 @@ async function openAttachments(idx){
   }
 }
 
-// Overlay fullscreen con due modalità: "fit" (default, intera immagine a schermo)
-// e "actual" (risoluzione originale, scrollable per vedere i dettagli).
-// Tap sull'immagine → toggle tra le due modalità. Tap fuori → chiudi.
+// Overlay fullscreen per leggere i dettagli degli scontrini.
+// Livelli di zoom:
+//  · Livello 1 (default): fit-to-width — la foto occupa tutta la larghezza
+//    dello schermo, si scrolla verticalmente se è più alta. Ottimo per leggere.
+//  · Livello 2 (actual): risoluzione nativa — per zoomare ulteriormente su
+//    dettagli molto piccoli. Si scrolla in entrambe le direzioni.
+// Tap sulla foto o sul bottone +/−: toggle. X o tap fuori: chiudi.
 function zoomImage(dataUrl){
   const overlay=document.createElement('div');
-  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:500;overflow:auto;-webkit-overflow-scrolling:touch;cursor:zoom-out;touch-action:pinch-zoom';
+  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:500;overflow:auto;-webkit-overflow-scrolling:touch';
   overlay.onclick=(e)=>{if(e.target===overlay)overlay.remove();};
-  const inner=document.createElement('div');
-  inner.style.cssText='min-height:100%;display:flex;align-items:center;justify-content:center;padding:20px';
+
   const img=document.createElement('img');
   img.src=dataUrl;
-  // Stato iniziale: fit-to-screen. Click sull'immagine → risoluzione reale (scrolla).
   let zoomed=false;
-  const fit='max-width:100%;max-height:calc(100vh - 40px);object-fit:contain;border-radius:6px;cursor:zoom-in;user-select:none';
-  const actual='max-width:none;max-height:none;width:auto;height:auto;border-radius:6px;cursor:zoom-in;user-select:none';
-  img.style.cssText=fit;
-  img.onclick=(e)=>{
-    e.stopPropagation();
+  const applyStyle=()=>{
+    if(zoomed){
+      // Risoluzione nativa: scroll in 2D
+      img.style.cssText='display:block;margin:0;max-width:none;max-height:none;cursor:zoom-out;user-select:none;-webkit-user-drag:none';
+    }else{
+      // Fit-to-width: usa tutta la larghezza, scroll solo verticale
+      img.style.cssText='display:block;margin:0 auto;width:100%;max-width:100%;height:auto;cursor:zoom-in;user-select:none;-webkit-user-drag:none';
+    }
+  };
+  applyStyle();
+  const toggleZoom=(e)=>{
+    if(e){e.stopPropagation();e.preventDefault();}
     zoomed=!zoomed;
-    img.style.cssText=zoomed?actual:fit;
-    // Scroll all'inizio quando si passa a risoluzione reale
+    applyStyle();
+    zoomBtn.textContent=zoomed?'−':'+';
     if(zoomed){overlay.scrollTop=0;overlay.scrollLeft=0;}
   };
-  // Hint visivo
-  const hint=document.createElement('div');
-  hint.style.cssText='position:fixed;top:14px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.7);color:#fff;padding:6px 14px;border-radius:16px;font-size:11px;font-family:var(--mono);pointer-events:none;letter-spacing:.3px';
-  hint.textContent='Tap foto: zoom · Tap sfondo: chiudi';
-  inner.appendChild(img);
-  overlay.appendChild(inner);
-  overlay.appendChild(hint);
+  img.onclick=toggleZoom;
+
+  // Bottone X in alto a destra
+  const closeBtn=document.createElement('div');
+  closeBtn.textContent='×';
+  closeBtn.style.cssText='position:fixed;top:10px;right:10px;width:40px;height:40px;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.75);border-radius:50%;color:#fff;font-size:26px;cursor:pointer;z-index:501;border:1px solid rgba(255,255,255,.2)';
+  closeBtn.onclick=(e)=>{e.stopPropagation();overlay.remove();};
+
+  // Bottone +/− in basso a destra
+  const zoomBtn=document.createElement('div');
+  zoomBtn.textContent='+';
+  zoomBtn.style.cssText='position:fixed;bottom:20px;right:20px;width:48px;height:48px;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.8);border-radius:50%;color:#fff;font-size:24px;font-weight:600;cursor:pointer;z-index:501;border:1px solid rgba(255,255,255,.2);user-select:none';
+  zoomBtn.onclick=toggleZoom;
+
+  overlay.appendChild(img);
+  overlay.appendChild(closeBtn);
+  overlay.appendChild(zoomBtn);
   document.body.appendChild(overlay);
-  setTimeout(()=>hint.style.opacity='0',2500);
-  hint.style.transition='opacity .4s';
 }
 
 // ── EXPORT CSV ──
