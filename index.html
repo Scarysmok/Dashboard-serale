@@ -312,13 +312,12 @@ body{display:flex;flex-direction:column}
 pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
 const LS='rp_cfg_v3';
-const CACHE_KEY='rp_cache_v2'; // bump dopo fix formato numero italiano
+const CACHE_KEY='rp_cache_v2';
 const CONCURRENCY=6;
 const PROXY_BASE='';
 let cfg=null, allData=[], filter='all', tempoView='giorno', syncTimer=null;
 let lastErrors=[];
 
-// ── CACHE ──
 function loadCache(){
   try{return JSON.parse(localStorage.getItem(CACHE_KEY)||'{}');}
   catch(e){return {};}
@@ -329,12 +328,10 @@ function saveCache(c){
 }
 function clearCache(){
   localStorage.removeItem(CACHE_KEY);
-  // ripulisci anche eventuali chiavi legacy per evitare dati stantii
   localStorage.removeItem('rp_cache_v1');
 }
 function forceResync(){clearCache();syncNow();}
 
-// ── DIAGNOSTICA ──
 function showErrors(){
   if(!lastErrors.length){alert('Nessun errore registrato nell\'ultimo sync.');return;}
   const sample=lastErrors.slice(0,10).map((e,i)=>`${i+1}. ${e.name}\n   → ${e.msg}`).join('\n\n');
@@ -441,7 +438,6 @@ async function listFiles(){
   return(await r.json()).files||[];
 }
 
-// Download via proxy serverless (bypass 403 CORS di Drive)
 async function fetchAndParse(file){
   const r=await fetch(`${PROXY_BASE}/api/drive?id=${encodeURIComponent(file.id)}`);
   if(!r.ok){
@@ -477,25 +473,15 @@ async function parsePDF(ab,fname,modifiedTime){
   txt=txt.replace(/(\d)\n\.(\d)/g,'$1.$2');
   txt=txt.replace(/(\d)\n,(\d)/g,'$1,$2');
 
-  // toNum gestisce il formato italiano: "2.969,78" → 2969.78, "500,55" → 500.55
-  // Regola: se nella stringa sono presenti sia "." che ",", il "." è separatore
-  // delle migliaia e la "," è decimale. Se c'è solo ".", allora è decimale (US).
-  // Se c'è solo ",", allora è decimale (IT). Questa logica copre tutti i formati.
+  // Formato italiano: "2.969,78" → 2969.78 (punto=migliaia, virgola=decimale).
   const toNum=s=>{
     if(s==null||s==='')return 0;
     const str=String(s).trim();
     const hasDot=str.includes('.'),hasComma=str.includes(',');
     let norm;
-    if(hasDot&&hasComma){
-      // "2.969,78" — punto migliaia, virgola decimale
-      norm=str.replace(/\./g,'').replace(',','.');
-    }else if(hasComma){
-      // "500,55" — virgola decimale
-      norm=str.replace(',','.');
-    }else{
-      // "1180.20" o "1180" — punto decimale o intero
-      norm=str;
-    }
+    if(hasDot&&hasComma) norm=str.replace(/\./g,'').replace(',','.');
+    else if(hasComma)    norm=str.replace(',','.');
+    else                 norm=str;
     const n=parseFloat(norm);
     return isNaN(n)?0:n;
   };
@@ -532,13 +518,9 @@ async function parsePDF(ab,fname,modifiedTime){
 
   if(isFormatoA){
     // Formato A: blocco RESPONSE separato dalle label.
-    // Il pattern numerico cattura anche numeri italiani con separatore migliaia
-    // tipo "2.969,78" — \d+(?:\.\d{3})* per la parte intera (eventuali gruppi di 3),
-    // (?:,\d+)? per i decimali.
     const respMatch=txt.match(/RESPONSE\s*([\s\S]*?)(?:FATTURE|DISTINTA)/i);
-    const NUM_IT=/\d+(?:\.\d{3})*(?:,\d+)?|\d+/g;
     const vals=respMatch
-      ?(respMatch[1].match(new RegExp(NUM_IT.source+'|Non utilizzato|S[iì]|No\\b','gi'))||[]).map(t=>t.trim())
+      ?(respMatch[1].match(/\d+(?:\.\d{3})*(?:,\d+)?|\d+|Non utilizzato|S[iì]|No\b/gi)||[]).map(t=>t.trim())
       :[];
     const rv=i=>vals[i]||'';
     const rvn=i=>toNum(rv(i));
@@ -553,10 +535,9 @@ async function parsePDF(ab,fname,modifiedTime){
     annull=/s[iì]/i.test(rv(8));
     sconti=/s[iì]/i.test(rv(11));
   }else{
-    // Formato B: label e valore su righe consecutive.
-    // pdf.js restituisce spesso "1. Corrispettivo\n€1180,20" (Adidas) o
-    // "1. Corrispettivo\n2.969,78€" (Mango, formato italiano con migliaia).
-    // Il pattern cattura interamente numeri tipo 2.969,78 oltre ai 1180,20.
+    // Formato B: label e valore su righe consecutive. pdf.js restituisce tipo
+    // "1. Corrispettivo\n€1180,20" (Adidas) o "1. Corrispettivo\n2.969,78€" (Mango).
+    // NUM cattura numeri italiani con separatore migliaia e decimali.
     const NUM='\\d+(?:\\.\\d{3})*(?:,\\d+)?';
     const gf=(label,def=0)=>{
       const esc=label.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
@@ -574,7 +555,6 @@ async function parsePDF(ab,fname,modifiedTime){
   }
 
   const pos=posTml1+posTml2+posTml3+posTml4;
-  // Fondo cassa e Importo versato: stesso pattern numerico italiano
   const fondo=gn(/Fondo cassa[^\d\n]{0,30}\n?\s*(?:€|EUR)?\s*(\d+(?:\.\d{3})*(?:,\d+)?)/i);
   const versato=gn(/Importo [Vv]ersato[^\d\n]{0,30}\n?\s*(?:€|EUR)?\s*(\d+(?:\.\d{3})*(?:,\d+)?)/i);
   const netSales=corrispettivo/1.22;
@@ -608,7 +588,9 @@ function setChip(el,f){
 function switchTab(t){
   ['negozi','tempo','settings'].forEach(n=>{
     const el=document.getElementById('tab-'+n);
-    if(el)el.style.display=n===t?'flex':'none';
+    // Usa 'block' invece di 'flex' altrimenti i figli del tab (kpi, alert,
+    // filtri, lista) vengono allineati in riga rompendo il layout verticale.
+    if(el)el.style.display=n===t?'block':'none';
     const nav=document.getElementById('nav-'+n);
     if(nav)nav.classList.toggle('active',n===t);
   });
