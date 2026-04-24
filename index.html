@@ -921,18 +921,32 @@ async function openAttachments(idx){
     container.style.cssText='padding:14px 14px 20px';
     const grid=document.createElement('div');
     grid.style.cssText='display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px';
+    // Sanifica parti del nome file (niente slash, due punti, ecc.)
+    const safe=s=>String(s||'').replace(/[^\w\-]+/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'');
+    const fileBase=`${safe(r.brand)}_${safe(r.location)}_${r.dateISO||'senza-data'}`;
+
     found.forEach((im,k)=>{
       const cell=document.createElement('div');
       cell.style.cssText='display:flex;flex-direction:column;gap:6px';
       const cap=document.createElement('div');
-      cap.style.cssText='font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px';
-      cap.textContent=`Allegato ${k+1} · ${im.width}×${im.height}`;
+      cap.style.cssText='font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;display:flex;justify-content:space-between;align-items:center';
+      cap.innerHTML=`<span>Allegato ${k+1} · ${im.width}×${im.height}</span>`;
       const img=document.createElement('img');
       img.src=im.dataUrl;
       img.style.cssText='width:100%;border-radius:10px;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.3);cursor:zoom-in';
       img.loading='lazy';img.alt=`Allegato ${k+1}`;
       img.onclick=()=>zoomImage(im.dataUrl);
-      cell.appendChild(cap);cell.appendChild(img);
+
+      // Bottone download PNG lossless
+      const dl=document.createElement('a');
+      dl.href=im.dataUrl;
+      dl.download=`${fileBase}_allegato_${k+1}.png`;
+      dl.textContent='↓ Scarica PNG';
+      dl.style.cssText='display:inline-flex;align-items:center;justify-content:center;padding:8px 12px;background:var(--s2);border:1px solid var(--bd2);border-radius:8px;color:var(--t1);font-family:var(--font);font-size:12px;font-weight:500;text-decoration:none;cursor:pointer;transition:background .15s';
+      dl.onmouseover=()=>dl.style.background='var(--s3)';
+      dl.onmouseout=()=>dl.style.background='var(--s2)';
+
+      cell.appendChild(cap);cell.appendChild(img);cell.appendChild(dl);
       grid.appendChild(cell);
     });
     container.appendChild(grid);
