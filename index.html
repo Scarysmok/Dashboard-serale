@@ -256,7 +256,6 @@ body{display:flex;flex-direction:column}
   <!-- TAB NEGOZI -->
   <div class="scroll-area" id="tab-negozi">
     <div class="kpi-scroll" id="kpi-scroll"></div>
-    <div class="alerts-wrap" id="alerts-wrap" style="display:none"></div>
     <div class="filter-bar">
       <button class="chip" id="chip-date" onclick="openDateFilter()">📅 Tutte le date</button>
       <button class="chip on" onclick="setChip(this,'all')">Tutti</button>
@@ -573,7 +572,7 @@ function setTempo(v,el){
 }
 
 // ── RENDER ALL ──
-function renderAll(){renderKPI();renderAlerts();renderCards();}
+function renderAll(){renderKPI();renderCards();}
 
 // Restituisce i record filtrati per la data selezionata (o tutti)
 function getFilteredData(){
@@ -647,19 +646,6 @@ function renderKPI(){
     <div class="kpi-v ${k.cls}">${k.v}</div>
     <div class="kpi-s">${k.s}</div>
   </div>`).join('');
-}
-
-// ── ALERTS ──
-function renderAlerts(){
-  const aw=document.getElementById('alerts-wrap');
-  const an=getFilteredData().filter(r=>r.anomaly||r.annull);
-  if(!an.length){aw.style.display='none';return;}
-  aw.style.display='flex';
-  aw.innerHTML=an.map(r=>`<div class="alert-pill">
-    <div class="a-dot"></div>
-    <div class="a-text"><strong>${r.location}</strong> <span style="color:var(--t3);font-size:11px">${r.brand}</span><br/>
-      ${r.anomaly?`Δ cassa ${fmt(r.diff)}`:''}${r.annull?' · Annullamenti':''}
-    </div></div>`).join('');
 }
 
 // ── CARDS (TAB NEGOZI) ──
