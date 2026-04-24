@@ -315,7 +315,10 @@ const LS='rp_cfg_v3';
 const CACHE_KEY='rp_cache_v2';
 const CONCURRENCY=6;
 const PROXY_BASE='';
-const LOGO_MIN_PIXELS=40000;
+// Lato minimo per considerare un'immagine "foto": scarta loghi a banner
+// (es. 572x82) e icone quadrate piccole (es. 64x64). Una ricevuta/scontrino
+// reale è sempre almeno ~200px sia in larghezza che in altezza.
+const ATTACH_MIN_SIDE=120;
 let cfg=null, allData=[], filter='all', tempoView='giorno', syncTimer=null;
 let lastErrors=[];
 
@@ -874,7 +877,7 @@ async function openAttachments(idx){
           ]);
         }
         if(!obj||!obj.width||!obj.height){console.warn('Skip immagine',name);continue;}
-        if(obj.width*obj.height<LOGO_MIN_PIXELS)continue;
+        if(Math.min(obj.width,obj.height)<ATTACH_MIN_SIDE)continue;
         try{
           const cv=document.createElement('canvas');
           cv.width=obj.width;cv.height=obj.height;
