@@ -147,6 +147,21 @@ body{display:flex;flex-direction:column}
 .grand-row-v{font-family:var(--mono);font-size:14px;font-weight:500}
 .grand-row-v.g{color:var(--green)}.grand-row-v.b{color:var(--blue)}.grand-row-v.y{color:var(--acc)}
 
+/* ── STORES TAB (saldo per negozio: fondocassa + da-versare cumulato) ── */
+.stores-wrap{padding:16px;display:flex;flex-direction:column;gap:10px;padding-bottom:32px}
+.stores-summary{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px}
+.stores-summary .ssum-card{background:var(--s1);border:1px solid var(--bd);border-radius:14px;padding:14px 16px}
+.stores-summary .ssum-l{font-size:10px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px}
+.stores-summary .ssum-v{font-family:var(--mono);font-size:22px;font-weight:500;line-height:1}
+.stores-summary .ssum-v.r{color:var(--red)}
+.stores-summary .ssum-v.g{color:var(--green)}
+.stores-summary .ssum-s{font-size:11px;color:var(--t3);margin-top:4px}
+.store-summary{cursor:default}
+.store-summary .card-body{grid-template-columns:1fr 1fr}
+.store-summary.empty{background:var(--s2);border-style:dashed}
+.store-summary.empty .card-name{color:var(--t2)}
+.no-data-cell{font-family:var(--mono);font-size:12px;color:var(--t3)}
+
 /* ── TEMPO TAB ── */
 .tempo-wrap{padding:16px;display:flex;flex-direction:column;gap:12px;padding-bottom:32px}
 .tempo-seg{display:flex;gap:0;border:1px solid var(--bd2);border-radius:10px;overflow:hidden;margin-bottom:4px;flex-shrink:0}
@@ -269,7 +284,7 @@ body{display:flex;flex-direction:column}
 <div id="dash-wrap" style="display:none;flex-direction:column;height:calc(100% - var(--safe-top))">
 
   <div class="app-header">
-    <div><span class="app-title">Chiusure</span><span class="app-badge">live</span></div>
+    <div><span class="app-title" id="app-title">Chiusure giornaliere</span><span class="app-badge">live</span></div>
     <div class="header-actions">
       <div class="sync-pill"><div class="pip" id="pip"></div><span id="sync-txt">—</span></div>
       <div class="icon-btn" onclick="syncNow()">↺</div>
@@ -291,6 +306,14 @@ body{display:flex;flex-direction:column}
       <input class="search-field" type="search" placeholder="Cerca negozio o brand…" id="search" oninput="renderCards()" autocorrect="off"/>
     </div>
     <div class="cards-list" id="cards-list"></div>
+  </div>
+
+  <!-- TAB NEGOZI (saldo per negozio: fondocassa + da-versare cumulato) -->
+  <div class="scroll-area" id="tab-stores" style="display:none">
+    <div class="stores-wrap">
+      <div class="stores-summary" id="stores-summary"></div>
+      <div class="stores-list" id="stores-list"></div>
+    </div>
   </div>
 
   <!-- TAB TEMPO -->
@@ -325,7 +348,8 @@ body{display:flex;flex-direction:column}
 
   <!-- BOTTOM NAV -->
   <div class="bottom-nav">
-    <div class="nav-item active" id="nav-negozi" onclick="switchTab('negozi')"><div class="nav-icon">🏪</div><span>Negozi</span></div>
+    <div class="nav-item active" id="nav-negozi" onclick="switchTab('negozi')"><div class="nav-icon">📋</div><span>Chiusure</span></div>
+    <div class="nav-item" id="nav-stores" onclick="switchTab('stores')"><div class="nav-icon">🏪</div><span>Negozi</span></div>
     <div class="nav-item" id="nav-tempo" onclick="switchTab('tempo')"><div class="nav-icon">📅</div><span>Periodo</span></div>
     <div class="nav-item" id="nav-settings" onclick="switchTab('settings')"><div class="nav-icon">⚙️</div><span>Config</span></div>
   </div>
@@ -336,8 +360,8 @@ body{display:flex;flex-direction:column}
 pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
 const LS='rp_cfg_v3';
-// v3: aggiunta estrazione completa Q&A per CSV export → invalidata cache vecchia
-const CACHE_KEY='rp_cache_v3';
+// v4: aggiunta estrazione 'Importo da versare' per la tab Negozi → reset cache
+const CACHE_KEY='rp_cache_v4';
 const CONCURRENCY=6;
 const PROXY_BASE='';
 // Lato minimo per considerare un'immagine una "foto utente": scarta loghi
@@ -548,6 +572,9 @@ async function parsePDF(ab,fname,modifiedTime,fileId){
   const pos=posTml1+posTml2+posTml3+posTml4;
   const fondo=gn(/Fondo cassa[^\d\n]{0,30}\n?\s*(?:€|EUR)?\s*(\d+(?:\.\d{3})*(?:,\d+)?)/i);
   const versato=gn(/Importo [Vv]ersato[^\d\n]{0,30}\n?\s*(?:€|EUR)?\s*(\d+(?:\.\d{3})*(?:,\d+)?)/i);
+  // "Importo da versare": il valore che il negozio doveva depositare quel giorno.
+  // Cumulato per negozio (sum daVersare - sum versato) dà il saldo aperto residuo.
+  const daVersare=gn(/Importo da versare[^\d\n]{0,30}\n?\s*(?:€|EUR)?\s*(\d+(?:\.\d{3})*(?:,\d+)?)/i);
   const netSales=corrispettivo/1.22;
   const diff=Math.abs(corrispettivo-contanti-pos);
   const anomaly=diff>1&&corrispettivo>0;
@@ -587,7 +614,7 @@ async function parsePDF(ab,fname,modifiedTime,fileId){
   if(cur) qa.push(cur);
 
   return{fileId,store,brand,location,dateISO,dateDisplay,
-    corrispettivo,netSales,contanti,pos,fondo,versato,
+    corrispettivo,netSales,contanti,pos,fondo,versato,daVersare,
     cambi,buonoE,buonoR,sconti,annull,anomaly,diff,qa};
 }
 
@@ -616,13 +643,18 @@ function setChip(el,f){
   el.classList.add('on');renderCards();
 }
 function switchTab(t){
-  ['negozi','tempo','settings'].forEach(n=>{
+  ['negozi','stores','tempo','settings'].forEach(n=>{
     const el=document.getElementById('tab-'+n);
     if(el)el.style.display=n===t?'block':'none';
     const nav=document.getElementById('nav-'+n);
     if(nav)nav.classList.toggle('active',n===t);
   });
+  // Titolo header dinamico in base alla tab
+  const titles={negozi:'Chiusure giornaliere',stores:'Negozi',tempo:'Periodo',settings:'Impostazioni'};
+  const titleEl=document.getElementById('app-title');
+  if(titleEl)titleEl.textContent=titles[t]||'Chiusure';
   if(t==='tempo')renderTempo();
+  if(t==='stores')renderStores();
 }
 function closeSheet(e){
   if(!e||e.target===document.getElementById('sheet'))
@@ -636,7 +668,12 @@ function setTempo(v,el){
 }
 
 // ── RENDER ALL ──
-function renderAll(){updateMissingChip();renderKPI();renderCards();}
+function renderAll(){
+  updateMissingChip();renderKPI();renderCards();
+  // Se la tab "Negozi" (saldi) è attiva, ricalcola i totali con i nuovi dati
+  const storesTab=document.getElementById('tab-stores');
+  if(storesTab && storesTab.style.display==='block') renderStores();
+}
 
 // Restituisce i record filtrati per la data selezionata (o tutti)
 function getFilteredData(){
@@ -1021,6 +1058,126 @@ function togglePeriod(id){
   if(!body)return;
   const open=body.classList.toggle('open');
   if(chev)chev.classList.toggle('open',open);
+}
+
+// ── TAB NEGOZI (saldi cumulati per ognuno dei 20 punti vendita) ──
+// Per ogni negozio della lista EXPECTED_STORES:
+//   - Fondocassa = valore della chiusura più recente ricevuta
+//   - Da-versare cumulato = sum(daVersare) - sum(versato) di tutte le chiusure
+// Negozi che non hanno mai inviato una chiusura compaiono in card grigia.
+function renderStores(){
+  // 1) Indicizzo le chiusure ricevute per chiave brand|location
+  const byStore={};
+  for(const r of allData){
+    const k=storeKey(r.brand,r.location);
+    if(!byStore[k]) byStore[k]=[];
+    byStore[k].push(r);
+  }
+  // 2) Raggruppo i 20 negozi attesi per brand mantenendo l'ordine della lista
+  const grouped={};
+  for(const s of EXPECTED_STORES){
+    if(!grouped[s.brand]) grouped[s.brand]=[];
+    grouped[s.brand].push(s);
+  }
+
+  // Aggregati globali per la summary in cima
+  let totFondo=0, totSaldo=0, storesWithData=0;
+
+  let html='';
+  for(const [brand,stores] of Object.entries(grouped)){
+    const bc=brandColor(brand);
+    let bFondo=0, bSaldo=0;
+
+    let sectionHtml='';
+    for(const s of stores){
+      const k=storeKey(s.brand,s.location);
+      const records=byStore[k]||[];
+      let fondo=0, sumDV=0, sumV=0, lastDisp='', lastISO='';
+      for(const r of records){
+        sumDV += r.daVersare||0;
+        sumV  += r.versato||0;
+        if(!lastISO || r.dateISO>lastISO){
+          lastISO=r.dateISO;
+          lastDisp=r.dateDisplay;
+          fondo=r.fondo||0;
+        }
+      }
+      const saldo=sumDV-sumV; // residuo da versare
+      const isEmpty=records.length===0;
+      bFondo+=fondo; bSaldo+=saldo;
+      if(!isEmpty) storesWithData++;
+
+      // Classi colore per il saldo: rosso se positivo (negozio deve ancora versare),
+      // verde se negativo (ha versato più del dovuto), neutro se zero
+      const saldoCls = saldo>0.01 ? 'r' : (saldo<-0.01 ? 'g' : '');
+
+      if(isEmpty){
+        sectionHtml += `<div class="store-card store-summary empty" style="border-left:3px dashed ${bc.strong}">
+          <div class="card-head">
+            <div class="card-name">${s.location}</div>
+            <div class="card-date">Nessuna chiusura ricevuta</div>
+          </div>
+          <div class="card-body">
+            <div class="card-cell">
+              <div class="card-cell-l">Fondocassa</div>
+              <div class="card-cell-v no-data-cell">—</div>
+            </div>
+            <div class="card-cell">
+              <div class="card-cell-l">Da versare cumulato</div>
+              <div class="card-cell-v no-data-cell">—</div>
+            </div>
+          </div>
+        </div>`;
+      }else{
+        sectionHtml += `<div class="store-card store-summary" style="border-left:3px solid ${bc.strong}">
+          <div class="card-head">
+            <div class="card-name">${s.location}</div>
+            <div class="card-date">aggiornato ${lastDisp} · ${records.length} chiusur${records.length===1?'a':'e'}</div>
+          </div>
+          <div class="card-body">
+            <div class="card-cell">
+              <div class="card-cell-l">Fondocassa</div>
+              <div class="card-cell-v">${fmt(fondo)}</div>
+            </div>
+            <div class="card-cell">
+              <div class="card-cell-l">Da versare cumulato</div>
+              <div class="card-cell-v ${saldoCls}">${fmt(saldo)}</div>
+            </div>
+          </div>
+        </div>`;
+      }
+    }
+
+    totFondo+=bFondo; totSaldo+=bSaldo;
+
+    html += `<div class="brand-header" style="background:${bc.tint};border-radius:8px;padding:8px 12px">
+      <span class="brand-label" style="color:${bc.text}">${brand}</span>
+      <span class="brand-count" style="color:${bc.text};opacity:.7">${stores.length} negoz${stores.length===1?'io':'i'}</span>
+    </div>` + sectionHtml + `<div class="subtotal-card" style="border-color:${bc.strong}40;background:${bc.tint}80">
+      <div>
+        <div class="sub-cell-l" style="color:${bc.text}">Fondocassa totale ${brand}</div>
+        <div class="sub-cell-v">${fmt(bFondo)}</div>
+      </div>
+      <div>
+        <div class="sub-cell-l" style="color:${bc.text}">Da versare cumulato</div>
+        <div class="sub-cell-v" style="color:${bSaldo>0.01?'var(--red)':bSaldo<-0.01?'var(--green)':'var(--t1)'}">${fmt(bSaldo)}</div>
+      </div>
+    </div>`;
+  }
+
+  // Summary in cima: totali generali
+  document.getElementById('stores-summary').innerHTML = `
+    <div class="ssum-card">
+      <div class="ssum-l">Fondocassa totale</div>
+      <div class="ssum-v">${fmt(totFondo)}</div>
+      <div class="ssum-s">${storesWithData} su ${EXPECTED_STORES.length} negozi attivi</div>
+    </div>
+    <div class="ssum-card">
+      <div class="ssum-l">Da versare cumulato</div>
+      <div class="ssum-v ${totSaldo>0.01?'r':totSaldo<-0.01?'g':''}">${fmt(totSaldo)}</div>
+      <div class="ssum-s">${totSaldo>0.01?'residuo da depositare':totSaldo<-0.01?'versato in eccesso':'in pareggio'}</div>
+    </div>`;
+  document.getElementById('stores-list').innerHTML = html;
 }
 
 // ── SHEET DETTAGLIO ──
