@@ -182,6 +182,23 @@ body{display:flex;flex-direction:column}
 .saldo-row-delta.g{color:var(--green)}
 .saldo-row-delta.n{color:var(--t2)}
 
+/* ── RIGA SETTIMANA (collassata, cliccabile) ── */
+.week-row{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-bottom:1px solid var(--bd);cursor:pointer;background:var(--s2);transition:background .1s}
+.week-row:active{background:var(--s3)}
+.week-row.empty{cursor:default;opacity:.65}
+.week-row.empty:active{background:var(--s2)}
+.week-label{font-size:13px;font-weight:600;color:var(--t1)}
+.week-detail{font-size:11px;color:var(--t2);margin-top:3px;font-family:var(--mono)}
+.week-delta-wrap{display:flex;align-items:center;gap:10px;flex-shrink:0;margin-left:12px}
+.week-chev{display:inline-block;font-size:9px;color:var(--t3);transition:transform .15s}
+.week-row.expanded .week-chev{transform:rotate(90deg)}
+.week-delta-val{font-family:var(--mono);font-size:14px;font-weight:500}
+.week-delta-val.r{color:var(--red)}
+.week-delta-val.g{color:var(--green)}
+.week-delta-val.n{color:var(--t2)}
+.week-days{background:linear-gradient(to right,var(--s2) 0,var(--s2) 4px,var(--s1) 4px)}
+.week-days .saldo-row{padding-left:28px}
+
 /* ── TEMPO TAB ── */
 .tempo-wrap{padding:16px;display:flex;flex-direction:column;gap:12px;padding-bottom:32px}
 .tempo-seg{display:flex;gap:0;border:1px solid var(--bd2);border-radius:10px;overflow:hidden;margin-bottom:4px;flex-shrink:0}
@@ -1202,15 +1219,80 @@ function renderStores(){
   document.getElementById('stores-list').innerHTML = html;
 }
 
+// ── HELPER ISO WEEK ──
+// Numero di settimana ISO 8601: lunedì primo giorno, settimana 1 contiene il
+// primo giovedì dell'anno (e quindi sempre il 4 gennaio). Implementazione
+// classica con conversione UTC per evitare drift legati al fuso orario.
+function isoWeek(dateISO){
+  const [y,m,d]=dateISO.split('-').map(Number);
+  const dt=new Date(Date.UTC(y,m-1,d));
+  // Sposto al giovedì della stessa settimana ISO
+  dt.setUTCDate(dt.getUTCDate()+4-(dt.getUTCDay()||7));
+  const yearStart=new Date(Date.UTC(dt.getUTCFullYear(),0,1));
+  const weekNo=Math.ceil((((dt-yearStart)/86400000)+1)/7);
+  return {year:dt.getUTCFullYear(), week:weekNo};
+}
+// Restituisce [lunedì, domenica] della settimana ISO indicata
+function isoWeekRange(year, week){
+  const jan4=new Date(Date.UTC(year,0,4));
+  const dow=jan4.getUTCDay()||7; // domenica=7
+  const w1Mon=new Date(jan4);
+  w1Mon.setUTCDate(jan4.getUTCDate()-(dow-1));
+  const mon=new Date(w1Mon);
+  mon.setUTCDate(w1Mon.getUTCDate()+(week-1)*7);
+  const sun=new Date(mon);
+  sun.setUTCDate(mon.getUTCDate()+6);
+  return [mon,sun];
+}
+// Etichetta range "20–26 apr 2026", "27 apr – 3 mag 2026", "29 dic 2025 – 4 gen 2026"
+function fmtWeekRange(d1, d2){
+  const months=['gen','feb','mar','apr','mag','giu','lug','ago','set','ott','nov','dic'];
+  const sameMonth = d1.getUTCMonth()===d2.getUTCMonth() && d1.getUTCFullYear()===d2.getUTCFullYear();
+  const sameYear  = d1.getUTCFullYear()===d2.getUTCFullYear();
+  if(sameMonth)
+    return `${d1.getUTCDate()}–${d2.getUTCDate()} ${months[d2.getUTCMonth()]} ${d2.getUTCFullYear()}`;
+  if(sameYear)
+    return `${d1.getUTCDate()} ${months[d1.getUTCMonth()]} – ${d2.getUTCDate()} ${months[d2.getUTCMonth()]} ${d2.getUTCFullYear()}`;
+  return `${d1.getUTCDate()} ${months[d1.getUTCMonth()]} ${d1.getUTCFullYear()} – ${d2.getUTCDate()} ${months[d2.getUTCMonth()]} ${d2.getUTCFullYear()}`;
+}
+
+// Toggle espansione di una settimana collassata (chiamato da onclick inline)
+function toggleWeek(key){
+  const days=document.querySelector(`.week-days[data-wk="${key}"]`);
+  if(!days) return;
+  const isHidden=days.style.display==='none';
+  days.style.display = isHidden ? '' : 'none';
+  const row=document.querySelector(`.week-row[data-wk="${key}"]`);
+  if(row) row.classList.toggle('expanded', isHidden);
+}
+
+// Costruisce il markup per una singola riga giornaliera (riusato sia per la
+// settimana corrente sia per le settimane espanse)
+function _buildDayRow(r){
+  const dv=r.daVersare||0, v=r.versato||0, delta=dv-v;
+  const dCls = delta>0.01 ? 'r' : (delta<-0.01 ? 'g' : 'n');
+  const dPrefix = delta>0.01 ? '+' : '';
+  const idx=allData.indexOf(r);
+  return `<div class="saldo-row" onclick="openSheet(${idx})">
+    <div>
+      <div class="saldo-row-date">${r.dateDisplay}</div>
+      <div class="saldo-row-detail">Da versare ${fmt(dv)} · Versato ${fmt(v)}</div>
+    </div>
+    <div class="saldo-row-delta ${dCls}">${dPrefix}${fmt(delta)}</div>
+  </div>`;
+}
+
 // ── SHEET STORICO SALDO (cliccando una card della tab Negozi) ──
-// Mostra: riepilogo cumulato in alto + lista cronologica di ogni chiusura
-// con il delta (da versare - versato) di quella giornata. Cliccando una riga
-// si apre la sheet di dettaglio della chiusura corrispondente (openSheet).
+// Layout:
+//   [Riepilogo: DV totale | V totale | Saldo]
+//   [Settimana corrente (in corso) — sempre espansa con righe giornaliere]
+//   [Settimana N — collassata, cliccabile per espandere le righe giornaliere]
+//   [...altre settimane collassate, anche vuote]
 function openStoreSheet(brand, location){
   const k=storeKey(brand,location);
   const records=allData
-    .filter(r=>storeKey(r.brand,r.location)===k)
-    .sort((a,b)=>(b.dateISO||'').localeCompare(a.dateISO||''));
+    .filter(r=>storeKey(r.brand,r.location)===k && r.dateISO)
+    .sort((a,b)=>b.dateISO.localeCompare(a.dateISO));
 
   const sumDV=records.reduce((s,r)=>s+(r.daVersare||0),0);
   const sumV=records.reduce((s,r)=>s+(r.versato||0),0);
@@ -1241,23 +1323,90 @@ function openStoreSheet(brand, location){
   if(!records.length){
     html += `<div class="empty-state"><div class="empty-icon">📭</div>
       <div class="empty-text">Nessun movimento da mostrare</div></div>`;
-  }else{
-    html += `<div class="sheet-row divider"><span>Storico chiusure (più recenti in alto)</span></div>`;
-    for(const r of records){
-      const dv=r.daVersare||0;
-      const v=r.versato||0;
-      const delta=dv-v; // positivo: residuo da versare per quella giornata
-      const dCls = delta>0.01 ? 'r' : (delta<-0.01 ? 'g' : 'n');
-      // Solo per valori positivi aggiungo il "+", il "-" è già nel numero negativo
-      const dPrefix = delta>0.01 ? '+' : '';
-      const idx=allData.indexOf(r);
-      html += `<div class="saldo-row" onclick="openSheet(${idx})">
+    document.getElementById('sheet-rows').innerHTML=html;
+    document.getElementById('sheet').classList.add('show');
+    return;
+  }
+
+  // 1) Raggruppa i record per settimana ISO (chiave "YYYY-WW")
+  const byWeek=new Map();
+  for(const r of records){
+    const {year,week}=isoWeek(r.dateISO);
+    const key=`${year}-${String(week).padStart(2,'0')}`;
+    if(!byWeek.has(key)){
+      const [mon,sun]=isoWeekRange(year,week);
+      byWeek.set(key,{key,year,week,mon,sun,records:[],sumDV:0,sumV:0});
+    }
+    const w=byWeek.get(key);
+    w.records.push(r);
+    w.sumDV+=r.daVersare||0;
+    w.sumV +=r.versato||0;
+  }
+
+  // 2) Determina range completo di settimane da mostrare:
+  //    da quella della chiusura più vecchia, fino a max(settimana ultima chiusura, settimana corrente)
+  const todayISO=(()=>{
+    const t=new Date();
+    return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
+  })();
+  const curW=isoWeek(todayISO);
+  const oldestISO=records[records.length-1].dateISO;
+  const newestISO=records[0].dateISO;
+  const oldestW=isoWeek(oldestISO);
+  const newestW=isoWeek(newestISO);
+  // End = la più recente tra newestW e curW
+  const endW = (curW.year>newestW.year || (curW.year===newestW.year && curW.week>newestW.week)) ? curW : newestW;
+
+  // Itero a ritroso dalla settimana finale a quella più vecchia (incluse vuote)
+  const [endMon]=isoWeekRange(endW.year,endW.week);
+  const [startMon]=isoWeekRange(oldestW.year,oldestW.week);
+  const allWeeks=[];
+  for(let cur=new Date(endMon); cur>=startMon; cur.setUTCDate(cur.getUTCDate()-7)){
+    const iso=`${cur.getUTCFullYear()}-${String(cur.getUTCMonth()+1).padStart(2,'0')}-${String(cur.getUTCDate()).padStart(2,'0')}`;
+    const {year,week}=isoWeek(iso);
+    const key=`${year}-${String(week).padStart(2,'0')}`;
+    const isCurrent = year===curW.year && week===curW.week;
+    if(byWeek.has(key)){
+      allWeeks.push({...byWeek.get(key), isCurrent});
+    }else{
+      const [mon,sun]=isoWeekRange(year,week);
+      allWeeks.push({key,year,week,mon,sun,records:[],sumDV:0,sumV:0,isCurrent});
+    }
+  }
+
+  // 3) Render: settimana corrente con righe giornaliere espanse, le passate collassate
+  for(const w of allWeeks){
+    const wDelta = w.sumDV - w.sumV;
+    const wCls = wDelta>0.01 ? 'r' : (wDelta<-0.01 ? 'g' : 'n');
+    const wPref = wDelta>0.01 ? '+' : '';
+    const range = fmtWeekRange(w.mon, w.sun);
+    const isEmpty = w.records.length===0;
+
+    if(w.isCurrent){
+      // Settimana corrente: sempre espansa, no clic per collassare
+      const subtitle = isEmpty ? 'in corso · nessuna chiusura ancora' : `in corso · ${w.records.length} chiusur${w.records.length===1?'a':'e'}`;
+      html += `<div class="sheet-row divider"><span>Settimana ${w.week} · ${range} · ${subtitle}</span></div>`;
+      for(const r of w.records) html += _buildDayRow(r);
+    }else{
+      // Settimana passata: riga collassata
+      const detail = isEmpty
+        ? 'Nessuna chiusura'
+        : `Da versare ${fmt(w.sumDV)} · Versato ${fmt(w.sumV)} · ${w.records.length} giorn${w.records.length===1?'o':'i'}`;
+      html += `<div class="week-row${isEmpty?' empty':''}" data-wk="${w.key}"${isEmpty?'':` onclick="toggleWeek('${w.key}')"`}>
         <div>
-          <div class="saldo-row-date">${r.dateDisplay}</div>
-          <div class="saldo-row-detail">Da versare ${fmt(dv)} · Versato ${fmt(v)}</div>
+          <div class="week-label">Settimana ${w.week} · ${range}</div>
+          <div class="week-detail">${detail}</div>
         </div>
-        <div class="saldo-row-delta ${dCls}">${dPrefix}${fmt(delta)}</div>
+        <div class="week-delta-wrap">
+          ${isEmpty?'':'<span class="week-chev">▶</span>'}
+          <span class="week-delta-val ${wCls}">${wPref}${fmt(wDelta)}</span>
+        </div>
       </div>`;
+      if(!isEmpty){
+        html += `<div class="week-days" data-wk="${w.key}" style="display:none">`;
+        for(const r of w.records) html += _buildDayRow(r);
+        html += `</div>`;
+      }
     }
   }
 
