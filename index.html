@@ -37,8 +37,8 @@ body{display:flex;flex-direction:column}
 .status-bar{height:var(--safe-top);background:var(--bg);flex-shrink:0}
 .scroll-area{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
 
-/* ── SETUP ── */
-#setup-wrap .setup-inner{padding:24px 16px;display:flex;flex-direction:column;gap:16px}
+/* ── SETUP / LOGIN / REGISTER / PENDING ── */
+#login-wrap .setup-inner,#register-wrap .setup-inner,#pending-wrap .setup-inner,#setup-wrap .setup-inner{padding:24px 16px;display:flex;flex-direction:column;gap:16px}
 .setup-hero{text-align:center;padding:24px 0 8px}
 .setup-icon{font-size:48px;margin-bottom:12px}
 .setup-h{font-size:22px;font-weight:600;margin-bottom:6px}
@@ -228,6 +228,26 @@ body{display:flex;flex-direction:column}
 .empty-icon{font-size:40px;margin-bottom:12px;opacity:.5}
 .empty-text{font-size:14px}
 
+/* ── ACCOUNT TAB (admin: gestione utenti) ── */
+.account-section{background:var(--s1);border:1px solid var(--bd);border-radius:14px;overflow:hidden;margin-bottom:12px}
+.account-section-title{padding:12px 16px;font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.6px;border-bottom:1px solid var(--bd);background:var(--s2);display:flex;justify-content:space-between;align-items:center}
+.account-row{padding:14px 16px;border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.account-row:last-child{border-bottom:none}
+.account-info{flex:1;min-width:160px}
+.account-name{font-size:14px;font-weight:500;color:var(--t1)}
+.account-email{font-size:12px;color:var(--t2);font-family:var(--mono);margin-top:2px}
+.account-meta{font-size:11px;color:var(--t3);margin-top:4px}
+.account-badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-right:6px}
+.account-badge.admin{background:#ddd6fe;color:#5b21b6}
+.account-badge.pending{background:#fef3c7;color:#a16207}
+.account-badge.active{background:#dcfce7;color:#166534}
+.account-actions{display:flex;gap:6px;flex-shrink:0}
+.acct-btn{padding:6px 10px;border-radius:6px;border:1px solid var(--bd2);background:var(--s2);color:var(--t1);font-family:var(--font);font-size:11px;font-weight:500;cursor:pointer;transition:background .15s}
+.acct-btn:active{background:var(--s3)}
+.acct-btn.approve{background:#dcfce7;color:#166534;border-color:#86efac}
+.acct-btn.deny{background:#fef2f2;color:var(--red);border-color:#fecaca}
+.acct-btn.promote{background:#ddd6fe;color:#5b21b6;border-color:#c4b5fd}
+
 /* ── BOTTOM NAV ── */
 .bottom-nav{display:flex;align-items:center;background:rgba(255,255,255,.92);backdrop-filter:blur(20px);border-top:1px solid var(--bd);flex-shrink:0;padding-bottom:var(--safe-bot)}
 .nav-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:10px 4px;cursor:pointer;color:var(--t3);transition:color .15s;font-size:10px;font-weight:500}
@@ -292,28 +312,62 @@ body{display:flex;flex-direction:column}
   </div>
 </div>
 
-<!-- SETUP -->
-<div class="scroll-area" id="setup-wrap">
+<!-- LOGIN -->
+<div class="scroll-area" id="login-wrap" style="display:none">
 <div class="setup-inner">
   <div class="setup-hero">
-    <div class="setup-icon">📊</div>
+    <div class="setup-icon">🔐</div>
     <div class="setup-h">Dashboard Chiusure</div>
-    <div class="setup-sub">Collega Google Drive per ricevere i report automaticamente ogni sera.</div>
+    <div class="setup-sub">Accedi al tuo account per continuare</div>
   </div>
   <div class="setup-card">
-    <div class="setup-card-title"><div class="step-badge">1</div> Cartella Google Drive</div>
-    <p>Crea una cartella <code>Chiusure Negozi</code> su Drive, rendila pubblica, e copia l'ID dall'URL: <code>drive.google.com/drive/folders/<b>ID</b></code></p>
-    <div class="field-label">ID Cartella</div>
-    <input class="field" id="cfg-folder" placeholder="1BxiMVs0XRA5nFMd…" autocomplete="off" autocorrect="off" autocapitalize="off"/>
+    <div class="field-label">Email</div>
+    <input class="field" type="email" id="login-email" placeholder="email@esempio.it" autocomplete="username"/>
+    <div class="field-label" style="margin-top:14px">Password</div>
+    <input class="field" type="password" id="login-password" autocomplete="current-password"/>
+    <label style="display:flex;align-items:center;gap:8px;margin-top:14px;font-size:13px;color:var(--t2);cursor:pointer">
+      <input type="checkbox" id="login-remember" checked style="width:16px;height:16px;accent-color:var(--acc)"/>
+      Ricordami per 30 giorni
+    </label>
+    <div id="login-error" style="color:var(--red);font-size:12px;margin-top:10px;display:none"></div>
+  </div>
+  <button class="cta" id="login-btn" onclick="doLogin()">Accedi →</button>
+  <div style="text-align:center;color:var(--t3);font-size:13px;margin:4px 0">oppure</div>
+  <button class="cta" style="background:var(--s2);color:var(--t1);border:1px solid var(--bd2)" onclick="showRegister()">Crea un nuovo account</button>
+</div>
+</div>
+
+<!-- REGISTER -->
+<div class="scroll-area" id="register-wrap" style="display:none">
+<div class="setup-inner">
+  <div class="setup-hero">
+    <div class="setup-icon">📝</div>
+    <div class="setup-h">Crea account</div>
+    <div class="setup-sub">Dopo la registrazione l'admin dovrà approvare il tuo account prima del primo accesso.</div>
   </div>
   <div class="setup-card">
-    <div class="setup-card-title"><div class="step-badge">2</div> Google API Key</div>
-    <p>Su <code>console.cloud.google.com</code> → crea progetto → abilita <code>Google Drive API</code> → Credenziali → Crea Chiave API.</p>
-    <div class="field-label">API Key</div>
-    <input class="field" id="cfg-apikey" placeholder="AIzaSy…" type="password" autocomplete="off"/>
+    <div class="field-label">Username</div>
+    <input class="field" type="text" id="reg-username" placeholder="es. mario.rossi" autocomplete="username" autocapitalize="off"/>
+    <div class="field-label" style="margin-top:14px">Email</div>
+    <input class="field" type="email" id="reg-email" placeholder="email@esempio.it" autocapitalize="off"/>
+    <div class="field-label" style="margin-top:14px">Password</div>
+    <input class="field" type="password" id="reg-password" placeholder="Almeno 8 caratteri" autocomplete="new-password"/>
+    <div id="reg-error" style="color:var(--red);font-size:12px;margin-top:10px;display:none"></div>
   </div>
-  <button class="cta" onclick="saveConfig()">Connetti e apri dashboard →</button>
-  <div class="setup-note">Le credenziali sono salvate solo nel tuo dispositivo. Nessun dato viene inviato a server esterni.</div>
+  <button class="cta" id="reg-btn" onclick="doRegister()">Registrati →</button>
+  <button class="cta" style="background:var(--s2);color:var(--t1);border:1px solid var(--bd2)" onclick="showLogin()">← Torna al login</button>
+</div>
+</div>
+
+<!-- PENDING (registrato ma non ancora approvato) -->
+<div class="scroll-area" id="pending-wrap" style="display:none">
+<div class="setup-inner">
+  <div class="setup-hero">
+    <div class="setup-icon">⏳</div>
+    <div class="setup-h">Account in attesa</div>
+    <div class="setup-sub" id="pending-msg">Registrazione completata. Devi attendere che l'admin approvi il tuo account prima di poter accedere.</div>
+  </div>
+  <button class="cta" onclick="showLogin()">Torna al login</button>
 </div>
 </div>
 
@@ -369,7 +423,7 @@ body{display:flex;flex-direction:column}
   <div class="scroll-area" id="tab-settings" style="display:none">
     <div class="settings-inner">
       <div class="settings-section">
-        <div class="settings-row"><span class="settings-label">Cartella Drive</span><span class="settings-value" id="cfg-disp">—</span></div>
+        <div class="settings-row"><span class="settings-label">Account</span><span class="settings-value" id="cfg-user-disp">—</span></div>
         <div class="settings-row"><span class="settings-label">Ultimo sync</span><span class="settings-value" id="last-sync-disp">—</span></div>
         <div class="settings-row"><span class="settings-label">PDF caricati</span><span class="settings-value" id="pdf-count-disp">—</span></div>
         <div class="settings-row"><span class="settings-label">Errori ultimo sync</span><span class="settings-value" id="err-count-disp">0</span></div>
@@ -379,7 +433,14 @@ body{display:flex;flex-direction:column}
       <button class="settings-btn" onclick="forceResync()">⟳ Ricarica tutto (svuota cache)</button>
       <button class="settings-btn" onclick="showErrors()">🔍 Mostra errori sync</button>
       <button class="settings-btn" onclick="exportCSV()">↓ Esporta CSV</button>
-      <button class="settings-btn danger" onclick="resetConfig()">⚙ Riconfigura connessione</button>
+      <button class="settings-btn danger" onclick="doLogout()">⎋ Disconnetti</button>
+    </div>
+  </div>
+
+  <!-- TAB ACCOUNT (admin only: gestione utenti) -->
+  <div class="scroll-area" id="tab-account" style="display:none">
+    <div class="settings-inner">
+      <div id="account-list-wrap"><div class="empty-state"><div class="spinner" style="margin:0 auto 14px"></div><div class="empty-text">Carico utenti…</div></div></div>
     </div>
   </div>
 
@@ -388,6 +449,7 @@ body{display:flex;flex-direction:column}
     <div class="nav-item active" id="nav-negozi" onclick="switchTab('negozi')"><div class="nav-icon">📋</div><span>Chiusure</span></div>
     <div class="nav-item" id="nav-stores" onclick="switchTab('stores')"><div class="nav-icon">🏪</div><span>Negozi</span></div>
     <div class="nav-item" id="nav-tempo" onclick="switchTab('tempo')"><div class="nav-icon">📅</div><span>Periodo</span></div>
+    <div class="nav-item" id="nav-account" onclick="switchTab('account')" style="display:none"><div class="nav-icon">👥</div><span>Account</span></div>
     <div class="nav-item" id="nav-settings" onclick="switchTab('settings')"><div class="nav-icon">⚙️</div><span>Config</span></div>
   </div>
 </div>
@@ -396,18 +458,21 @@ body{display:flex;flex-direction:column}
 <script>
 pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-const LS='rp_cfg_v3';
+// URL del backend FastAPI (Render). Hardcoded perché non cambia spesso.
+const API_BASE='https://dashboard-backend-ur63.onrender.com';
 // v4: aggiunta estrazione 'Importo da versare' per la tab Negozi → reset cache
 const CACHE_KEY='rp_cache_v4';
 const CONCURRENCY=6;
-const PROXY_BASE='';
 // Lato minimo per considerare un'immagine una "foto utente": scarta loghi
 // a banner (GoAudits 572x82), mappe Google location (264x120), icone piccole.
 // Le foto scontrino/documento da smartphone sono sempre >= 200px per lato
 // anche dopo la compressione JPEG applicata dal generatore di PDF.
 const ATTACH_MIN_SIDE=200;
-let cfg=null, allData=[], filter='all', filterDate=null, tempoView='giorno', syncTimer=null;
+let allData=[], filter='all', filterDate=null, tempoView='giorno', syncTimer=null;
 let lastErrors=[];
+// Stato autenticazione: user info + token cache. I token sono anche salvati
+// in localStorage per sopravvivere ai refresh della pagina.
+let auth={user:null, accessToken:null, refreshToken:null};
 
 function loadCache(){try{return JSON.parse(localStorage.getItem(CACHE_KEY)||'{}');}catch(e){return {};}}
 function saveCache(c){try{localStorage.setItem(CACHE_KEY,JSON.stringify(c));}catch(e){console.warn('Cache save fallita',e);}}
@@ -424,31 +489,194 @@ function showErrors(){
 const MESI=['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
 const MESI_SHORT=['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
 
+// ── AUTH: helper per chiamate API autenticate ──
+// Usa cookie httponly se disponibili (cross-site con credentials:include) +
+// fallback Authorization Bearer per browser che bloccano i cookie cross-site
+// (es. Safari iOS). Su 401 prova auto-refresh una volta e ritenta.
+async function api(path, opts={}){
+  const url=API_BASE+path;
+  const buildOpts=(token)=>({
+    ...opts,
+    credentials:'include',
+    headers:{
+      ...(opts.body?{'Content-Type':'application/json'}:{}),
+      ...(opts.headers||{}),
+      ...(token?{'Authorization':`Bearer ${token}`}:{}),
+    },
+  });
+  let res=await fetch(url, buildOpts(auth.accessToken));
+  // Se il token è scaduto e abbiamo un refresh, lo usiamo e ritentiamo
+  if(res.status===401 && auth.refreshToken && path!=='/auth/refresh'){
+    if(await tryRefresh()){
+      res=await fetch(url, buildOpts(auth.accessToken));
+    }
+  }
+  return res;
+}
+async function tryRefresh(){
+  try{
+    const r=await fetch(API_BASE+'/auth/refresh',{
+      method:'POST',
+      credentials:'include',
+      headers:auth.refreshToken?{'Authorization':`Bearer ${auth.refreshToken}`}:{},
+    });
+    if(!r.ok)return false;
+    const data=await r.json();
+    setAuth(data.user, data.access_token, data.refresh_token);
+    return true;
+  }catch(e){return false;}
+}
+function setAuth(user, accessToken, refreshToken){
+  auth.user=user;
+  auth.accessToken=accessToken;
+  auth.refreshToken=refreshToken;
+  if(accessToken) localStorage.setItem('access_token', accessToken);
+  if(refreshToken) localStorage.setItem('refresh_token', refreshToken);
+}
+function clearAuth(){
+  auth.user=null; auth.accessToken=null; auth.refreshToken=null;
+  localStorage.removeItem('access_token');
+  localStorage.removeItem('refresh_token');
+}
+
 // ── INIT ──
-(function(){
-  const s=localStorage.getItem(LS);
-  if(s){try{cfg=JSON.parse(s);showDash();}catch(e){}}
+// All'avvio: prova ad autenticarsi col token salvato. Se valido, mostra dash.
+// Altrimenti mostra schermata login. Notifica spinner per cold start Render.
+(async function(){
+  auth.accessToken=localStorage.getItem('access_token');
+  auth.refreshToken=localStorage.getItem('refresh_token');
+  if(auth.accessToken){
+    load(true,'Verifico sessione… (potrebbe richiedere qualche secondo se il server era inattivo)');
+    try{
+      const r=await api('/auth/me');
+      if(r.ok){
+        auth.user=await r.json();
+        load(false);
+        showDash();
+        return;
+      }
+    }catch(e){console.warn('Auth check failed',e);}
+    load(false);
+  }
+  showLogin();
 })();
 
-function saveConfig(){
-  const f=document.getElementById('cfg-folder').value.trim();
-  const k=document.getElementById('cfg-apikey').value.trim();
-  if(!f||!k){alert('Inserisci entrambi i campi.');return;}
-  cfg={folder:f,apikey:k};
-  localStorage.setItem(LS,JSON.stringify(cfg));
-  showDash();
+// ── UI: switch fra login / register / pending / dashboard ──
+function _hideAllScreens(){
+  ['login-wrap','register-wrap','pending-wrap','dash-wrap'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.style.display='none';
+  });
 }
-function resetConfig(){
-  if(!confirm('Riconfigurare la connessione?'))return;
-  localStorage.removeItem(LS);clearCache();clearInterval(syncTimer);location.reload();
+function showLogin(){
+  _hideAllScreens();
+  document.getElementById('login-wrap').style.display='';
+  document.getElementById('login-error').style.display='none';
+}
+function showRegister(){
+  _hideAllScreens();
+  document.getElementById('register-wrap').style.display='';
+  document.getElementById('reg-error').style.display='none';
+}
+function showPending(msg){
+  _hideAllScreens();
+  document.getElementById('pending-wrap').style.display='';
+  if(msg) document.getElementById('pending-msg').textContent=msg;
 }
 function showDash(){
-  document.getElementById('setup-wrap').style.display='none';
+  _hideAllScreens();
   const d=document.getElementById('dash-wrap');
   d.style.display='flex';
-  document.getElementById('cfg-disp').textContent=cfg.folder.slice(0,20)+'…';
+  // Aggiorna badge admin / sezioni in base al ruolo
+  applyRoleVisibility();
+  // Riempi info utente in Config
+  if(auth.user){
+    const cu=document.getElementById('cfg-user-disp');
+    if(cu) cu.textContent=auth.user.username+' · '+auth.user.role;
+  }
   syncNow();
   syncTimer=setInterval(syncNow,5*60*1000);
+}
+function applyRoleVisibility(){
+  // Tab Account visibile solo agli admin
+  const navAccount=document.getElementById('nav-account');
+  if(navAccount) navAccount.style.display = auth.user?.role==='admin' ? '' : 'none';
+}
+
+// ── LOGIN / REGISTER / LOGOUT ──
+async function doLogin(){
+  const email=document.getElementById('login-email').value.trim();
+  const password=document.getElementById('login-password').value;
+  const remember=document.getElementById('login-remember').checked;
+  const errEl=document.getElementById('login-error');
+  errEl.style.display='none';
+  if(!email||!password){errEl.textContent='Inserisci email e password';errEl.style.display='block';return;}
+  const btn=document.getElementById('login-btn');
+  btn.disabled=true; btn.textContent='Accesso in corso…';
+  load(true,'Accesso… (se il server era inattivo, il primo login può richiedere 30-60 secondi)');
+  try{
+    const r=await fetch(API_BASE+'/auth/login',{
+      method:'POST',credentials:'include',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({email,password,remember}),
+    });
+    const data=await r.json().catch(()=>({}));
+    if(!r.ok){
+      errEl.textContent=data.detail||'Login fallito';
+      errEl.style.display='block';
+      return;
+    }
+    setAuth(data.user, data.access_token, data.refresh_token);
+    showDash();
+  }catch(e){
+    errEl.textContent='Errore di rete: '+(e.message||e);
+    errEl.style.display='block';
+  }finally{
+    load(false);
+    btn.disabled=false; btn.textContent='Accedi →';
+  }
+}
+async function doRegister(){
+  const username=document.getElementById('reg-username').value.trim();
+  const email=document.getElementById('reg-email').value.trim();
+  const password=document.getElementById('reg-password').value;
+  const errEl=document.getElementById('reg-error');
+  errEl.style.display='none';
+  if(!username||!email||!password){errEl.textContent='Compila tutti i campi';errEl.style.display='block';return;}
+  if(password.length<8){errEl.textContent='La password deve essere lunga almeno 8 caratteri';errEl.style.display='block';return;}
+  const btn=document.getElementById('reg-btn');
+  btn.disabled=true; btn.textContent='Registrazione…';
+  load(true,'Registrazione… (se il server era inattivo, può richiedere qualche secondo)');
+  try{
+    const r=await fetch(API_BASE+'/auth/register',{
+      method:'POST',credentials:'include',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({username,email,password}),
+    });
+    const data=await r.json().catch(()=>({}));
+    if(!r.ok){
+      errEl.textContent=data.detail||'Registrazione fallita';
+      errEl.style.display='block';
+      return;
+    }
+    showPending(data.message||'Registrazione completata. Attendi che l\'admin approvi il tuo account.');
+  }catch(e){
+    errEl.textContent='Errore di rete: '+(e.message||e);
+    errEl.style.display='block';
+  }finally{
+    load(false);
+    btn.disabled=false; btn.textContent='Registrati →';
+  }
+}
+async function doLogout(){
+  if(!confirm('Disconnettersi?'))return;
+  try{await api('/auth/logout',{method:'POST'});}catch(e){}
+  clearAuth();
+  clearInterval(syncTimer);
+  allData=[];
+  // Pulisci anche la cache PDF: utente diverso potrebbe non vedere gli stessi dati
+  clearCache();
+  showLogin();
 }
 
 // ── SYNC (parallelo + cache + diagnostica + proxy) ──
@@ -494,14 +722,22 @@ async function syncNow(){
 }
 
 async function listFiles(){
-  const url=`https://www.googleapis.com/drive/v3/files?q=%27${cfg.folder}%27+in+parents+and+mimeType=%27application/pdf%27+and+trashed=false&fields=files(id,name,modifiedTime)&orderBy=modifiedTime+desc&pageSize=500&key=${cfg.apikey}`;
-  const r=await fetch(url);
-  if(!r.ok){const e=await r.json();throw new Error(e.error?.message||'API '+r.status);}
-  return(await r.json()).files||[];
+  // Il backend conosce folder ID e API key Google (env vars), il browser no
+  const r=await api('/drive/list');
+  if(!r.ok){
+    let msg='API '+r.status;
+    try{const e=await r.json();if(e.detail)msg=e.detail;}catch(_){}
+    throw new Error(msg);
+  }
+  return await r.json();
 }
 async function fetchAndParse(file){
-  const r=await fetch(`${PROXY_BASE}/api/drive?id=${encodeURIComponent(file.id)}`);
-  if(!r.ok){let msg='Download '+r.status;try{const e=await r.json();if(e.error)msg=e.error+(e.hint?' · '+e.hint:'');}catch(_){}throw new Error(msg);}
+  const r=await api(`/drive/file/${encodeURIComponent(file.id)}`);
+  if(!r.ok){
+    let msg='Download '+r.status;
+    try{const e=await r.json();if(e.detail)msg=e.detail;}catch(_){}
+    throw new Error(msg);
+  }
   return parsePDF(await r.arrayBuffer(),file.name,file.modifiedTime,file.id);
 }
 
@@ -680,18 +916,19 @@ function setChip(el,f){
   el.classList.add('on');renderCards();
 }
 function switchTab(t){
-  ['negozi','stores','tempo','settings'].forEach(n=>{
+  ['negozi','stores','tempo','settings','account'].forEach(n=>{
     const el=document.getElementById('tab-'+n);
     if(el)el.style.display=n===t?'block':'none';
     const nav=document.getElementById('nav-'+n);
     if(nav)nav.classList.toggle('active',n===t);
   });
   // Titolo header dinamico in base alla tab
-  const titles={negozi:'Chiusure giornaliere',stores:'Negozi',tempo:'Periodo',settings:'Impostazioni'};
+  const titles={negozi:'Chiusure giornaliere',stores:'Negozi',tempo:'Periodo',settings:'Impostazioni',account:'Gestione utenti'};
   const titleEl=document.getElementById('app-title');
   if(titleEl)titleEl.textContent=titles[t]||'Chiusure';
   if(t==='tempo')renderTempo();
   if(t==='stores')renderStores();
+  if(t==='account')renderAccount();
 }
 function closeSheet(e){
   if(!e||e.target===document.getElementById('sheet'))
@@ -1210,6 +1447,106 @@ function renderStores(){
   document.getElementById('stores-list').innerHTML = html;
 }
 
+// ── TAB ACCOUNT (admin only) ──
+// Lista degli utenti registrati. Tre sezioni: pending (in attesa di approvazione),
+// attivi (abilitati), separati per leggibilità. L'admin può: approvare/disabilitare,
+// promuovere a admin / demote, eliminare. Si protegge da auto-degradazione.
+async function renderAccount(){
+  const wrap=document.getElementById('account-list-wrap');
+  wrap.innerHTML=`<div class="empty-state"><div class="spinner" style="margin:0 auto 14px"></div><div class="empty-text">Carico utenti…</div></div>`;
+  try{
+    const r=await api('/admin/users');
+    if(!r.ok){
+      let detail='Errore '+r.status;
+      try{const e=await r.json(); if(e.detail) detail=e.detail;}catch(_){}
+      wrap.innerHTML=`<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-text">${detail}</div></div>`;
+      return;
+    }
+    const users=await r.json();
+    const pending=users.filter(u=>!u.enabled);
+    const active=users.filter(u=>u.enabled);
+
+    const formatDate=iso=>{try{const d=new Date(iso);return d.toLocaleDateString('it-IT',{day:'2-digit',month:'short',year:'numeric'})+' '+d.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'});}catch(e){return iso;}};
+    const buildRow=(u)=>{
+      const isMe=auth.user && u.id===auth.user.id;
+      const meTag=isMe?' <span class="account-badge admin">Tu</span>':'';
+      const roleTag=u.role==='admin'?'<span class="account-badge admin">Admin</span>':'';
+      const stateTag=u.enabled?'<span class="account-badge active">Attivo</span>':'<span class="account-badge pending">In attesa</span>';
+      let actions='';
+      if(!u.enabled){
+        actions += `<button class="acct-btn approve" onclick="approveUser('${u.id}')">✓ Approva</button>`;
+        actions += `<button class="acct-btn deny" onclick="deleteAccount('${u.id}','${u.username.replace(/'/g,"\\'")}')">✕ Rifiuta</button>`;
+      }else if(!isMe){
+        if(u.role==='admin'){
+          actions += `<button class="acct-btn" onclick="demoteAdmin('${u.id}')">Rimuovi admin</button>`;
+        }else{
+          actions += `<button class="acct-btn promote" onclick="promoteAdmin('${u.id}')">Promuovi admin</button>`;
+        }
+        actions += `<button class="acct-btn deny" onclick="disableUser('${u.id}')">Disabilita</button>`;
+        actions += `<button class="acct-btn deny" onclick="deleteAccount('${u.id}','${u.username.replace(/'/g,"\\'")}')">Elimina</button>`;
+      }
+      return `<div class="account-row">
+        <div class="account-info">
+          <div class="account-name">${u.username}${meTag} ${roleTag} ${stateTag}</div>
+          <div class="account-email">${u.email}</div>
+          <div class="account-meta">Registrato il ${formatDate(u.created_at)}</div>
+        </div>
+        <div class="account-actions">${actions}</div>
+      </div>`;
+    };
+
+    let html='';
+    if(pending.length){
+      html+=`<div class="account-section"><div class="account-section-title">In attesa di approvazione<span>${pending.length}</span></div>${pending.map(buildRow).join('')}</div>`;
+    }
+    if(active.length){
+      html+=`<div class="account-section"><div class="account-section-title">Utenti attivi<span>${active.length}</span></div>${active.map(buildRow).join('')}</div>`;
+    }
+    if(!users.length){
+      html=`<div class="empty-state"><div class="empty-icon">👥</div><div class="empty-text">Nessun utente registrato</div></div>`;
+    }
+    wrap.innerHTML=html;
+  }catch(e){
+    wrap.innerHTML=`<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-text">Errore di rete: ${e.message||e}</div></div>`;
+  }
+}
+
+async function _updateUser(userId, payload, label){
+  const r=await api(`/admin/users/${userId}`,{method:'PUT',body:JSON.stringify(payload)});
+  if(!r.ok){
+    let detail='Errore '+r.status;
+    try{const e=await r.json();if(e.detail)detail=e.detail;}catch(_){}
+    alert((label||'Aggiornamento')+' fallito: '+detail);
+    return false;
+  }
+  await renderAccount();
+  return true;
+}
+async function approveUser(id){await _updateUser(id,{enabled:true},'Approvazione');}
+async function disableUser(id){
+  if(!confirm('Disabilitare questo utente? Non potrà più accedere finché non lo riapprovi.'))return;
+  await _updateUser(id,{enabled:false},'Disabilitazione');
+}
+async function promoteAdmin(id){
+  if(!confirm('Promuovere questo utente ad admin? Avrà accesso a questa stessa tab.'))return;
+  await _updateUser(id,{role:'admin'},'Promozione');
+}
+async function demoteAdmin(id){
+  if(!confirm('Rimuovere i privilegi admin a questo utente?'))return;
+  await _updateUser(id,{role:'user'},'Demozione');
+}
+async function deleteAccount(id, username){
+  if(!confirm(`Eliminare definitivamente l'account "${username}"?\nL'azione non può essere annullata.`))return;
+  const r=await api(`/admin/users/${id}`,{method:'DELETE'});
+  if(!r.ok){
+    let detail='Errore '+r.status;
+    try{const e=await r.json();if(e.detail)detail=e.detail;}catch(_){}
+    alert('Eliminazione fallita: '+detail);
+    return;
+  }
+  await renderAccount();
+}
+
 // ── HELPER ISO WEEK ──
 // Numero di settimana ISO 8601: lunedì primo giorno, settimana 1 contiene il
 // primo giovedì dell'anno (e quindi sempre il 4 gennaio). Implementazione
@@ -1443,7 +1780,7 @@ function openSheet(idx){
 //  1) Prima scansione: cerca LINK ANNOTATIONS nel PDF. GoAudits incorpora le
 //     thumbnail in bassa risoluzione nel PDF ma salva gli originali ad alta
 //     risoluzione sul proprio CDN. Le annotazioni contengono l'URL originale.
-//     Se troviamo link → li serviamo via /api/image (bypass CORS + download).
+//     Se troviamo link → li serviamo via backend /drive/image (CORS-safe + auth).
 //  2) Fallback: se non ci sono link annotations (PDF non-GoAudits), estrae
 //     le immagini embedded dal PDF direttamente.
 async function openAttachments(idx){
@@ -1460,7 +1797,7 @@ async function openAttachments(idx){
   };
   setStatus('Carico il PDF…');
   try{
-    const resp=await fetch(`${PROXY_BASE}/api/drive?id=${encodeURIComponent(r.fileId)}`);
+    const resp=await api(`/drive/file/${encodeURIComponent(r.fileId)}`);
     if(!resp.ok)throw new Error('Download '+resp.status);
     const ab=await resp.arrayBuffer();
     const pdf=await pdfjsLib.getDocument({data:ab}).promise;
@@ -1617,7 +1954,7 @@ async function openAttachments(idx){
   }
 }
 
-// Galleria con le foto originali dal CDN GoAudits (via proxy /api/image).
+// Galleria con le foto originali dal CDN GoAudits (via backend autenticato).
 function renderLinkGallery(links,idx,r){
   const rowsEl=document.getElementById('sheet-rows');
   const safe=s=>String(s||'').replace(/[^\w\-]+/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'');
@@ -1641,26 +1978,46 @@ function renderLinkGallery(links,idx,r){
     cap.style.cssText='font-size:11px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px';
     cap.textContent=`Allegato ${k+1} · originale`;
 
-    // URL sempre via /api/image (CORS-safe, Content-Disposition per download)
-    const displayUrl=`${PROXY_BASE}/api/image?url=${encodeURIComponent(link.url)}`;
+    // L'<img> non può mandare Authorization Bearer, quindi scarico l'immagine
+    // via fetch (col token) e la mostro come blob URL. Più affidabile dei cookie
+    // cross-site che alcuni browser bloccano (Safari iOS).
     const extMatch=link.url.match(/\.(jpe?g|png|webp)(?:\?|$|\/)/i);
     const ext=extMatch?extMatch[1].toLowerCase():'jpg';
     const fname=`${fileBase}_allegato_${k+1}.${ext}`;
-    const downloadUrl=`${PROXY_BASE}/api/image?url=${encodeURIComponent(link.url)}&download=${encodeURIComponent(fname)}`;
 
     const img=document.createElement('img');
-    img.src=displayUrl;
     img.style.cssText='width:100%;border-radius:10px;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.3);cursor:zoom-in;min-height:140px';
     img.loading='lazy';img.alt=`Allegato ${k+1}`;
-    img.onclick=()=>zoomImage(displayUrl);
     img.onerror=()=>{img.alt='Errore caricamento';img.style.minHeight='60px';cap.textContent+=' · errore';};
 
-    const dl=document.createElement('a');
-    dl.href=downloadUrl;
+    // Scarica l'immagine via API autenticata e crea blob URL
+    let blobUrl=null;
+    api(`/drive/image?url=${encodeURIComponent(link.url)}`).then(async r=>{
+      if(!r.ok)throw new Error('HTTP '+r.status);
+      const blob=await r.blob();
+      blobUrl=URL.createObjectURL(blob);
+      img.src=blobUrl;
+      img.onclick=()=>zoomImage(blobUrl);
+    }).catch(e=>{img.onerror();console.warn('Image load failed',e);});
+
+    // Per il download uso lo stesso blob, salvato con un nome custom
+    const dl=document.createElement('button');
     dl.textContent='↓ Scarica originale';
     dl.style.cssText='display:inline-flex;align-items:center;justify-content:center;padding:8px 12px;background:var(--s2);border:1px solid var(--bd2);border-radius:8px;color:var(--t1);font-family:var(--font);font-size:12px;font-weight:500;text-decoration:none;cursor:pointer;transition:background .15s';
     dl.onmouseover=()=>dl.style.background='var(--s3)';
     dl.onmouseout=()=>dl.style.background='var(--s2)';
+    dl.onclick=async()=>{
+      try{
+        if(!blobUrl){
+          const r=await api(`/drive/image?url=${encodeURIComponent(link.url)}`);
+          if(!r.ok)throw new Error('HTTP '+r.status);
+          blobUrl=URL.createObjectURL(await r.blob());
+        }
+        const a=document.createElement('a');
+        a.href=blobUrl; a.download=fname;
+        document.body.appendChild(a); a.click(); a.remove();
+      }catch(e){alert('Download fallito: '+e.message);}
+    };
 
     cell.appendChild(cap);cell.appendChild(img);cell.appendChild(dl);
     grid.appendChild(cell);
