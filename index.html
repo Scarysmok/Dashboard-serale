@@ -896,10 +896,10 @@ const fmt=n=>{
   if(!n&&n!==0)return'—';
   return'€\u00a0'+n.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2});
 };
-const load=(on,msg='')=>{
+function load(on,msg=''){
   document.getElementById('loading').classList.toggle('show',on);
   if(msg)document.getElementById('loading-msg').textContent=msg;
-};
+}
 const setPip=(s,t)=>{
   const p=document.getElementById('pip');
   p.className='pip'+(s?' '+s:'');
