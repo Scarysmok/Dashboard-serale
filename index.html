@@ -336,7 +336,8 @@ body{display:flex;flex-direction:column}
 pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
 const LS='rp_cfg_v3';
-const CACHE_KEY='rp_cache_v2';
+// v3: aggiunta estrazione completa Q&A per CSV export → invalidata cache vecchia
+const CACHE_KEY='rp_cache_v3';
 const CONCURRENCY=6;
 const PROXY_BASE='';
 // Lato minimo per considerare un'immagine una "foto utente": scarta loghi
@@ -551,9 +552,43 @@ async function parsePDF(ab,fname,modifiedTime,fileId){
   const diff=Math.abs(corrispettivo-contanti-pos);
   const anomaly=diff>1&&corrispettivo>0;
 
+  // ── ESTRAZIONE COMPLETA Q&A (28 domande della checklist GoAudits) ──
+  // Le domande hanno il formato "N. Testo domanda" su una riga, seguita
+  // dalla risposta su una o più righe successive. La risposta termina alla
+  // prossima domanda numerata o a un boundary (Q# QUESTION, Page X of Y,
+  // intestazioni di pagina, sezioni in maiuscolo).
+  const qa=[];
+  const isBoundary=(s)=>{
+    const t=s.trim();
+    if(!t) return false;
+    if(/^(Q#\s*QUESTION|Page\s+\d+\s+of\s+\d+|Powered By|Auditor|Location Map|D\s*E\s*C\s*L\s*A\s*R\s*A\s*T\s*I\s*O\s*N|S\s*U\s*M\s*M\s*A\s*R\s*Y)/i.test(t)) return true;
+    if(/RINO PETINO SPA|CHECKLIST CHIUSURA/i.test(t)) return true;
+    // Intestazione di sezione: tutta in maiuscolo, niente cifre, almeno 4 char
+    if(/^[A-Z][A-Z\s\-]{3,}$/.test(t) && !/\d/.test(t)) return true;
+    return false;
+  };
+  let cur=null;
+  for(const line of txt.split('\n')){
+    const m=line.match(/^(\d{1,2})\.\s+(.+?)\s*$/);
+    // Match solo se è una vera intestazione di domanda: numero 1-30 e il testo
+    // dopo il punto NON contiene cifre evidenti (tipo "23/04/2026"), così non
+    // confondiamo righe di data/risposta con nuove domande.
+    if(m && +m[1]>=1 && +m[1]<=30 && !/\d{2}[\/\-]\d{2}/.test(m[2])){
+      if(cur) qa.push(cur);
+      cur={n:+m[1], q:m[2].trim(), a:''};
+    }else if(cur){
+      if(isBoundary(line)){
+        qa.push(cur); cur=null;
+      }else if(line.trim()){
+        cur.a=(cur.a?cur.a+' ':'')+line.trim();
+      }
+    }
+  }
+  if(cur) qa.push(cur);
+
   return{fileId,store,brand,location,dateISO,dateDisplay,
     corrispettivo,netSales,contanti,pos,fondo,versato,
-    cambi,buonoE,buonoR,sconti,annull,anomaly,diff};
+    cambi,buonoE,buonoR,sconti,annull,anomaly,diff,qa};
 }
 
 // ── HELPERS ──
@@ -1314,16 +1349,49 @@ function zoomImage(dataUrl){
 }
 
 // ── EXPORT CSV ──
+// Formato "wide": una riga per negozio+data, una colonna per ogni domanda
+// della checklist (28 in totale). Le colonne Q&A vengono ricavate dall'unione
+// delle domande viste in tutti i record, ordinate per numero (1..28).
 function exportCSV(){
   if(!allData.length){alert('Nessun dato.');return;}
-  const H=['Brand','Location','Data Incasso','Corrispettivo','Net Sales','Contanti','POS','Versato','Fondo Cassa','Sconti','Annullamenti','Anomalia'];
-  const rows=allData.map(r=>[
-    r.brand,r.location,r.dateDisplay,
-    r.corrispettivo.toFixed(2),(r.corrispettivo/1.22).toFixed(2),
-    r.contanti.toFixed(2),r.pos.toFixed(2),r.versato.toFixed(2),r.fondo.toFixed(2),
-    r.sconti?'Sì':'No',r.annull?'Sì':'No',r.anomaly?'Sì':'No'
-  ]);
-  const csv=[H,...rows].map(r=>r.map(v=>`"${v}"`).join(';')).join('\n');
+
+  // 1) Costruisci elenco unione delle domande, prendendo il testo della
+  //    domanda dal primo record che la contiene. Così se un PDF è incompleto
+  //    o ha varianti minori, prevale comunque la versione "canonica" trovata.
+  const qMap=new Map(); // n -> "N. Testo domanda"
+  for(const r of allData){
+    if(!r.qa) continue;
+    for(const item of r.qa){
+      if(!qMap.has(item.n)) qMap.set(item.n, `${item.n}. ${item.q}`);
+    }
+  }
+  const ns=[...qMap.keys()].sort((a,b)=>a-b);
+  const qaHeaders=ns.map(n=>qMap.get(n));
+
+  // 2) Header completo: identificativi + KPI riassuntivi + tutte le Q&A
+  const H=['Brand','Location','Data Incasso',
+           'Corrispettivo','Net Sales','Contanti','POS','Versato','Fondo Cassa',
+           'Sconti','Annullamenti','Anomalia',
+           ...qaHeaders];
+
+  // 3) Una riga per record, valori Q&A presi dal map per numero
+  const rows=allData.map(r=>{
+    const aMap={};
+    if(r.qa){for(const item of r.qa) aMap[item.n]=item.a;}
+    const base=[
+      r.brand, r.location, r.dateDisplay,
+      r.corrispettivo.toFixed(2), (r.corrispettivo/1.22).toFixed(2),
+      r.contanti.toFixed(2), r.pos.toFixed(2), r.versato.toFixed(2), r.fondo.toFixed(2),
+      r.sconti?'Sì':'No', r.annull?'Sì':'No', r.anomaly?'Sì':'No'
+    ];
+    const qaVals=ns.map(n=>aMap[n]||'');
+    return [...base, ...qaVals];
+  });
+
+  // 4) Escape CSV: virgolette doppie + rimozione newline interni alle risposte
+  const esc=v=>`"${String(v==null?'':v).replace(/"/g,'""').replace(/[\r\n]+/g,' ')}"`;
+  const csv=[H,...rows].map(r=>r.map(esc).join(';')).join('\n');
+
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'}));
   a.download=`chiusure_${new Date().toISOString().slice(0,10)}.csv`;
