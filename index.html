@@ -156,11 +156,31 @@ body{display:flex;flex-direction:column}
 .stores-summary .ssum-v.r{color:var(--red)}
 .stores-summary .ssum-v.g{color:var(--green)}
 .stores-summary .ssum-s{font-size:11px;color:var(--t3);margin-top:4px}
-.store-summary{cursor:default}
+.store-summary{cursor:pointer;transition:background .1s}
+.store-summary:active{background:var(--s2)}
 .store-summary .card-body{grid-template-columns:1fr 1fr}
 .store-summary.empty{background:var(--s2);border-style:dashed}
 .store-summary.empty .card-name{color:var(--t2)}
 .no-data-cell{font-family:var(--mono);font-size:12px;color:var(--t3)}
+
+/* ── SHEET STORICO SALDO (dettaglio negozio) ── */
+.saldo-summary{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--bd);border-bottom:1px solid var(--bd)}
+.saldo-summary-cell{background:var(--s1);padding:14px 12px;text-align:center}
+.saldo-summary-l{font-size:10px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.saldo-summary-v{font-family:var(--mono);font-size:15px;font-weight:500}
+.saldo-summary-v.r{color:var(--red)}
+.saldo-summary-v.g{color:var(--green)}
+.saldo-summary-v.b{color:var(--blue)}
+.saldo-summary-v.w{color:var(--warn)}
+.saldo-row{display:flex;justify-content:space-between;align-items:center;padding:13px 20px;border-bottom:1px solid var(--bd);cursor:pointer;transition:background .1s}
+.saldo-row:active{background:var(--s2)}
+.saldo-row:last-child{border-bottom:none}
+.saldo-row-date{font-size:13px;font-weight:500;color:var(--t1)}
+.saldo-row-detail{font-size:11px;color:var(--t3);margin-top:3px;font-family:var(--mono)}
+.saldo-row-delta{font-family:var(--mono);font-size:14px;font-weight:500;text-align:right;flex-shrink:0;margin-left:12px}
+.saldo-row-delta.r{color:var(--red)}
+.saldo-row-delta.g{color:var(--green)}
+.saldo-row-delta.n{color:var(--t2)}
 
 /* ── TEMPO TAB ── */
 .tempo-wrap{padding:16px;display:flex;flex-direction:column;gap:12px;padding-bottom:32px}
@@ -1111,8 +1131,10 @@ function renderStores(){
       // verde se negativo (ha versato più del dovuto), neutro se zero
       const saldoCls = saldo>0.01 ? 'r' : (saldo<-0.01 ? 'g' : '');
 
+      // Escape singoli apici nel parametro location per evitare break dell'onclick
+      const onclick = `onclick="openStoreSheet('${s.brand.replace(/'/g,"\\'")}','${s.location.replace(/'/g,"\\'")}')"`;
       if(isEmpty){
-        sectionHtml += `<div class="store-card store-summary empty" style="border-left:3px dashed ${bc.strong}">
+        sectionHtml += `<div class="store-card store-summary empty" style="border-left:3px dashed ${bc.strong}" ${onclick}>
           <div class="card-head">
             <div class="card-name">${s.location}</div>
             <div class="card-date">Nessuna chiusura ricevuta</div>
@@ -1129,7 +1151,7 @@ function renderStores(){
           </div>
         </div>`;
       }else{
-        sectionHtml += `<div class="store-card store-summary" style="border-left:3px solid ${bc.strong}">
+        sectionHtml += `<div class="store-card store-summary" style="border-left:3px solid ${bc.strong}" ${onclick}>
           <div class="card-head">
             <div class="card-name">${s.location}</div>
             <div class="card-date">aggiornato ${lastDisp} · ${records.length} chiusur${records.length===1?'a':'e'}</div>
@@ -1178,6 +1200,69 @@ function renderStores(){
       <div class="ssum-s">${totSaldo>0.01?'residuo da depositare':totSaldo<-0.01?'versato in eccesso':'in pareggio'}</div>
     </div>`;
   document.getElementById('stores-list').innerHTML = html;
+}
+
+// ── SHEET STORICO SALDO (cliccando una card della tab Negozi) ──
+// Mostra: riepilogo cumulato in alto + lista cronologica di ogni chiusura
+// con il delta (da versare - versato) di quella giornata. Cliccando una riga
+// si apre la sheet di dettaglio della chiusura corrispondente (openSheet).
+function openStoreSheet(brand, location){
+  const k=storeKey(brand,location);
+  const records=allData
+    .filter(r=>storeKey(r.brand,r.location)===k)
+    .sort((a,b)=>(b.dateISO||'').localeCompare(a.dateISO||''));
+
+  const sumDV=records.reduce((s,r)=>s+(r.daVersare||0),0);
+  const sumV=records.reduce((s,r)=>s+(r.versato||0),0);
+  const saldo=sumDV-sumV;
+  const bc=brandColor(brand);
+
+  document.getElementById('sheet-title').textContent=`${brand} ${location}`;
+  document.getElementById('sheet-sub').textContent=records.length
+    ? `${records.length} chiusur${records.length===1?'a':'e'} ricevut${records.length===1?'a':'e'}`
+    : 'Nessuna chiusura ricevuta ancora';
+
+  const saldoCls = saldo>0.01 ? 'r' : (saldo<-0.01 ? 'g' : '');
+  let html = `<div class="saldo-summary">
+    <div class="saldo-summary-cell">
+      <div class="saldo-summary-l">Da versare</div>
+      <div class="saldo-summary-v w">${fmt(sumDV)}</div>
+    </div>
+    <div class="saldo-summary-cell">
+      <div class="saldo-summary-l">Versato</div>
+      <div class="saldo-summary-v b">${fmt(sumV)}</div>
+    </div>
+    <div class="saldo-summary-cell" style="background:${bc.tint}">
+      <div class="saldo-summary-l" style="color:${bc.text}">Saldo</div>
+      <div class="saldo-summary-v ${saldoCls}">${fmt(saldo)}</div>
+    </div>
+  </div>`;
+
+  if(!records.length){
+    html += `<div class="empty-state"><div class="empty-icon">📭</div>
+      <div class="empty-text">Nessun movimento da mostrare</div></div>`;
+  }else{
+    html += `<div class="sheet-row divider"><span>Storico chiusure (più recenti in alto)</span></div>`;
+    for(const r of records){
+      const dv=r.daVersare||0;
+      const v=r.versato||0;
+      const delta=dv-v; // positivo: residuo da versare per quella giornata
+      const dCls = delta>0.01 ? 'r' : (delta<-0.01 ? 'g' : 'n');
+      // Solo per valori positivi aggiungo il "+", il "-" è già nel numero negativo
+      const dPrefix = delta>0.01 ? '+' : '';
+      const idx=allData.indexOf(r);
+      html += `<div class="saldo-row" onclick="openSheet(${idx})">
+        <div>
+          <div class="saldo-row-date">${r.dateDisplay}</div>
+          <div class="saldo-row-detail">Da versare ${fmt(dv)} · Versato ${fmt(v)}</div>
+        </div>
+        <div class="saldo-row-delta ${dCls}">${dPrefix}${fmt(delta)}</div>
+      </div>`;
+    }
+  }
+
+  document.getElementById('sheet-rows').innerHTML=html;
+  document.getElementById('sheet').classList.add('show');
 }
 
 // ── SHEET DETTAGLIO ──
