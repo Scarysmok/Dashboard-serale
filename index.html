@@ -1192,16 +1192,7 @@ function renderStores(){
     html += `<div class="brand-header" style="background:${bc.tint};border-radius:8px;padding:8px 12px">
       <span class="brand-label" style="color:${bc.text}">${brand}</span>
       <span class="brand-count" style="color:${bc.text};opacity:.7">${stores.length} negoz${stores.length===1?'io':'i'}</span>
-    </div>` + sectionHtml + `<div class="subtotal-card" style="border-color:${bc.strong}40;background:${bc.tint}80">
-      <div>
-        <div class="sub-cell-l" style="color:${bc.text}">Fondocassa totale ${brand}</div>
-        <div class="sub-cell-v">${fmt(bFondo)}</div>
-      </div>
-      <div>
-        <div class="sub-cell-l" style="color:${bc.text}">Da versare cumulato</div>
-        <div class="sub-cell-v" style="color:${bSaldo>0.01?'var(--red)':bSaldo<-0.01?'var(--green)':'var(--t1)'}">${fmt(bSaldo)}</div>
-      </div>
-    </div>`;
+    </div>` + sectionHtml;
   }
 
   // Summary in cima: totali generali
