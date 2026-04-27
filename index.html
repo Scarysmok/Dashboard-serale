@@ -91,6 +91,8 @@ body{display:flex;flex-direction:column}
 .chip{flex-shrink:0;padding:7px 14px;border-radius:20px;font-size:12px;font-weight:500;border:1px solid var(--bd2);background:var(--s2);color:var(--t2);cursor:pointer;-webkit-appearance:none;font-family:var(--font);transition:all .15s}
 .chip.on{border-color:var(--acc);color:var(--acc);background:#2563eb10}
 .chip:active{opacity:.7}
+.chip.disabled{opacity:.45;cursor:not-allowed;pointer-events:none}
+.chip#chip-mancanti.on{border-color:var(--warn);color:var(--warn);background:#ea580c14}
 
 /* ── SEARCH ── */
 .search-wrap{padding:0 16px 12px}
@@ -117,6 +119,15 @@ body{display:flex;flex-direction:column}
 .tag-neutral{background:var(--s2);color:var(--t2);border:1px solid var(--bd)}
 .verify-ok{font-size:11px;color:var(--green);margin-left:auto;font-family:var(--mono)}
 .verify-bad{font-size:11px;color:var(--red);margin-left:auto;font-family:var(--mono)}
+
+/* ── MISSING CARDS (negozi senza chiusura per la data filtrata) ── */
+.store-card.missing{background:var(--s2);border:1px dashed var(--bd2);cursor:default}
+.store-card.missing:active{background:var(--s2)}
+.store-card.missing .card-name{color:var(--t2);font-weight:500}
+.store-card.missing .card-date{color:var(--t3)}
+.missing-body{display:flex;align-items:center;gap:8px;padding:10px 16px 14px;border-top:1px dashed var(--bd2);font-size:12px;color:var(--t2)}
+.missing-dot{display:inline-block;width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.missing-label{font-weight:500}
 
 /* ── BRAND SECTION ── */
 .brand-header{display:flex;align-items:center;justify-content:space-between;padding:10px 16px 6px;margin-top:8px}
@@ -274,6 +285,7 @@ body{display:flex;flex-direction:column}
       <button class="chip" onclick="setChip(this,'anomalie')">⚠ Anomalie</button>
       <button class="chip" onclick="setChip(this,'sconti')">Sconti</button>
       <button class="chip" onclick="setChip(this,'annull')">Annullamenti</button>
+      <button class="chip" id="chip-mancanti" onclick="setChip(this,'mancanti')">📭 Mancanti</button>
     </div>
     <div class="search-wrap">
       <input class="search-field" type="search" placeholder="Cerca negozio o brand…" id="search" oninput="renderCards()" autocorrect="off"/>
@@ -559,8 +571,13 @@ const setPip=(s,t)=>{
   document.getElementById('sync-txt').textContent=t;
 };
 function setChip(el,f){
+  // Guard: il chip Mancanti richiede una data filtrata
+  if(f==='mancanti' && !filterDate) return;
   filter=f;
-  document.querySelectorAll('.chip').forEach(c=>c.classList.remove('on'));
+  // Reset solo dei chip-filtro, non del chip-date (che ha vita propria)
+  document.querySelectorAll('.chip').forEach(c=>{
+    if(c.id!=='chip-date')c.classList.remove('on');
+  });
   el.classList.add('on');renderCards();
 }
 function switchTab(t){
@@ -584,7 +601,7 @@ function setTempo(v,el){
 }
 
 // ── RENDER ALL ──
-function renderAll(){renderKPI();renderCards();}
+function renderAll(){updateMissingChip();renderKPI();renderCards();}
 
 // Restituisce i record filtrati per la data selezionata (o tutti)
 function getFilteredData(){
@@ -647,8 +664,12 @@ function renderKPI(){
   const d=getFilteredData();
   const totCorr=d.reduce((a,r)=>a+r.corrispettivo,0);
   const totNet=totCorr/1.22;
+  const expectedCount=EXPECTED_STORES.length;
+  const negSub=filterDate
+    ? `inviate · ${expectedCount-d.length} mancanti su ${expectedCount}`
+    : 'PDF caricati';
   document.getElementById('kpi-scroll').innerHTML=[
-    {l:'Negozi',v:d.length,cls:'y',s:filterDate?'filtrati':'PDF caricati'},
+    {l:'Negozi',v:filterDate?`${d.length}/${expectedCount}`:d.length,cls:'y',s:negSub},
     {l:'Corrispettivo',v:fmt(totCorr),cls:'g',s:'lordo IVA 22%'},
     {l:'Net Sales',v:fmt(totNet),cls:'b',s:'al netto IVA'},
     {l:'Contanti',v:fmt(d.reduce((a,r)=>a+r.contanti,0)),cls:'',s:'incassato'},
@@ -674,6 +695,66 @@ function brandColor(name){
   return BRAND_COLORS[String(name||'').toLowerCase().trim()]||DEFAULT_BRAND_COLOR;
 }
 
+// ── ELENCO NEGOZI ATTESI ──
+// Lista hardcoded dei negozi che dovrebbero inviare la chiusura giornaliera.
+// Confrontata con allData per la data filtrata per capire chi non ha inviato.
+// Aggiornare qui quando si aprono/chiudono punti vendita.
+const EXPECTED_STORES=[
+  {brand:'Adidas',  location:'Foggia'},
+  {brand:'Adidas',  location:'Teramo'},
+  {brand:'Adidas',  location:'Bariblu'},
+  {brand:'Adidas',  location:'Rende'},
+  {brand:'Adidas',  location:'Brindisi City (Umberto)'},
+  {brand:'Adidas',  location:'Brindisi Colonne'},
+  {brand:'Adidas',  location:'Lecce City'},
+  {brand:'Adidas',  location:'Taranto'},
+  {brand:'Carpisa', location:'Brindisi Colonne'},
+  {brand:'Carpisa', location:'Gallipoli'},
+  {brand:'Carpisa', location:'Lecce'},
+  {brand:'Carpisa', location:'Ostuni'},
+  {brand:'Carpisa', location:'Surbo'},
+  {brand:'Mango',   location:'Taranto'},
+  {brand:'Mango',   location:'Foggia'},
+  {brand:'Mango',   location:'Teramo'},
+  {brand:'Mango',   location:'Bariblu'},
+  {brand:'Mango',   location:'Molfetta'},
+  {brand:'Yamamay', location:'Polignano'},
+  {brand:'Yamamay', location:'Lecce'},
+];
+// Chiave normalizzata: case-insensitive, spazi compattati, niente trailing/leading.
+// Serve a confrontare brand+location senza farsi fregare da differenze tipografiche.
+const storeKey=(brand,location)=>
+  String(brand||'').toLowerCase().trim()+'|'+String(location||'').toLowerCase().replace(/\s+/g,' ').trim();
+
+// Restituisce l'elenco dei negozi attesi che NON hanno inviato la chiusura
+// per la data passata. Se non c'è una data, ritorna [].
+function getMissingStores(date){
+  if(!date) return [];
+  const present=new Set(allData.filter(r=>r.dateISO===date).map(r=>storeKey(r.brand,r.location)));
+  return EXPECTED_STORES.filter(s=>!present.has(storeKey(s.brand,s.location)));
+}
+
+// Aggiorna label e stato del chip "Mancanti" in base al filtro data attivo.
+function updateMissingChip(){
+  const chip=document.getElementById('chip-mancanti');
+  if(!chip) return;
+  if(!filterDate){
+    chip.textContent='📭 Mancanti';
+    chip.classList.add('disabled');
+    if(filter==='mancanti'){
+      // Se c'era il filtro mancanti attivo e si toglie la data, fallback su 'all'
+      filter='all';
+      document.querySelectorAll('.chip').forEach(c=>c.classList.remove('on'));
+      const allChip=document.querySelector('.chip[onclick*="\'all\'"]');
+      if(allChip)allChip.classList.add('on');
+    }
+  }else{
+    const n=getMissingStores(filterDate).length;
+    chip.textContent=`📭 Mancanti (${n})`;
+    chip.classList.remove('disabled');
+  }
+}
+
 // ── CARDS (TAB NEGOZI) ──
 function renderCards(){
   const q=document.getElementById('search').value.toLowerCase();
@@ -682,31 +763,58 @@ function renderCards(){
   if(filter==='anomalie')rows=rows.filter(r=>r.anomaly||r.annull);
   if(filter==='sconti')  rows=rows.filter(r=>r.sconti);
   if(filter==='annull')  rows=rows.filter(r=>r.annull);
+  if(filter==='mancanti')rows=[]; // mostro solo le card grigie sotto
   if(q)rows=rows.filter(r=>r.store.toLowerCase().includes(q)||r.location.toLowerCase().includes(q)||r.brand.toLowerCase().includes(q));
+
+  // Card "mancanti": solo se è selezionata una data e il filtro lo consente.
+  // Con 'all' compaiono in linea con gli altri; con 'mancanti' sono le uniche.
+  let missingRows=[];
+  if(filterDate && (filter==='all'||filter==='mancanti')){
+    missingRows=getMissingStores(filterDate);
+    if(q)missingRows=missingRows.filter(s=>s.brand.toLowerCase().includes(q)||s.location.toLowerCase().includes(q));
+  }
+
   const cl=document.getElementById('cards-list');
-  if(!rows.length){
-    cl.innerHTML='<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-text">Nessun dato</div></div>';
+  if(!rows.length && !missingRows.length){
+    const msg=filter==='mancanti' && !filterDate
+      ? 'Seleziona una data per vedere i negozi mancanti'
+      : 'Nessun dato';
+    cl.innerHTML=`<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-text">${msg}</div></div>`;
     return;
   }
 
-  // Raggruppa per brand
+  // Raggruppa per brand: real + missing nello stesso oggetto
   const brands={};
-  for(const r of rows){if(!brands[r.brand])brands[r.brand]=[];brands[r.brand].push(r);}
+  for(const r of rows){
+    if(!brands[r.brand])brands[r.brand]={real:[],miss:[]};
+    brands[r.brand].real.push(r);
+  }
+  for(const s of missingRows){
+    if(!brands[s.brand])brands[s.brand]={real:[],miss:[]};
+    brands[s.brand].miss.push(s);
+  }
   const totCorr=rows.reduce((a,r)=>a+r.corrispettivo,0);
   const totNet=totCorr/1.22;
   const totCash=rows.reduce((a,r)=>a+r.contanti,0);
   const totPOS=rows.reduce((a,r)=>a+r.pos,0);
+  // Etichetta data per le card mancanti (formato dd/mm/yyyy)
+  let missDateDisp='';
+  if(filterDate){const [yy,mm,dd]=filterDate.split('-');missDateDisp=`${dd}/${mm}/${yy}`;}
   let html='';
 
-  for(const [brand,stores] of Object.entries(brands)){
+  for(const [brand,group] of Object.entries(brands)){
+    const stores=group.real;
+    const miss=group.miss;
     const bCorr=stores.reduce((a,r)=>a+r.corrispettivo,0);
     const bNet=bCorr/1.22;
     const bCash=stores.reduce((a,r)=>a+r.contanti,0);
     const bPOS=stores.reduce((a,r)=>a+r.pos,0);
     const bc=brandColor(brand);
+    const totCount=stores.length+miss.length;
+    const missLabel=miss.length?` · <span style="color:var(--warn)">${miss.length} mancante${miss.length>1?'i':''}</span>`:'';
     html+=`<div class="brand-header" style="background:${bc.tint};border-radius:8px;padding:8px 12px">
       <span class="brand-label" style="color:${bc.text}">${brand}</span>
-      <span class="brand-count" style="color:${bc.text};opacity:.7">${stores.length} negoz${stores.length===1?'io':'i'}</span>
+      <span class="brand-count" style="color:${bc.text};opacity:.7">${totCount} negoz${totCount===1?'io':'i'}${missLabel}</span>
     </div>`;
     for(const r of stores){
       html+=`<div class="store-card${r.anomaly?' anomaly':''}" style="border-left:3px solid ${bc.strong}" onclick="openSheet(${allData.indexOf(r)})">
@@ -736,23 +844,43 @@ function renderCards(){
         </div>
       </div>`;
     }
-    html+=`<div class="subtotal-card" style="border-color:${bc.strong}40;background:${bc.tint}80">
-      <div>
-        <div class="sub-cell-l" style="color:${bc.text}">Sub-totale ${brand}</div>
-        <div class="sub-cell-v" style="color:var(--green)">${fmt(bCorr)}</div>
-        <div class="sub-cell-net">NET ${fmt(bNet)}</div>
-      </div>
-      <div>
-        <div class="sub-cell-l" style="color:${bc.text}">Contanti + POS</div>
-        <div class="sub-cell-v">${fmt(bCash)}</div>
-        <div class="sub-cell-net">POS ${fmt(bPOS)}</div>
-      </div>
-    </div>`;
+    // Card grigie tratteggiate per i negozi che non hanno inviato la chiusura
+    for(const s of miss){
+      html+=`<div class="store-card missing" style="border-left:3px dashed ${bc.strong}">
+        <div class="card-head">
+          <div class="card-name">${s.location}</div>
+          <div class="card-date">${missDateDisp}</div>
+        </div>
+        <div class="missing-body">
+          <span class="missing-dot" style="background:${bc.strong}"></span>
+          <span class="missing-label">Nessuna chiusura ricevuta</span>
+        </div>
+      </div>`;
+    }
+    // Subtotale: solo se ci sono dati reali
+    if(stores.length){
+      html+=`<div class="subtotal-card" style="border-color:${bc.strong}40;background:${bc.tint}80">
+        <div>
+          <div class="sub-cell-l" style="color:${bc.text}">Sub-totale ${brand}</div>
+          <div class="sub-cell-v" style="color:var(--green)">${fmt(bCorr)}</div>
+          <div class="sub-cell-net">NET ${fmt(bNet)}</div>
+        </div>
+        <div>
+          <div class="sub-cell-l" style="color:${bc.text}">Contanti + POS</div>
+          <div class="sub-cell-v">${fmt(bCash)}</div>
+          <div class="sub-cell-net">POS ${fmt(bPOS)}</div>
+        </div>
+      </div>`;
+    }
   }
 
   if(rows.length>1){
+    const totMiss=missingRows.length;
+    const grandLabel=totMiss
+      ? `Totale · ${rows.length} negozi inviati · ${totMiss} mancante${totMiss>1?'i':''}`
+      : `Totale · ${rows.length} negozi`;
     html+=`<div class="grand-total">
-      <div class="grand-label">Totale · ${rows.length} negozi</div>
+      <div class="grand-label">${grandLabel}</div>
       <div class="grand-row"><span class="grand-row-l">Corrispettivo totale</span><span class="grand-row-v g">${fmt(totCorr)}</span></div>
       <div class="grand-row"><span class="grand-row-l">Net Sales totali</span><span class="grand-row-v b">${fmt(totNet)}</span></div>
       <div class="grand-row"><span class="grand-row-l">Totale contanti</span><span class="grand-row-v">${fmt(totCash)}</span></div>
