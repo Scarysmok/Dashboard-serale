@@ -288,6 +288,29 @@ body{display:flex;flex-direction:column}
 .row-l{font-size:13px;color:var(--t2)}
 .row-v{font-family:var(--mono);font-size:14px;font-weight:500}
 .row-v.g{color:var(--green)}.row-v.r{color:var(--red)}.row-v.b{color:var(--blue)}
+
+/* Editable row: input invisibile in stato di riposo, evidenziato al focus */
+.row-v-edit{display:flex;align-items:center;gap:8px;justify-content:flex-end}
+.row-input{font-family:var(--mono);font-size:14px;font-weight:500;color:var(--t1);
+  background:transparent;border:1px solid transparent;border-radius:6px;
+  padding:6px 10px;width:130px;text-align:right;-webkit-appearance:none;appearance:none;
+  cursor:text;transition:border-color .15s,background .15s}
+.row-input:hover{border-color:var(--bd)}
+.row-input:focus{outline:none;border-color:var(--acc);background:var(--s1)}
+.row-input.modified{color:#a05a00;background:#fff8e6;border-color:#f3c969}
+.row-input.modified:focus{border-color:#d99a1f;background:#fff4d4}
+.row-input.saving{opacity:.55}
+.ovr-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;
+  color:#a05a00;background:#fff4d4;border:1px solid #f3c969;border-radius:10px;
+  padding:2px 8px;cursor:help;text-transform:uppercase;letter-spacing:.4px;line-height:1.3}
+.ovr-reset{font-size:10px;color:var(--t3);background:none;border:none;cursor:pointer;
+  padding:2px 4px;text-decoration:underline;font-weight:500}
+.ovr-reset:hover{color:var(--red)}
+.row-cash-result{padding:14px 20px;background:var(--s2);font-size:13px;font-weight:600;
+  display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--bd)}
+.row-cash-result.ok{color:var(--green)}
+.row-cash-result.ko{color:var(--red)}
+.row-cash-result .delta{font-family:var(--mono);font-size:14px}
 </style>
 </head>
 <body>
@@ -461,7 +484,11 @@ pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/p
 // URL del backend FastAPI (Render). Hardcoded perché non cambia spesso.
 const API_BASE='https://dashboard-backend-ur63.onrender.com';
 // v4: aggiunta estrazione 'Importo da versare' per la tab Negozi → reset cache
-const CACHE_KEY='rp_cache_v4';
+// v5: aggiunto parsing giftcard + annullamenti/sconti come importi numerici.
+// Bump della versione → invalida automaticamente le cache esistenti, così i
+// vecchi record (senza giftcard, con annull/sconti booleani) non interferiscono
+// con la nuova formula di verifica cassa.
+const CACHE_KEY='rp_cache_v5';
 const CONCURRENCY=6;
 // Lato minimo per considerare un'immagine una "foto utente": scarta loghi
 // a banner (GoAudits 572x82), mappe Google location (264x120), icone piccole.
@@ -476,7 +503,7 @@ let auth={user:null, accessToken:null, refreshToken:null};
 
 function loadCache(){try{return JSON.parse(localStorage.getItem(CACHE_KEY)||'{}');}catch(e){return {};}}
 function saveCache(c){try{localStorage.setItem(CACHE_KEY,JSON.stringify(c));}catch(e){console.warn('Cache save fallita',e);}}
-function clearCache(){localStorage.removeItem(CACHE_KEY);localStorage.removeItem('rp_cache_v1');}
+function clearCache(){localStorage.removeItem(CACHE_KEY);['rp_cache_v1','rp_cache_v2','rp_cache_v3','rp_cache_v4'].forEach(k=>localStorage.removeItem(k));}
 function forceResync(){clearCache();syncNow();}
 function showErrors(){
   if(!lastErrors.length){alert('Nessun errore registrato nell\'ultimo sync.');return;}
@@ -707,6 +734,12 @@ async function syncNow(){
     for(const k of Object.keys(cache)) if(!validKeys.has(k)) delete cache[k];
     saveCache(cache);
     allData=results.filter(Boolean);
+    // Correzioni manuali: scarico l'elenco dal backend e le applico sui record.
+    // Va fatto DOPO il filtraggio dei record validi e PRIMA di renderAll(),
+    // così la verifica cassa e i contatori usano i valori corretti.
+    load(true,`Carico correzioni manuali…`);
+    const overrides=await fetchOverrides();
+    applyOverrides(allData, overrides);
     const t=new Date().toLocaleTimeString('it-IT');
     document.getElementById('last-sync-disp').textContent=t;
     document.getElementById('pdf-count-disp').textContent=allData.length+' file';
@@ -805,8 +838,20 @@ async function parsePDF(ab,fname,modifiedTime,fileId){
   }
 
   // ── VALORI CASSA ──
-  let corrispettivo,contanti,posTml1,posTml2,posTml3,posTml4,cambi,buonoE,buonoR,annull,sconti;
+  // annull e giftcard sono importi numerici (€). sconti resta booleano (Sì/No)
+  // perché non entra nella formula di verifica cassa.
+  let corrispettivo,contanti,posTml1,posTml2,posTml3,posTml4,cambi,giftcard,buonoE,buonoR,annull,sconti;
   const isFormatoA=/RESPONSE/i.test(txt);
+
+  // Helper label-based usato sia nel ramo non-RESPONSE sia come fallback per
+  // RESPONSE quando la posizione fissa nel vettore vals non è affidabile.
+  const NUM='\\d+(?:\\.\\d{3})*(?:,\\d+)?';
+  const gfLabel=(label,def=0)=>{
+    const esc=label.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+    const re=new RegExp(esc+'(?![A-Za-z])[^\\d\\n]{0,30}\\n?\\s*(?:€|EUR)?\\s*('+NUM+')','i');
+    const m=txt.match(re);
+    return m?toNum(m[1]):def;
+  };
 
   if(isFormatoA){
     const respMatch=txt.match(/RESPONSE\s*([\s\S]*?)(?:FATTURE|DISTINTA)/i);
@@ -815,31 +860,34 @@ async function parsePDF(ab,fname,modifiedTime,fileId){
       :[];
     const rv=i=>vals[i]||'';
     const rvn=i=>toNum(rv(i));
+    // Mappa posizionale del formato RESPONSE (ordine fisso nelle chiusure):
+    //  0 corrispettivo · 1 contanti · 2-5 POS TML 1-4 · 6 giftcard · 7 cambi
+    //  8 annullamenti  · 9 buono emesso · 10 buono ritirato · 11 sconti
     corrispettivo=rvn(0);contanti=rvn(1);
     posTml1=/non utilizzato/i.test(rv(2))?0:rvn(2);
     posTml2=/non utilizzato/i.test(rv(3))?0:rvn(3);
     posTml3=/non utilizzato/i.test(rv(4))?0:rvn(4);
     posTml4=/non utilizzato/i.test(rv(5))?0:rvn(5);
+    giftcard=/non utilizzato/i.test(rv(6))?0:rvn(6);
     cambi=/non utilizzato/i.test(rv(7))?0:rvn(7);
+    annull=/non utilizzato|s[iì]|^no$/i.test(rv(8))?0:rvn(8);
     buonoE=/non utilizzato/i.test(rv(9))?0:rvn(9);
     buonoR=/non utilizzato/i.test(rv(10))?0:rvn(10);
-    annull=/s[iì]/i.test(rv(8));
-    sconti=/s[iì]/i.test(rv(11));
+    sconti=/non utilizzato|s[iì]|^no$/i.test(rv(11))?0:rvn(11);
+    // Fallback label: se per qualunque motivo il valore posizionale è 0 ma
+    // l'etichetta esiste con un importo, preferiamo il label match.
+    if(!giftcard) giftcard=gfLabel('Giftcard');
+    if(!annull)   annull  =gfLabel('Annullamenti');
+    if(!sconti)   sconti  =gfLabel('Sconti su vendite');
   }else{
-    const NUM='\\d+(?:\\.\\d{3})*(?:,\\d+)?';
-    const gf=(label,def=0)=>{
-      const esc=label.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-      const re=new RegExp(esc+'(?![A-Za-z])[^\\d\\n]{0,30}\\n?\\s*(?:€|EUR)?\\s*('+NUM+')','i');
-      const m=txt.match(re);
-      return m?toNum(m[1]):def;
-    };
-    corrispettivo=gf('Corrispettivo');
-    contanti=gf('Contanti');
-    posTml1=gf('POS TML 1');posTml2=gf('POS TML 2');
-    posTml3=gf('POS TML 3');posTml4=gf('POS TML 4');
-    cambi=gf('Cambi');buonoE=gf('Buono Emesso');buonoR=gf('Buono ritirato');
-    annull=gf('Annullamenti')>0||/Annullamenti[^\n]{0,30}\n\s*S[iì]/i.test(txt);
-    sconti=gf('Sconti su vendite')>0||/Sconti su vendite[^\n]{0,30}\n\s*S[iì]/i.test(txt);
+    corrispettivo=gfLabel('Corrispettivo');
+    contanti=gfLabel('Contanti');
+    posTml1=gfLabel('POS TML 1');posTml2=gfLabel('POS TML 2');
+    posTml3=gfLabel('POS TML 3');posTml4=gfLabel('POS TML 4');
+    giftcard=gfLabel('Giftcard');
+    cambi=gfLabel('Cambi');buonoE=gfLabel('Buono Emesso');buonoR=gfLabel('Buono ritirato');
+    annull=gfLabel('Annullamenti');
+    sconti=gfLabel('Sconti su vendite');
   }
 
   const pos=posTml1+posTml2+posTml3+posTml4;
@@ -849,8 +897,14 @@ async function parsePDF(ab,fname,modifiedTime,fileId){
   // Cumulato per negozio (sum daVersare - sum versato) dà il saldo aperto residuo.
   const daVersare=gn(/Importo da versare[^\d\n]{0,30}\n?\s*(?:€|EUR)?\s*(\d+(?:\.\d{3})*(?:,\d+)?)/i);
   const netSales=corrispettivo/1.22;
-  const diff=Math.abs(corrispettivo-contanti-pos);
-  const anomaly=diff>1&&corrispettivo>0;
+  // Verifica cassa: corrispettivo deve uguagliare (contanti+POS) al netto di
+  // movimenti che non rappresentano corrispettivo: cambi (rimborsi/cambi merce),
+  // giftcard vendute, annullamenti, e buoni emessi (vendite differite); va
+  // invece sommato quanto incassato in buoni ritirati (riscatto buoni emessi
+  // in chiusure precedenti che ora generano corrispettivo monetario).
+  const cash=computeCash({corrispettivo,contanti,pos,cambi,giftcard,annull,buonoE,buonoR});
+  const diff=cash.diff;
+  const anomaly=cash.anomaly;
 
   // ── ESTRAZIONE COMPLETA Q&A (28 domande della checklist GoAudits) ──
   // Le domande hanno il formato "N. Testo domanda" su una riga, seguita
@@ -888,7 +942,97 @@ async function parsePDF(ab,fname,modifiedTime,fileId){
 
   return{fileId,store,brand,location,dateISO,dateDisplay,
     corrispettivo,netSales,contanti,pos,fondo,versato,daVersare,
-    cambi,buonoE,buonoR,sconti,annull,anomaly,diff,qa};
+    cambi,giftcard,buonoE,buonoR,sconti,annull,anomaly,diff,qa};
+}
+
+// ── VERIFICA CASSA ──
+// Formula: corrispettivo == (contanti + POS) - cambi - giftcard - annull
+//                            - buoniEmessi + buoniRitirati
+// Restituisce {expected, diff, anomaly}. diff può essere negativo (ammanco)
+// o positivo (eccedenza). anomaly = scarto > 1€ (tolleranza arrotondamenti).
+// È function-declaration (non const) per essere hoistata: viene chiamata
+// dentro parse() che esegue prima della sua riga di dichiarazione.
+function computeCash(r){
+  const contanti=+r.contanti||0, pos=+r.pos||0;
+  const cambi=+r.cambi||0, giftcard=+r.giftcard||0, annull=+r.annull||0;
+  const bE=+r.buonoE||0, bR=+r.buonoR||0;
+  const corrispettivo=+r.corrispettivo||0;
+  const expected = contanti + pos - cambi - giftcard - annull - bE + bR;
+  const diff = corrispettivo - expected;  // segnato: + = eccedenza, - = ammanco
+  const anomaly = Math.abs(diff) > 1 && corrispettivo > 0;
+  return {expected, diff, anomaly};
+}
+
+// ── OVERRIDES (correzioni manuali persistite sul backend) ──
+// Whitelist dei campi modificabili. Deve corrispondere a ALLOWED_OVERRIDE_FIELDS
+// nel backend (main.py). Aggiungere campi qui senza aggiornare il backend
+// causerà errori 400 al primo PUT.
+const OVR_FIELDS=['corrispettivo','contanti','pos','cambi','giftcard','annull','buonoE','buonoR'];
+
+// Snapshot dei valori parsati dal PDF (prima delle correzioni manuali).
+// Necessario per: (1) mostrare il "valore originale" nel tooltip del badge,
+// (2) auto-rimuovere l'override quando l'utente reimposta il valore originale.
+function setOriginal(r){
+  if(r._original) return;
+  r._original={};
+  for(const k of OVR_FIELDS) r._original[k]=+r[k]||0;
+}
+
+// Aggiorna r.diff/r.anomaly dopo una modifica ai valori. Da chiamare ogni
+// volta che cambia uno qualsiasi degli importi che entrano nella formula.
+function recomputeCash(r){
+  const c=computeCash(r);
+  r.diff=c.diff;
+  r.anomaly=c.anomaly;
+  return c;
+}
+
+async function fetchOverrides(){
+  // Restituisce array di {fileId, fields, updatedBy, updatedAt}. Non-fatale:
+  // se il backend è giù la dashboard mostra comunque i valori parsati.
+  try{
+    const r=await api('/overrides');
+    if(!r.ok) return [];
+    return await r.json();
+  }catch(e){console.warn('fetchOverrides',e);return[];}
+}
+
+function applyOverrides(records, overrides){
+  // Indicizza per fileId e applica i campi consentiti. Mutazione in-place
+  // perché allData è la fonte di verità per tutti i render.
+  const byId=new Map();
+  for(const o of overrides) if(o&&o.fileId) byId.set(o.fileId,o);
+  for(const r of records){
+    setOriginal(r);
+    r._overridden={};  // reset ogni sync
+    const o=r.fileId ? byId.get(r.fileId) : null;
+    if(o && o.fields){
+      for(const k of OVR_FIELDS){
+        if(o.fields[k]==null) continue;
+        const v=+o.fields[k];
+        if(!isFinite(v)) continue;
+        r[k]=v;
+        r._overridden[k]={by:o.updatedBy||'',at:o.updatedAt||''};
+      }
+    }
+    recomputeCash(r);
+  }
+}
+
+async function saveOverride(fileId, field, value){
+  // value=null → rimuove l'override per quel singolo campo. value numerico → upsert.
+  const body={fields:{[field]: value==null ? null : +value}};
+  const r=await api(`/overrides/${encodeURIComponent(fileId)}`,{
+    method:'PUT',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(body),
+  });
+  if(!r.ok){
+    let msg='Errore '+r.status;
+    try{const e=await r.json();if(e.detail)msg=e.detail;}catch(_){}
+    throw new Error(msg);
+  }
+  return await r.json();
 }
 
 // ── HELPERS ──
@@ -896,6 +1040,37 @@ const fmt=n=>{
   if(!n&&n!==0)return'—';
   return'€\u00a0'+n.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2});
 };
+// Numero senza prefisso €, formato italiano (per gli input editabili)
+const fmtNumIt=n=>{
+  const v=+n;
+  if(!isFinite(v)) return '0,00';
+  return v.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2});
+};
+// Parse di una stringa numerica in formato IT/EN. Accetta "1.234,56", "1234,56",
+// "1234.56", "1234". Restituisce 0 se non parsabile.
+function parseNumIt(s){
+  if(s==null) return 0;
+  let str=String(s).trim();
+  if(!str) return 0;
+  const neg=str.startsWith('-'); if(neg) str=str.slice(1);
+  str=str.replace(/[€\s ]/g,'');
+  if(!str) return 0;
+  const hasDot=str.includes('.'), hasComma=str.includes(',');
+  let norm;
+  if(hasDot&&hasComma) norm=str.replace(/\./g,'').replace(',','.');
+  else if(hasComma)    norm=str.replace(',','.');
+  else                 norm=str;
+  const n=parseFloat(norm);
+  return isFinite(n) ? (neg?-n:n) : 0;
+}
+function fmtDateTime(iso){
+  if(!iso) return '';
+  const d=new Date(iso);
+  if(isNaN(d)) return '';
+  return d.toLocaleString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});
+}
+// Escape per attributi HTML/title (per i valori serializzati nel markup)
+function attrEsc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function load(on,msg=''){
   document.getElementById('loading').classList.toggle('show',on);
   if(msg)document.getElementById('loading-msg').textContent=msg;
@@ -1743,36 +1918,156 @@ function openStoreSheet(brand, location){
 }
 
 // ── SHEET DETTAGLIO ──
+// Helper per costruire una riga nello sheet. Tre tipi:
+//  - divider:    intestazione di sezione
+//  - read-only:  label + valore formattato (no input)
+//  - editable:   label + input numerico modificabile, salva su backend con
+//                badge "modificato" quando l'utente ha sovrascritto il valore
+//                originale parsato dal PDF.
+function staticRow(label, valueStr, cls){
+  cls=cls||'';
+  return `<div class="sheet-row"><span class="row-l">${label}</span><span class="row-v ${cls}">${valueStr}</span></div>`;
+}
+function dividerRow(label){
+  return `<div class="sheet-row divider"><span>${label}</span></div>`;
+}
+function editRow(label, field, r){
+  // Campo editabile: input + (eventuale) badge "modificato" + reset.
+  const v=+r[field]||0;
+  const isMod=!!(r._overridden && r._overridden[field]);
+  let badge='', reset='';
+  if(isMod){
+    const meta=r._overridden[field]||{};
+    const orig=(r._original && r._original[field]!=null) ? +r._original[field] : 0;
+    const tip=`Originale: ${fmt(orig)}`+
+              (meta.by?` · modificato da ${meta.by}`:'')+
+              (meta.at?` il ${fmtDateTime(meta.at)}`:'');
+    badge=` <span class="ovr-badge" title="${attrEsc(tip)}">modificato</span>`;
+    reset=` <button class="ovr-reset" data-reset-field="${field}" title="Ripristina valore originale (${fmt(orig)})">ripristina</button>`;
+  }
+  return `<div class="sheet-row">
+    <span class="row-l">${label}</span>
+    <span class="row-v-edit">
+      <input class="row-input${isMod?' modified':''}" type="text" inputmode="decimal"
+             data-field="${field}" value="${fmtNumIt(v)}" />
+      ${badge}${reset}
+    </span>
+  </div>`;
+}
+
 function openSheet(idx){
   const r=allData[idx];
   document.getElementById('sheet-title').textContent=r.location;
   document.getElementById('sheet-sub').textContent=r.brand+' · '+r.dateDisplay;
-  const rowsHtml=[
-    ['divider','Dati giornata',''],
-    ['row','Data incasso',r.dateDisplay,''],
-    ['row','Corrispettivo (lordo)',fmt(r.corrispettivo),'g'],
-    ['row','Net Sales (÷1.22)',fmt(r.netSales),'b'],
-    ['divider','Cassa',''],
-    ['row','Contanti',fmt(r.contanti),''],
-    ['row','POS totale',fmt(r.pos),''],
-    ['row','Importo versato',fmt(r.versato),''],
-    ['row','Fondo cassa',fmt(r.fondo),''],
-    ['row','Cambi',fmt(r.cambi),''],
-    ['row','Buono emesso',fmt(r.buonoE),''],
-    ['row','Buono ritirato',fmt(r.buonoR),''],
-    ['divider','Note',''],
-    ['row','Sconti',r.sconti?'Sì':'No',r.sconti?'r':''],
-    ['row','Annullamenti',r.annull?'Sì':'No',r.annull?'r':''],
-    ['row','Verifica cassa',r.anomaly?`⚠ Δ ${fmt(r.diff)}`:'✓ Quadra',r.anomaly?'r':'g'],
-  ].map(row=>{
-    if(row[0]==='divider')return`<div class="sheet-row divider"><span>${row[1]}</span></div>`;
-    return`<div class="sheet-row"><span class="row-l">${row[1]}</span><span class="row-v ${row[3]}">${row[2]}</span></div>`;
-  }).join('');
+
+  // Ordine richiesto: Data → Corrispettivo → Net Sales → CASSA (Contanti, POS,
+  // Giftcard, Cambi, Annullamenti, Buono emesso, Buono ritirato, Sconti su
+  // vendite, Importo da versare, Importo versato) → Verifica cassa.
+  // Editabili (con override): Corrispettivo, Contanti, POS, Giftcard, Cambi,
+  // Annullamenti, Buono emesso, Buono ritirato.
+  const parts=[
+    dividerRow('Dati giornata'),
+    staticRow('Data incasso', r.dateDisplay, ''),
+    editRow('Corrispettivo (lordo)','corrispettivo', r),
+    staticRow('Net Sales (÷1.22)', fmt((+r.corrispettivo||0)/1.22), 'b'),
+    dividerRow('Cassa'),
+    editRow('Contanti','contanti', r),
+    editRow('POS totale','pos', r),
+    editRow('Giftcard','giftcard', r),
+    editRow('Cambi','cambi', r),
+    editRow('Annullamenti','annull', r),
+    editRow('Buono emesso','buonoE', r),
+    editRow('Buono ritirato','buonoR', r),
+    staticRow('Sconti su vendite', fmt(r.sconti), ''),
+    staticRow('Importo da versare', fmt(r.daVersare), ''),
+    staticRow('Importo versato', fmt(r.versato), ''),
+    // Verifica cassa: risultato della formula sul record corrente. Si aggiorna
+    // automaticamente ogni volta che l'utente modifica un valore editabile.
+    `<div id="cash-result" class="row-cash-result ${r.anomaly?'ko':'ok'}"><span>Verifica cassa</span><span class="delta">${r.anomaly?`⚠ Δ ${fmt(r.diff)}`:'✓ Quadra'}</span></div>`,
+  ];
+
   const attachBtn=r.fileId
     ? `<div style="padding:16px"><button class="settings-btn" onclick="openAttachments(${idx})">📎 Vedi foto allegate</button></div>`
     : '';
-  document.getElementById('sheet-rows').innerHTML=rowsHtml+attachBtn;
+  const sheetEl=document.getElementById('sheet-rows');
+  sheetEl.innerHTML=parts.join('')+attachBtn;
   document.getElementById('sheet').classList.add('show');
+
+  // ── Wiring eventi (delegation per sopravvivere al rerender) ──
+  // Click su "ripristina" → cancella l'override del singolo campo
+  sheetEl.querySelectorAll('button[data-reset-field]').forEach(btn=>{
+    btn.addEventListener('click', async(e)=>{
+      e.preventDefault();
+      const field=btn.getAttribute('data-reset-field');
+      await applyEditToRecord(r, field, null, idx);
+    });
+  });
+  // Input editabili: salva su Enter o blur (se cambiato)
+  sheetEl.querySelectorAll('input.row-input[data-field]').forEach(inp=>{
+    inp.addEventListener('focus', ()=>inp.select());
+    inp.addEventListener('keydown', (e)=>{
+      if(e.key==='Enter'){ e.preventDefault(); inp.blur(); }
+      else if(e.key==='Escape'){
+        // ripristina la visualizzazione corrente senza salvare
+        const f=inp.getAttribute('data-field');
+        inp.value=fmtNumIt(+r[f]||0);
+        inp.blur();
+      }
+    });
+    inp.addEventListener('blur', async()=>{
+      const field=inp.getAttribute('data-field');
+      const newVal=parseNumIt(inp.value);
+      const cur=+r[field]||0;
+      // Se non è cambiato, non chiamiamo il backend
+      if(Math.abs(newVal - cur) < 0.005){
+        inp.value=fmtNumIt(cur);
+        return;
+      }
+      // Se l'utente reimposta esattamente il valore originale, rimuovo l'override
+      const orig=(r._original && r._original[field]!=null) ? +r._original[field] : 0;
+      const isReset = Math.abs(newVal - orig) < 0.005;
+      await applyEditToRecord(r, field, isReset ? null : newVal, idx);
+    });
+  });
+}
+
+// Applica una modifica (o un reset) a un record: chiama il backend, aggiorna
+// lo stato locale, ricalcola la verifica cassa e ridisegna le viste correlate.
+async function applyEditToRecord(r, field, newVal, idx){
+  if(!r.fileId){
+    alert('Questo record non ha un fileId Drive: impossibile salvare la correzione.');
+    return;
+  }
+  // UX: marco l'input come "saving"
+  const inputs=document.querySelectorAll(`#sheet-rows input.row-input[data-field="${field}"]`);
+  inputs.forEach(i=>i.classList.add('saving'));
+  try{
+    // newVal=null → reset (PUT con null), altrimenti upsert
+    await saveOverride(r.fileId, field, newVal);
+    if(newVal==null){
+      // Ripristina il valore originale e rimuovi marker
+      const orig=(r._original && r._original[field]!=null) ? +r._original[field] : 0;
+      r[field]=orig;
+      if(r._overridden) delete r._overridden[field];
+    }else{
+      r[field]=+newVal;
+      r._overridden = r._overridden || {};
+      // Username corrente se conosciuto, altrimenti generico
+      const me=(auth && auth.user && (auth.user.username||auth.user.email)) || 'tu';
+      r._overridden[field]={by:me, at:new Date().toISOString()};
+    }
+    recomputeCash(r);
+    // Ridisegna lo sheet (semplifica la coerenza badge/colori) ma riapri
+    // mantenendo lo stato corrente.
+    openSheet(idx);
+    // Aggiorna anche le viste a monte: la card del negozio potrebbe perdere
+    // il marker di anomalia, i contatori delle anomalie cambiano, etc.
+    if(typeof renderAll==='function') renderAll();
+  }catch(e){
+    console.error('saveOverride',e);
+    alert('Errore salvataggio correzione: '+(e.message||e));
+    inputs.forEach(i=>i.classList.remove('saving'));
+  }
 }
 
 // ── VISUALIZZATORE ALLEGATI ──
@@ -2110,18 +2405,22 @@ function exportCSV(){
   // 2) Header completo: identificativi + KPI riassuntivi + tutte le Q&A
   const H=['Brand','Location','Data Incasso',
            'Corrispettivo','Net Sales','Contanti','POS','Versato','Fondo Cassa',
-           'Sconti','Annullamenti','Anomalia',
+           'Cambi','Giftcard','Annullamenti','Buono Emesso','Buono Ritirato',
+           'Sconti su Vendite','Anomalia','Delta Cassa',
            ...qaHeaders];
 
   // 3) Una riga per record, valori Q&A presi dal map per numero
   const rows=allData.map(r=>{
     const aMap={};
     if(r.qa){for(const item of r.qa) aMap[item.n]=item.a;}
+    const num=v=>(+v||0).toFixed(2);
     const base=[
       r.brand, r.location, r.dateDisplay,
-      r.corrispettivo.toFixed(2), (r.corrispettivo/1.22).toFixed(2),
-      r.contanti.toFixed(2), r.pos.toFixed(2), r.versato.toFixed(2), r.fondo.toFixed(2),
-      r.sconti?'Sì':'No', r.annull?'Sì':'No', r.anomaly?'Sì':'No'
+      num(r.corrispettivo), num((+r.corrispettivo||0)/1.22),
+      num(r.contanti), num(r.pos), num(r.versato), num(r.fondo),
+      num(r.cambi), num(r.giftcard), num(r.annull),
+      num(r.buonoE), num(r.buonoR), num(r.sconti),
+      r.anomaly?'Sì':'No', num(r.diff)
     ];
     const qaVals=ns.map(n=>aMap[n]||'');
     return [...base, ...qaVals];
