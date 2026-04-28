@@ -946,21 +946,34 @@ async function parsePDF(ab,fname,modifiedTime,fileId){
 }
 
 // ── VERIFICA CASSA ──
-// Formula: corrispettivo == (contanti + POS) - cambi - giftcard - annull
-//                            - buoniEmessi + buoniRitirati
-// Restituisce {expected, diff, anomaly}. diff può essere negativo (ammanco)
-// o positivo (eccedenza). anomaly = scarto > 1€ (tolleranza arrotondamenti).
+// Formula standard:
+//   corrispettivo == (contanti + POS) - cambi - giftcard - annull
+//                     - buoniEmessi + buoniRitirati
+// Formula Mango (eccezione richiesta dal cliente):
+//   corrispettivo == (contanti + POS) - buoniEmessi + buoniRitirati
+//   (cambi, giftcard e annullamenti NON vanno sottratti perché in Mango quei
+//    movimenti sono già conteggiati nel corrispettivo lordo del registratore)
+// Restituisce {expected, diff, anomaly}. diff segnato: + = eccedenza, - = ammanco.
+// anomaly = scarto > 1€ (tolleranza arrotondamenti).
 // È function-declaration (non const) per essere hoistata: viene chiamata
 // dentro parse() che esegue prima della sua riga di dichiarazione.
+function isMangoBrand(brand){
+  // Match case-insensitive con piccola tolleranza per varianti tipo "MANGO" o
+  // "mango ". Usato anche fuori da computeCash (es. per badge informativi).
+  return /^\s*mango\b/i.test(String(brand||''));
+}
 function computeCash(r){
   const contanti=+r.contanti||0, pos=+r.pos||0;
   const cambi=+r.cambi||0, giftcard=+r.giftcard||0, annull=+r.annull||0;
   const bE=+r.buonoE||0, bR=+r.buonoR||0;
   const corrispettivo=+r.corrispettivo||0;
-  const expected = contanti + pos - cambi - giftcard - annull - bE + bR;
-  const diff = corrispettivo - expected;  // segnato: + = eccedenza, - = ammanco
+  const mango=isMangoBrand(r.brand);
+  const expected = mango
+    ? (contanti + pos - bE + bR)
+    : (contanti + pos - cambi - giftcard - annull - bE + bR);
+  const diff = corrispettivo - expected;
   const anomaly = Math.abs(diff) > 1 && corrispettivo > 0;
-  return {expected, diff, anomaly};
+  return {expected, diff, anomaly, formula: mango ? 'mango' : 'std'};
 }
 
 // ── OVERRIDES (correzioni manuali persistite sul backend) ──
@@ -1983,7 +1996,9 @@ function openSheet(idx){
     staticRow('Importo versato', fmt(r.versato), ''),
     // Verifica cassa: risultato della formula sul record corrente. Si aggiorna
     // automaticamente ogni volta che l'utente modifica un valore editabile.
-    `<div id="cash-result" class="row-cash-result ${r.anomaly?'ko':'ok'}"><span>Verifica cassa</span><span class="delta">${r.anomaly?`⚠ Δ ${fmt(r.diff)}`:'✓ Quadra'}</span></div>`,
+    // Mango usa una formula semplificata (no cambi/giftcard/annull): segnaliamo
+    // con un piccolo badge a fianco del label così è chiaro perché non sottrae.
+    `<div id="cash-result" class="row-cash-result ${r.anomaly?'ko':'ok'}"><span>Verifica cassa${isMangoBrand(r.brand)?' <span class="ovr-badge" style="background:#ffedd5;border-color:#f97316;color:#c2410c" title="In Mango cambi, giftcard e annullamenti sono già nel corrispettivo: la formula è (contanti+POS) − buoni emessi + buoni ritirati">formula Mango</span>':''}</span><span class="delta">${r.anomaly?`⚠ Δ ${fmt(r.diff)}`:'✓ Quadra'}</span></div>`,
   ];
 
   const attachBtn=r.fileId
