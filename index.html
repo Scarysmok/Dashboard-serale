@@ -239,6 +239,7 @@ body{display:flex;flex-direction:column}
 .account-meta{font-size:11px;color:var(--t3);margin-top:4px}
 .account-badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-right:6px}
 .account-badge.admin{background:#ddd6fe;color:#5b21b6}
+.account-badge.editor{background:#cffafe;color:#155e75}
 .account-badge.pending{background:#fef3c7;color:#a16207}
 .account-badge.active{background:#dcfce7;color:#166534}
 .account-actions{display:flex;gap:6px;flex-shrink:0}
@@ -298,6 +299,7 @@ body{display:flex;flex-direction:column}
 .row-input:hover{border-color:var(--bd)}
 .row-input:focus{outline:none;border-color:var(--acc);background:var(--s1)}
 .row-input.modified{color:#a05a00;background:#fff8e6;border-color:#f3c969}
+.row-v.modified-ro{color:#a05a00}
 .row-input.modified:focus{border-color:#d99a1f;background:#fff4d4}
 .row-input.saving{opacity:.55}
 .ovr-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;
@@ -1048,6 +1050,13 @@ async function saveOverride(fileId, field, value){
   return await r.json();
 }
 
+// Permessi: solo editor e admin possono modificare i valori cassa. I 'user'
+// base hanno sola lettura. Centralizzato qui per coerenza tra backend e UI.
+function canEdit(){
+  const role = auth && auth.user && auth.user.role;
+  return role === 'editor' || role === 'admin';
+}
+
 // ── HELPERS ──
 const fmt=n=>{
   if(!n&&n!==0)return'—';
@@ -1658,16 +1667,25 @@ async function renderAccount(){
     const buildRow=(u)=>{
       const isMe=auth.user && u.id===auth.user.id;
       const meTag=isMe?' <span class="account-badge admin">Tu</span>':'';
-      const roleTag=u.role==='admin'?'<span class="account-badge admin">Admin</span>':'';
+      // Tag ruolo: admin (viola), editor (azzurro), user (nessun tag = sola lettura)
+      let roleTag='';
+      if(u.role==='admin')      roleTag='<span class="account-badge admin">Admin</span>';
+      else if(u.role==='editor')roleTag='<span class="account-badge editor">Editor</span>';
       const stateTag=u.enabled?'<span class="account-badge active">Attivo</span>':'<span class="account-badge pending">In attesa</span>';
       let actions='';
       if(!u.enabled){
         actions += `<button class="acct-btn approve" onclick="approveUser('${u.id}')">✓ Approva</button>`;
         actions += `<button class="acct-btn deny" onclick="deleteAccount('${u.id}','${u.username.replace(/'/g,"\\'")}')">✕ Rifiuta</button>`;
       }else if(!isMe){
+        // Transizioni di ruolo possibili dallo stato corrente:
         if(u.role==='admin'){
           actions += `<button class="acct-btn" onclick="demoteAdmin('${u.id}')">Rimuovi admin</button>`;
+        }else if(u.role==='editor'){
+          actions += `<button class="acct-btn promote" onclick="promoteAdmin('${u.id}')">Promuovi admin</button>`;
+          actions += `<button class="acct-btn" onclick="demoteToUser('${u.id}')">Rimuovi editor</button>`;
         }else{
+          // role === 'user' (sola lettura)
+          actions += `<button class="acct-btn promote" onclick="promoteEditor('${u.id}')">Promuovi a editor</button>`;
           actions += `<button class="acct-btn promote" onclick="promoteAdmin('${u.id}')">Promuovi admin</button>`;
         }
         actions += `<button class="acct-btn deny" onclick="disableUser('${u.id}')">Disabilita</button>`;
@@ -1716,12 +1734,20 @@ async function disableUser(id){
   await _updateUser(id,{enabled:false},'Disabilitazione');
 }
 async function promoteAdmin(id){
-  if(!confirm('Promuovere questo utente ad admin? Avrà accesso a questa stessa tab.'))return;
-  await _updateUser(id,{role:'admin'},'Promozione');
+  if(!confirm('Promuovere questo utente ad admin? Avrà accesso a questa stessa tab e potrà gestire altri utenti.'))return;
+  await _updateUser(id,{role:'admin'},'Promozione admin');
 }
 async function demoteAdmin(id){
-  if(!confirm('Rimuovere i privilegi admin a questo utente?'))return;
-  await _updateUser(id,{role:'user'},'Demozione');
+  if(!confirm('Rimuovere i privilegi admin a questo utente? Tornerà a essere un utente in sola lettura.'))return;
+  await _updateUser(id,{role:'user'},'Rimozione admin');
+}
+async function promoteEditor(id){
+  if(!confirm('Promuovere questo utente a editor? Potrà modificare i valori cassa (correzioni manuali).'))return;
+  await _updateUser(id,{role:'editor'},'Promozione editor');
+}
+async function demoteToUser(id){
+  if(!confirm('Rimuovere i privilegi editor? L\'utente potrà solo leggere i dati.'))return;
+  await _updateUser(id,{role:'user'},'Rimozione editor');
 }
 async function deleteAccount(id, username){
   if(!confirm(`Eliminare definitivamente l'account "${username}"?\nL'azione non può essere annullata.`))return;
@@ -1968,6 +1994,32 @@ function editRow(label, field, r){
   </div>`;
 }
 
+// Riga read-only di un campo "potenzialmente modificabile". Mostra il badge
+// "modificato" (se applicabile) per trasparenza, ma senza input né reset.
+// Usata per gli utenti con role=user (sola lettura).
+function viewRow(label, field, r){
+  const v=+r[field]||0;
+  const isMod=!!(r._overridden && r._overridden[field]);
+  let badge='';
+  if(isMod){
+    const meta=r._overridden[field]||{};
+    const orig=(r._original && r._original[field]!=null) ? +r._original[field] : 0;
+    const tip=`Originale: ${fmt(orig)}`+
+              (meta.by?` · modificato da ${meta.by}`:'')+
+              (meta.at?` il ${fmtDateTime(meta.at)}`:'');
+    badge=` <span class="ovr-badge" title="${attrEsc(tip)}">modificato</span>`;
+  }
+  return `<div class="sheet-row">
+    <span class="row-l">${label}</span>
+    <span class="row-v-edit"><span class="row-v${isMod?' modified-ro':''}">${fmt(v)}</span>${badge}</span>
+  </div>`;
+}
+
+// Riga "valore" che sceglie automaticamente edit vs view in base ai permessi
+function valueRow(label, field, r){
+  return canEdit() ? editRow(label, field, r) : viewRow(label, field, r);
+}
+
 function openSheet(idx){
   const r=allData[idx];
   document.getElementById('sheet-title').textContent=r.location;
@@ -1981,16 +2033,16 @@ function openSheet(idx){
   const parts=[
     dividerRow('Dati giornata'),
     staticRow('Data incasso', r.dateDisplay, ''),
-    editRow('Corrispettivo (lordo)','corrispettivo', r),
+    valueRow('Corrispettivo (lordo)','corrispettivo', r),
     staticRow('Net Sales (÷1.22)', fmt((+r.corrispettivo||0)/1.22), 'b'),
     dividerRow('Cassa'),
-    editRow('Contanti','contanti', r),
-    editRow('POS totale','pos', r),
-    editRow('Giftcard','giftcard', r),
-    editRow('Cambi','cambi', r),
-    editRow('Annullamenti','annull', r),
-    editRow('Buono emesso','buonoE', r),
-    editRow('Buono ritirato','buonoR', r),
+    valueRow('Contanti','contanti', r),
+    valueRow('POS totale','pos', r),
+    valueRow('Giftcard','giftcard', r),
+    valueRow('Cambi','cambi', r),
+    valueRow('Annullamenti','annull', r),
+    valueRow('Buono emesso','buonoE', r),
+    valueRow('Buono ritirato','buonoR', r),
     staticRow('Sconti su vendite', fmt(r.sconti), ''),
     staticRow('Importo da versare', fmt(r.daVersare), ''),
     staticRow('Importo versato', fmt(r.versato), ''),
