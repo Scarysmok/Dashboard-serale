@@ -491,7 +491,10 @@ const API_BASE='https://dashboard-backend-ur63.onrender.com';
 // vecchi record (senza giftcard, con annull/sconti booleani) non interferiscono
 // con la nuova formula di verifica cassa.
 const CACHE_KEY='rp_cache_v5';
-const CONCURRENCY=6;
+// Quanti PDF scaricare/parsare in parallelo. Render free tier regge ampiamente
+// 12 connessioni concorrenti, e sul lato browser riduce a ~metà il tempo di
+// parsing dei nuovi PDF rispetto a 6.
+const CONCURRENCY=12;
 // Lato minimo per considerare un'immagine una "foto utente": scarta loghi
 // a banner (GoAudits 572x82), mappe Google location (264x120), icone piccole.
 // Le foto scontrino/documento da smartphone sono sempre >= 200px per lato
@@ -571,7 +574,19 @@ function clearAuth(){
 // ── INIT ──
 // All'avvio: prova ad autenticarsi col token salvato. Se valido, mostra dash.
 // Altrimenti mostra schermata login. Notifica spinner per cold start Render.
+//
+// PRE-WARM: il backend Render free tier va in sleep dopo 15 min di inattività
+// e svegliarlo richiede 30-60 sec. Spariamo subito un ping all'endpoint pubblico
+// '/' (zero auth, zero costo) per innescare il wake-up IN PARALLELO mentre
+// l'utente legge il form di login e digita le credenziali. Quando poi clicca
+// "Accedi", il backend è già caldo e la chiamata di login risponde subito.
+// Per chi ha l'auto-login (token in localStorage), il ping gira in parallelo
+// con /auth/me, quindi non aiuta ma non danneggia: i due request condividono
+// lo stesso wake-up del backend.
 (async function(){
+  // Fire-and-forget warm-up. Non await, non blocca, errori loggati e basta.
+  fetch(API_BASE+'/', {credentials:'include'}).catch(e=>console.debug('warmup',e));
+
   auth.accessToken=localStorage.getItem('access_token');
   auth.refreshToken=localStorage.getItem('refresh_token');
   if(auth.accessToken){
@@ -708,39 +723,95 @@ async function doLogout(){
   showLogin();
 }
 
-// ── SYNC (parallelo + cache + diagnostica + proxy) ──
+// ── SYNC (parallelo + cache locale + cache backend condivisa + render incrementale) ──
 async function syncNow(){
   setPip('spin','Sincronizzazione…');
   load(true,'Lettura Google Drive…');
   lastErrors=[];
   try{
-    const files=await listFiles();
+    // Lista file da Drive + cache backend in parallelo (latenza coperta).
+    // Carico anche le correzioni manuali ora così a fine pipeline applyOverrides
+    // ha già tutto pronto e non aggiunge un altro round-trip.
+    const [files, backendCache, overrides] = await Promise.all([
+      listFiles(),
+      fetchPdfCache(),
+      fetchOverrides(),
+    ]);
     if(!files.length){setPip('','Nessun PDF');load(false);allData=[];renderAll();return;}
-    const cache=loadCache();
+
+    const localCache=loadCache();
     const results=new Array(files.length);
     const toFetch=[];
-    let fromCache=0;
-    files.forEach((f,i)=>{const key=f.id+'_'+f.modifiedTime;if(cache[key]){results[i]=cache[key];fromCache++;}else toFetch.push({i,f,key});});
-    load(true, toFetch.length===0 ? `${fromCache} file dalla cache…` : `Cache: ${fromCache}/${files.length} · scarico ${toFetch.length}…`);
-    let done=fromCache, cursor=0;
+    let fromBackend=0, fromLocal=0;
+
+    // Per ogni file scegliere la sorgente: cache backend > cache locale > download
+    files.forEach((f,i)=>{
+      const key=f.id+'_'+f.modifiedTime;
+      if(backendCache[key]){
+        results[i]=backendCache[key];
+        // Aggiorno anche la cache locale così se vai offline funzioni
+        localCache[key]=backendCache[key];
+        fromBackend++;
+      }else if(localCache[key]){
+        results[i]=localCache[key];
+        fromLocal++;
+      }else{
+        toFetch.push({i,f,key});
+      }
+    });
+
+    const cachedTotal = fromBackend + fromLocal;
+    load(true, toFetch.length===0
+      ? `${cachedTotal} file dalla cache (${fromBackend} condivisi)…`
+      : `Cache: ${cachedTotal}/${files.length} (${fromBackend} dal backend) · scarico ${toFetch.length}…`);
+
+    // RENDER INCREMENTALE: rendo subito quello che ho dalla cache così l'utente
+    // vede i numeri immediatamente, mentre i nuovi PDF si caricano in background.
+    // Una guard temporale evita di ridisegnare 30 volte al secondo (throttle 400ms).
+    let lastRender=0;
+    const maybeRender=(force=false)=>{
+      const now=Date.now();
+      if(!force && now-lastRender<400) return;
+      lastRender=now;
+      allData=results.filter(Boolean);
+      // Applico le correzioni manuali ANCHE durante il caricamento incrementale,
+      // altrimenti il render mostrerebbe i valori parsati senza override.
+      applyOverrides(allData, overrides);
+      try{ renderAll(); }catch(_){}
+    };
+    if(cachedTotal>0) maybeRender(true);  // primo render immediato con la cache
+
+    // Workers paralleli per scaricare e parsare i PDF mancanti
+    let done=cachedTotal, cursor=0;
     const worker=async()=>{
       while(cursor<toFetch.length){
         const job=toFetch[cursor++];
-        try{const d=await fetchAndParse(job.f);if(d){results[job.i]=d;cache[job.key]=d;}}
-        catch(e){console.warn(job.f.name,e);lastErrors.push({name:job.f.name,msg:e.message||String(e)});}
-        done++;load(true,`PDF ${done}/${files.length}…`);
+        try{
+          const d=await fetchAndParse(job.f);
+          if(d){
+            results[job.i]=d;
+            localCache[job.key]=d;
+            // Upload alla cache backend per gli altri utenti (best-effort, non blocca)
+            pushPdfCache(job.key, d).catch(e=>console.warn('pushPdfCache',e));
+          }
+        }catch(e){
+          console.warn(job.f.name,e);
+          lastErrors.push({name:job.f.name,msg:e.message||String(e)});
+        }
+        done++;
+        load(true,`PDF ${done}/${files.length}…`);
+        maybeRender();  // render incrementale ad ogni nuovo PDF (throttled)
       }
     };
     await Promise.all(Array.from({length:Math.min(CONCURRENCY,toFetch.length)},worker));
+
+    // Pulizia cache locale: chiavi non più valide vanno via per non gonfiare localStorage
     const validKeys=new Set(files.map(f=>f.id+'_'+f.modifiedTime));
-    for(const k of Object.keys(cache)) if(!validKeys.has(k)) delete cache[k];
-    saveCache(cache);
+    for(const k of Object.keys(localCache)) if(!validKeys.has(k)) delete localCache[k];
+    saveCache(localCache);
+
+    // Render finale forzato (ignora throttle) per garantire stato coerente
     allData=results.filter(Boolean);
-    // Correzioni manuali: scarico l'elenco dal backend e le applico sui record.
-    // Va fatto DOPO il filtraggio dei record validi e PRIMA di renderAll(),
-    // così la verifica cassa e i contatori usano i valori corretti.
-    load(true,`Carico correzioni manuali…`);
-    const overrides=await fetchOverrides();
     applyOverrides(allData, overrides);
     const t=new Date().toLocaleTimeString('it-IT');
     document.getElementById('last-sync-disp').textContent=t;
@@ -1032,6 +1103,37 @@ function applyOverrides(records, overrides){
     }
     recomputeCash(r);
   }
+}
+
+// ── CACHE BACKEND CONDIVISA (PDF parsati) ──
+// Il primo utente che parsa un PDF lo deposita qui; tutti gli altri lo
+// recuperano in millisecondi senza doverlo scaricare e riparsare. Funzioni
+// non-fatali: se il backend non risponde la dashboard funziona comunque
+// (cade sulla cache locale + parsing).
+async function fetchPdfCache(){
+  try{
+    const r=await api('/pdfcache');
+    if(!r.ok) return {};
+    const data=await r.json();
+    return (data && typeof data==='object') ? data : {};
+  }catch(e){console.warn('fetchPdfCache',e);return {};}
+}
+
+async function pushPdfCache(key, data){
+  // Best-effort upload. Errori loggati ma non propagati: la cache backend è
+  // un'ottimizzazione, non un requisito per il funzionamento.
+  try{
+    const r=await api('/pdfcache',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({key, data}),
+    });
+    if(!r.ok){
+      let msg='HTTP '+r.status;
+      try{const e=await r.json();if(e.detail)msg=typeof e.detail==='string'?e.detail:JSON.stringify(e.detail);}catch(_){}
+      console.warn('pushPdfCache failed for',key,msg);
+    }
+  }catch(e){console.warn('pushPdfCache',e);}
 }
 
 async function saveOverride(fileId, field, value){
@@ -1717,11 +1819,34 @@ async function renderAccount(){
   }
 }
 
+// Estrae un messaggio leggibile dal body di una risposta di errore FastAPI.
+// detail può essere:
+//  - stringa: HTTPException(detail="...")
+//  - array di oggetti: errori di validazione pydantic (422), uno per campo
+//  - oggetto: form atipici → fallback a JSON.stringify
+async function readErrorDetail(res){
+  try{
+    const e=await res.json();
+    if(e==null) return 'Errore '+res.status;
+    if(typeof e.detail === 'string') return e.detail;
+    if(Array.isArray(e.detail)){
+      // [{loc:[...], msg:"...", type:"..."}, ...]
+      return e.detail.map(it=>{
+        const loc = Array.isArray(it.loc) ? it.loc.slice(-1)[0] : '';
+        return (loc?loc+': ':'') + (it.msg || JSON.stringify(it));
+      }).join(' · ');
+    }
+    if(e.detail) return JSON.stringify(e.detail);
+    return JSON.stringify(e).slice(0, 300);
+  }catch(_){
+    return 'Errore '+res.status;
+  }
+}
+
 async function _updateUser(userId, payload, label){
   const r=await api(`/admin/users/${userId}`,{method:'PUT',body:JSON.stringify(payload)});
   if(!r.ok){
-    let detail='Errore '+r.status;
-    try{const e=await r.json();if(e.detail)detail=e.detail;}catch(_){}
+    const detail=await readErrorDetail(r);
     alert((label||'Aggiornamento')+' fallito: '+detail);
     return false;
   }
