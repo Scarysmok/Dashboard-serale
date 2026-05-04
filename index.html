@@ -290,6 +290,32 @@ body{display:flex;flex-direction:column}
 .row-v{font-family:var(--mono);font-size:14px;font-weight:500}
 .row-v.g{color:var(--green)}.row-v.r{color:var(--red)}.row-v.b{color:var(--blue)}
 
+/* Calendar overlay per il filtro data */
+.cal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:400;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);padding:16px;animation:fadein .15s ease}
+.cal-panel{background:var(--s1);border-radius:18px;width:100%;max-width:380px;padding:14px 0 14px;box-shadow:0 12px 40px rgba(0,0,0,.25);animation:slideup .22s cubic-bezier(.32,1,.57,1)}
+.cal-header{display:flex;align-items:center;justify-content:space-between;padding:6px 16px 12px}
+.cal-title{font-size:16px;font-weight:600;color:var(--t1);text-transform:capitalize}
+.cal-nav{background:none;border:none;font-size:22px;color:var(--acc);cursor:pointer;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:background .15s;line-height:1}
+.cal-nav:hover{background:var(--s2)}
+.cal-nav:disabled{opacity:.3;cursor:default}
+.cal-grid-head{display:grid;grid-template-columns:repeat(7,1fr);padding:6px 12px 4px;font-size:11px;color:var(--t3);text-align:center;font-weight:600;letter-spacing:.4px}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;padding:0 12px}
+.cal-day{background:none;border:none;cursor:pointer;aspect-ratio:1;border-radius:50%;font-size:14px;color:var(--t1);display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;transition:background .15s,color .15s;padding:0}
+.cal-day:hover:not(.empty):not(.blank){background:var(--s2)}
+.cal-day.blank{visibility:hidden}
+.cal-day.empty{color:var(--t3);cursor:default;opacity:.35}
+.cal-day.today:not(.selected){color:var(--red);font-weight:700}
+.cal-day.selected{background:var(--acc);color:#fff;font-weight:600}
+.cal-day.selected:hover{background:var(--acc)}
+.cal-count{position:absolute;bottom:1px;font-size:8px;font-weight:700;color:var(--t3);letter-spacing:-.2px;line-height:1}
+.cal-day.selected .cal-count{color:rgba(255,255,255,.85)}
+.cal-day.today:not(.selected) .cal-count{color:var(--red)}
+.cal-footer{border-top:1px solid var(--bd);padding:14px 16px 0;margin-top:14px}
+.cal-all{width:100%;background:var(--s2);border:none;border-radius:10px;padding:12px;font-size:13px;font-weight:500;color:var(--t1);cursor:pointer;transition:background .15s}
+.cal-all:hover{background:var(--bd)}
+.cal-all.active{background:var(--acc);color:#fff}
+@keyframes fadein{from{opacity:0}to{opacity:1}}
+
 /* Editable row: input invisibile in stato di riposo, evidenziato al focus */
 .row-v-edit{display:flex;align-items:center;gap:8px;justify-content:flex-end}
 .row-input{font-family:var(--mono);font-size:14px;font-weight:500;color:var(--t1);
@@ -1253,40 +1279,105 @@ function getFilteredData(){
   return filterDate ? allData.filter(r=>r.dateISO===filterDate) : allData;
 }
 
-// Apre il menu di selezione data: mostra solo le date effettivamente presenti
-// nei PDF caricati, più l'opzione "Tutte le date" per resettare.
+// Apre il filtro data come calendario interattivo. Mostra il mese di default
+// più recente con dati (o quello del filtro corrente se attivo). I giorni
+// senza dati sono disabilitati e in grigio; quello selezionato ha sfondo
+// accent; "oggi" è in rosso. Indicatore di quanti negozi per giorno
+// (numerino sotto la cifra). Bottone "Mostra tutte le date" per il reset.
 function openDateFilter(){
-  const dates=[...new Set(allData.map(r=>r.dateISO).filter(Boolean))].sort().reverse();
+  // Pre-calcolo: set di date disponibili + count per data
+  const dates=new Set(), counts={};
+  for(const r of allData){
+    if(!r.dateISO) continue;
+    dates.add(r.dateISO);
+    counts[r.dateISO]=(counts[r.dateISO]||0)+1;
+  }
+  if(!dates.size){
+    alert('Nessuna data disponibile: carica prima qualche chiusura.');
+    return;
+  }
+  const sorted=[...dates].sort();
+  const earliestISO=sorted[0];
+  const latestISO=sorted[sorted.length-1];
+
+  // Mese visualizzato all'apertura: quello del filtro attivo, altrimenti il
+  // più recente con dati (= quasi sempre quello che l'utente vuole vedere).
+  const initISO=filterDate || latestISO;
+  let [yr,mo]=initISO.split('-').map(Number);
+
   const overlay=document.createElement('div');
-  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:400;display:flex;align-items:flex-end;justify-content:center;backdrop-filter:blur(4px)';
+  overlay.className='cal-overlay';
   overlay.onclick=(e)=>{if(e.target===overlay)overlay.remove();};
+
   const panel=document.createElement('div');
-  panel.style.cssText='background:var(--s1);border-radius:20px 20px 0 0;width:100%;max-width:560px;max-height:70vh;overflow-y:auto;padding-bottom:var(--safe-bot);animation:slideup .25s cubic-bezier(.32,1,.57,1)';
-  const handle=document.createElement('div');
-  handle.className='sheet-handle';
-  panel.appendChild(handle);
-  const title=document.createElement('div');
-  title.style.cssText='padding:14px 20px;border-bottom:1px solid var(--bd);font-size:15px;font-weight:600';
-  title.textContent='Filtra per data';
-  panel.appendChild(title);
-  const options=[{label:'📅 Tutte le date',value:null,sub:`${allData.length} negozi totali`}];
-  for(const d of dates){
-    const [y,m,dd]=d.split('-');
-    const count=allData.filter(r=>r.dateISO===d).length;
-    options.push({label:`${dd}/${m}/${y}`,value:d,sub:`${count} negoz${count===1?'io':'i'}`});
-  }
-  for(const opt of options){
-    const row=document.createElement('div');
-    const isSel=filterDate===opt.value;
-    row.className='sheet-row';
-    row.style.cssText='cursor:pointer'+(isSel?';background:var(--s2)':'');
-    row.innerHTML=`<div><div class="row-l" style="color:${isSel?'var(--acc)':'var(--t1)'};font-size:14px">${opt.label}</div>
-      <div style="font-size:11px;color:var(--t3);margin-top:2px">${opt.sub}</div></div>
-      ${isSel?'<span class="row-v y">✓</span>':''}`;
-    row.onclick=()=>{setDateFilter(opt.value);overlay.remove();};
-    panel.appendChild(row);
-  }
+  panel.className='cal-panel';
   overlay.appendChild(panel);
+
+  const monthNames=['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno',
+                    'Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+
+  const todayD=new Date();
+  const todayISO=`${todayD.getFullYear()}-${String(todayD.getMonth()+1).padStart(2,'0')}-${String(todayD.getDate()).padStart(2,'0')}`;
+
+  // Helper per limitare la navigazione al range delle date disponibili.
+  // Evita che l'utente perda tempo su mesi vuoti molto lontani.
+  const earliest=earliestISO.split('-').map(Number);  // [y,m,d]
+  const latest=latestISO.split('-').map(Number);
+  const canPrev=()=> (yr>earliest[0]) || (yr===earliest[0] && mo>earliest[1]);
+  const canNext=()=> (yr<latest[0])   || (yr===latest[0]   && mo<latest[1]);
+
+  function render(){
+    // Costruzione griglia: prima riga lunedì-domenica, poi 6 righe da 7 celle
+    const firstWeekday=new Date(yr,mo-1,1).getDay();   // Sun=0 .. Sat=6
+    const leadingBlanks=(firstWeekday+6)%7;            // shift a Lun=0 .. Dom=6
+    const daysInMonth=new Date(yr,mo,0).getDate();
+
+    let cells='';
+    for(let i=0;i<leadingBlanks;i++) cells+='<button class="cal-day blank" tabindex="-1"></button>';
+    for(let d=1;d<=daysInMonth;d++){
+      const iso=`${yr}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const has=dates.has(iso);
+      const sel=filterDate===iso;
+      const isToday=iso===todayISO;
+      const cnt=counts[iso]||0;
+      const cls=['cal-day'];
+      if(!has) cls.push('empty');
+      if(sel) cls.push('selected');
+      if(isToday) cls.push('today');
+      const attrs=has ? `data-iso="${iso}"` : 'disabled';
+      const badge=has && cnt ? `<span class="cal-count">${cnt}</span>` : '';
+      cells+=`<button class="${cls.join(' ')}" ${attrs}>${d}${badge}</button>`;
+    }
+
+    const allActive=!filterDate;
+
+    panel.innerHTML=`
+      <div class="cal-header">
+        <button class="cal-nav" data-nav="prev" aria-label="Mese precedente"${canPrev()?'':' disabled'}>‹</button>
+        <div class="cal-title">${monthNames[mo-1]} ${yr}</div>
+        <button class="cal-nav" data-nav="next" aria-label="Mese successivo"${canNext()?'':' disabled'}>›</button>
+      </div>
+      <div class="cal-grid-head">
+        <div>L</div><div>M</div><div>M</div><div>G</div><div>V</div><div>S</div><div>D</div>
+      </div>
+      <div class="cal-grid">${cells}</div>
+      <div class="cal-footer">
+        <button class="cal-all${allActive?' active':''}" data-action="all">📅 Mostra tutte le date · ${allData.length} negozi totali</button>
+      </div>
+    `;
+
+    // Wiring eventi (delegation locale al panel: si rinfresca a ogni render)
+    const prevBtn=panel.querySelector('[data-nav="prev"]');
+    const nextBtn=panel.querySelector('[data-nav="next"]');
+    if(prevBtn) prevBtn.onclick=()=>{ if(canPrev()){ mo--; if(mo<1){mo=12;yr--;} render(); } };
+    if(nextBtn) nextBtn.onclick=()=>{ if(canNext()){ mo++; if(mo>12){mo=1;yr++;} render(); } };
+    panel.querySelector('[data-action="all"]').onclick=()=>{ setDateFilter(null); overlay.remove(); };
+    panel.querySelectorAll('button[data-iso]').forEach(el=>{
+      el.onclick=()=>{ setDateFilter(el.dataset.iso); overlay.remove(); };
+    });
+  }
+
+  render();
   document.body.appendChild(overlay);
 }
 
