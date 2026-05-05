@@ -1294,6 +1294,7 @@ async function fetchHistorical(){
 // dell'header Excel (in minuscolo, spazi compattati) come chiave, e
 // [brand, location] come valore. Aggiungi anche il negozio a EXPECTED_STORES.
 const TARGETS_HEADER_MAP = {
+  // 20 negozi monitorati GoAudits (i target c'erano già)
   'adidas bari bariblu':              ['Adidas',  'Bariblu'],
   'adidas brindisi city (umberto)':   ['Adidas',  'Brindisi City'],
   'adidas brindisi colonne':          ['Adidas',  'Brindisi Colonne'],
@@ -1314,6 +1315,20 @@ const TARGETS_HEADER_MAP = {
   'mango teramo gran sasso':          ['Mango',   'Teramo'],
   'yamamay lecce city (sauro)':       ['Yamamay', 'Lecce'],
   'yamamay polignano city (a. moro)': ['Yamamay', 'Polignano'],
+  // 10 negozi NON-GoAudits (target c'erano nell'Excel ma non venivano letti
+  // perché le colonne non sono verdi). Gli header del target hanno nomi più
+  // estesi del file storico (es. "carpisa Bari City (Sparano)" anziché solo
+  // "Carpisa Sparano"), per quello servono entrambe le mappature.
+  'carpisa bari bariblu':                       ['Carpisa', 'Bariblu'],
+  'carpisa bari city (sparano)':                ['Carpisa', 'Sparano'],
+  'carpisa bari santa caterina mongolfiera':    ['Carpisa', 'S. Caterina'],
+  'carpisa casamassima parco commerciale':      ['Carpisa', 'Casamassima'],
+  'yamamay bari aeroporto':                     ['Yamamay', 'Aeroporto'],
+  'yamamay bari city (sparano)':                ['Yamamay', 'Sparano'],
+  'yamamay bari santa caterina mongolfiera':    ['Yamamay', 'S. Caterina'],
+  'yamamay casamassima parco commerciale':      ['Yamamay', 'Casamassima'],
+  'yamamay molfetta puglia village':            ['Yamamay', 'Molfetta'],
+  'yamamay putignano city (umberto)':           ['Yamamay', 'Putignano'],
 };
 // Parsa l'Excel selezionato dall'utente e POSTa i target a /targets/bulk con
 // replace_all=true (sostituisce tutto il dataset esistente in MongoDB).
