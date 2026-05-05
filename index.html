@@ -1808,6 +1808,36 @@ function targetBadgeHTML(r){
   const pctStr = pct.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2}) + '%';
   return `<div class="card-target ${cls}" title="Target NET ${fmt(tgt)} · Net sales ${fmt(net)}">${pctStr}</div>`;
 }
+// Versione aggregata: calcola la % di realizzazione target su un GRUPPO di
+// chiusure (un giorno con più negozi, un mese intero, un anno intero, ecc.).
+// "Dinamica" perché la somma dei target include SOLO i giorni-negozio per cui
+// abbiamo una chiusura ricevuta. Quindi nel mese in corso o nell'anno in corso
+// la % evolve giorno dopo giorno: man mano che arrivano nuove chiusure, sia il
+// numeratore (net sales) sia il denominatore (sum target) crescono.
+// Restituisce {pct, totNet, totTgt} oppure null se nessun target è disponibile
+// per i record passati (es. mesi/anni interamente festivi o senza target caricati).
+function periodTargetData(records){
+  let totNet=0, totTgt=0;
+  for(const r of records){
+    const key = storeKey(r.brand, r.location) + '|' + (r.dateISO||'');
+    const tgt = +targetsByKey[key] || 0;
+    if(tgt > 0){
+      totTgt += tgt;
+      totNet += (+r.netSales) || ((+r.corrispettivo||0) / 1.22);
+    }
+  }
+  if(totTgt <= 0) return null;
+  return {pct: totNet/totTgt*100, totNet, totTgt};
+}
+function periodTargetBadgeHTML(records){
+  const d = periodTargetData(records);
+  if(!d) return `<div class="card-target zero">TGT=0</div>`;
+  let cls='red';
+  if(d.pct >= 95) cls='green';
+  else if(d.pct >= 70) cls='yellow';
+  const pctStr = d.pct.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2}) + '%';
+  return `<div class="card-target ${cls}" title="Target NET ${fmt(d.totTgt)} · Net sales ${fmt(d.totNet)} · ${records.length} chiusur${records.length===1?'a':'e'}">${pctStr}</div>`;
+}
 // ── CARDS (TAB NEGOZI) ──
 function renderCards(){
   const q=document.getElementById('search').value.toLowerCase();
@@ -2023,11 +2053,15 @@ function renderTempo(){
           const gCorr = recs.reduce((a,r)=>a+r.corrispettivo,0);
           const gNet  = gCorr/1.22;
           const bc = breakdownMode==='brand' ? brandColor(name) : fixedBc;
+          // Badge % per il singolo gruppo (brand o negozio): aggrega solo i
+          // record di quel gruppo, così ogni riga mostra la propria realizzazione.
+          const groupBadge = periodTargetBadgeHTML(recs);
           return `<div class="brand-row" style="border-left:3px solid ${bc.strong};padding-left:13px">
             <span class="brand-row-name" style="color:${bc.text}">${name} <span style="font-size:11px;color:var(--t3);font-weight:normal">(${recs.length})</span></span>
-            <div class="brand-row-right">
+            <div class="brand-row-right" style="display:flex;flex-direction:column;align-items:flex-end;gap:3px">
               <div class="brand-row-corr">${fmt(gCorr)}</div>
               <div class="brand-row-net">NET ${fmt(gNet)}</div>
+              ${groupBadge}
             </div>
           </div>`;
         }).join('');
@@ -2036,15 +2070,21 @@ function renderTempo(){
     const subLabel = (breakdownMode === 'none')
       ? `${p.records.length} chiusur${p.records.length===1?'a':'e'}`
       : `${p.records.length} negoz${p.records.length===1?'io':'i'}`;
+    // Badge % di realizzazione TGT per il periodo intero. Su giorno è la
+    // media del giorno; su mese/anno è dinamica perché include solo i giorni
+    // (per ogni negozio) per cui c'è una chiusura ricevuta — quindi cresce
+    // di pari passo numeratore e denominatore man mano che il periodo avanza.
+    const periodBadge = periodTargetBadgeHTML(p.records);
     html+=`<div class="period-card">
       <div class="period-head" onclick="togglePeriod('${pid}')">
         <div>
           <div class="period-date">${labelFn(p.key)}</div>
           <div style="font-size:11px;color:var(--t3);margin-top:2px">${subLabel}</div>
         </div>
-        <div style="text-align:right">
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px">
           <div class="period-corr">${fmt(pCorr)}</div>
           <div class="period-net">NET ${fmt(pNet)}</div>
+          ${periodBadge}
         </div>
         <span class="period-chevron" id="chev-${pid}">›</span>
       </div>
