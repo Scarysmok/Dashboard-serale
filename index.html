@@ -213,6 +213,13 @@ body{display:flex;flex-direction:column}
 
 /* ── TEMPO TAB ── */
 .tempo-wrap{padding:16px;display:flex;flex-direction:column;gap:12px;padding-bottom:32px}
+/* Filtri brand + punto vendita: due dropdown impilati. Lo store è hidden
+   finché non viene scelto un brand specifico, in modo da non confondere
+   l'utente con un secondo filtro che non ha opzioni. */
+.tempo-filters{display:flex;flex-direction:column;gap:8px;flex-shrink:0}
+.tempo-filter-label{font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.tempo-select{width:100%;padding:11px 38px 11px 14px;background:var(--s1);border:1px solid var(--bd2);border-radius:10px;color:var(--t1);font-family:var(--font);font-size:14px;font-weight:500;outline:none;-webkit-appearance:none;appearance:none;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238c959f' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;transition:border-color .15s}
+.tempo-select:focus,.tempo-select:hover{border-color:var(--acc)}
 .tempo-seg{display:flex;gap:0;border:1px solid var(--bd2);border-radius:10px;overflow:hidden;margin-bottom:4px;flex-shrink:0}
 .tempo-btn{flex:1;padding:9px 4px;font-size:12px;font-weight:500;font-family:var(--font);background:var(--s2);color:var(--t2);border:none;cursor:pointer;transition:all .15s;-webkit-appearance:none}
 .tempo-btn.on{background:var(--acc);color:#0f0f11}
@@ -473,6 +480,27 @@ body{display:flex;flex-direction:column}
   <!-- TAB TEMPO -->
   <div class="scroll-area" id="tab-tempo" style="display:none">
     <div class="tempo-wrap">
+      <!-- Filtro 1 — Brand. "Tutti i brand" è il default. -->
+      <!-- Filtro 2 — Punto vendita. Visibile solo dopo aver scelto un brand,
+           con opzioni dinamiche calcolate dai negozi attesi del brand. -->
+      <div class="tempo-filters">
+        <div>
+          <div class="tempo-filter-label">Brand</div>
+          <select class="tempo-select" id="tempo-brand" onchange="setTempoBrand(this.value)">
+            <option value="">Tutti i brand</option>
+            <option value="Adidas">Adidas</option>
+            <option value="Carpisa">Carpisa</option>
+            <option value="Mango">Mango</option>
+            <option value="Yamamay">Yamamay</option>
+          </select>
+        </div>
+        <div id="tempo-store-wrap" style="display:none">
+          <div class="tempo-filter-label">Punto vendita</div>
+          <select class="tempo-select" id="tempo-store" onchange="setTempoStore(this.value)">
+            <!-- Popolato dinamicamente da setTempoBrand() -->
+          </select>
+        </div>
+      </div>
       <div class="tempo-seg">
         <button class="tempo-btn on" id="tb-giorno" onclick="setTempo('giorno',this)">Giorno</button>
         <button class="tempo-btn" id="tb-mese" onclick="setTempo('mese',this)">Mese</button>
@@ -547,6 +575,10 @@ const CONCURRENCY = IS_MOBILE ? 4 : 12;
 // anche dopo la compressione JPEG applicata dal generatore di PDF.
 const ATTACH_MIN_SIDE=200;
 let allData=[], filter='all', filterDate=null, tempoView='giorno', syncTimer=null;
+// Filtri tab Periodo: tempoBrand=='' significa tutti i brand (filtro spento),
+// tempoStore=='' significa tutti i negozi del brand selezionato. Lo store
+// non può essere settato senza un brand: setTempoBrand('') resetta anche lo store.
+let tempoBrand='', tempoStore='';
 let lastErrors=[];
 // Target di vendita giornalieri per (brand, location, dateISO). Caricati una
 // volta a sync da /targets, poi indicizzati con la stessa chiave normalizzata
@@ -1482,6 +1514,44 @@ function setTempo(v,el){
   el.classList.add('on');
   renderTempo();
 }
+// ── FILTRI TAB PERIODO (brand → punto vendita a cascata) ──
+// Quando l'utente sceglie un brand, popoliamo dinamicamente il dropdown
+// "Punto vendita" con i soli negozi di quel brand (presi da EXPECTED_STORES
+// più eventuali altri visti nei dati reali, se mai dovessero esistere).
+// Cambiare brand resetta sempre il filtro store: non avrebbe senso mantenere
+// un negozio di un brand diverso da quello appena scelto.
+function setTempoBrand(brand){
+  tempoBrand = brand || '';
+  tempoStore = '';
+  const storeWrap = document.getElementById('tempo-store-wrap');
+  const storeSel  = document.getElementById('tempo-store');
+  if(!tempoBrand){
+    // "Tutti i brand" → nascondo del tutto il filtro punto vendita
+    if(storeWrap) storeWrap.style.display = 'none';
+  }else{
+    // Costruisco la lista negozi del brand: parto da EXPECTED_STORES (per
+    // includere anche i negozi che non hanno ancora inviato chiusure) e
+    // aggiungo eventuali location nuove viste in allData (difensivo: se in
+    // futuro arrivano dati di un negozio non in EXPECTED_STORES).
+    const set = new Set();
+    for(const s of EXPECTED_STORES){
+      if(s.brand === tempoBrand) set.add(s.location);
+    }
+    for(const r of allData){
+      if(r.brand === tempoBrand && r.location) set.add(r.location);
+    }
+    const stores = [...set].sort((a,b)=>a.localeCompare(b,'it'));
+    storeSel.innerHTML = '<option value="">Tutti i negozi</option>' +
+      stores.map(s=>`<option value="${attrEsc(s)}">${attrEsc(s)}</option>`).join('');
+    storeSel.value = '';
+    if(storeWrap) storeWrap.style.display = '';
+  }
+  renderTempo();
+}
+function setTempoStore(loc){
+  tempoStore = loc || '';
+  renderTempo();
+}
 
 // ── RENDER ALL ──
 function renderAll(){
@@ -1875,18 +1945,39 @@ function renderCards(){
 }
 
 // ── TAB PERIODO ──
+// Modalità di breakdown dentro ogni card-periodo, in base ai filtri attivi:
+//  - Nessun filtro → breakdown per BRAND (default storico)
+//  - Brand filtrato, store vuoto → breakdown per NEGOZIO (solo quelli del brand)
+//  - Brand + store specifici → nessun breakdown, solo totali del periodo
 function renderTempo(){
   if(!allData.length){
     document.getElementById('tempo-content').innerHTML='<div class="empty-state"><div class="empty-icon">📅</div><div class="empty-text">Nessun dato disponibile</div></div>';
     return;
   }
-
-  // Raggruppa i record per chiave temporale
+  // 1) Applica i filtri brand + store sui record. Filtraggio progressivo:
+  //    se non c'è brand, non filtra niente; con brand filtra per brand;
+  //    con brand+store filtra anche per location.
+  let data = allData;
+  if(tempoBrand) data = data.filter(r => r.brand === tempoBrand);
+  if(tempoStore) data = data.filter(r => r.location === tempoStore);
+  if(!data.length){
+    let msg = 'Nessun dato per i filtri selezionati';
+    if(tempoBrand && tempoStore) msg = `Nessuna chiusura per ${tempoBrand} ${tempoStore}`;
+    else if(tempoBrand) msg = `Nessuna chiusura per ${tempoBrand}`;
+    document.getElementById('tempo-content').innerHTML=`<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-text">${msg}</div></div>`;
+    return;
+  }
+  // 2) Determina la modalità di breakdown
+  const breakdownMode =
+    (tempoBrand && tempoStore) ? 'none'  :  // singolo negozio: zero breakdown
+    (tempoBrand)               ? 'store' :  // brand: per negozio
+                                 'brand';   // default: per brand
+  // 3) Funzioni di chiave/label temporali (giorno/mese/anno)
   const keyFn = r => {
     if(!r.dateISO) return 'Data sconosciuta';
-    if(tempoView==='giorno') return r.dateISO; // YYYY-MM-DD
+    if(tempoView==='giorno') return r.dateISO;          // YYYY-MM-DD
     if(tempoView==='mese')   return r.dateISO.slice(0,7); // YYYY-MM
-    return r.dateISO.slice(0,4); // YYYY
+    return r.dateISO.slice(0,4);                          // YYYY
   };
   const labelFn = key => {
     if(tempoView==='giorno'){
@@ -1899,46 +1990,57 @@ function renderTempo(){
     }
     return key;
   };
-
-  // Costruisci mappa periodo → {totale, per brand}
+  // 4) Costruisci mappa periodo → {records, breakdownGroups}
+  // breakdownGroups raggruppa per brand o per location a seconda del modo.
   const periodi={};
-  for(const r of allData){
+  for(const r of data){
     const k=keyFn(r);
-    if(!periodi[k])periodi[k]={key:k,records:[],brands:{}};
+    if(!periodi[k]) periodi[k]={key:k, records:[], groups:{}};
     periodi[k].records.push(r);
-    if(!periodi[k].brands[r.brand])periodi[k].brands[r.brand]=[];
-    periodi[k].brands[r.brand].push(r);
+    if(breakdownMode !== 'none'){
+      const groupKey = breakdownMode==='brand' ? r.brand : r.location;
+      if(!periodi[k].groups[groupKey]) periodi[k].groups[groupKey] = [];
+      periodi[k].groups[groupKey].push(r);
+    }
   }
-
-  // Ordina periodi decrescente
-  const sorted=Object.values(periodi).sort((a,b)=>b.key.localeCompare(a.key));
-
+  const sorted = Object.values(periodi).sort((a,b)=>b.key.localeCompare(a.key));
+  // Colore "del brand corrente" per le righe-negozio (quando brand è selezionato).
+  // Quando il breakdown è per brand, il colore viene calcolato per ogni gruppo.
+  const fixedBc = tempoBrand ? brandColor(tempoBrand) : null;
   let html='';
   for(const p of sorted){
-    const pCorr=p.records.reduce((a,r)=>a+r.corrispettivo,0);
-    const pNet=pCorr/1.22;
-    const pCash=p.records.reduce((a,r)=>a+r.contanti,0);
-    const pPOS=p.records.reduce((a,r)=>a+r.pos,0);
-    const pid='p_'+p.key.replace(/-/g,'');
-
-    const brandRows=Object.entries(p.brands).map(([brand,recs])=>{
-      const bCorr=recs.reduce((a,r)=>a+r.corrispettivo,0);
-      const bNet=bCorr/1.22;
-      const bc=brandColor(brand);
-      return `<div class="brand-row" style="border-left:3px solid ${bc.strong};padding-left:13px">
-        <span class="brand-row-name" style="color:${bc.text}">${brand} <span style="font-size:11px;color:var(--t3);font-weight:normal">(${recs.length})</span></span>
-        <div class="brand-row-right">
-          <div class="brand-row-corr">${fmt(bCorr)}</div>
-          <div class="brand-row-net">NET ${fmt(bNet)}</div>
-        </div>
-      </div>`;
-    }).join('');
-
+    const pCorr = p.records.reduce((a,r)=>a+r.corrispettivo,0);
+    const pNet  = pCorr/1.22;
+    const pCash = p.records.reduce((a,r)=>a+r.contanti,0);
+    const pPOS  = p.records.reduce((a,r)=>a+r.pos,0);
+    const pid   = 'p_'+p.key.replace(/-/g,'');
+    // Costruzione righe di breakdown (vuote in modalità 'none')
+    let groupRows = '';
+    if(breakdownMode !== 'none'){
+      groupRows = Object.entries(p.groups)
+        .sort((a,b)=>a[0].localeCompare(b[0],'it'))
+        .map(([name, recs])=>{
+          const gCorr = recs.reduce((a,r)=>a+r.corrispettivo,0);
+          const gNet  = gCorr/1.22;
+          const bc = breakdownMode==='brand' ? brandColor(name) : fixedBc;
+          return `<div class="brand-row" style="border-left:3px solid ${bc.strong};padding-left:13px">
+            <span class="brand-row-name" style="color:${bc.text}">${name} <span style="font-size:11px;color:var(--t3);font-weight:normal">(${recs.length})</span></span>
+            <div class="brand-row-right">
+              <div class="brand-row-corr">${fmt(gCorr)}</div>
+              <div class="brand-row-net">NET ${fmt(gNet)}</div>
+            </div>
+          </div>`;
+        }).join('');
+    }
+    // Sotto-titolo del periodo: cambia label in base al modo (negozi vs chiusure)
+    const subLabel = (breakdownMode === 'none')
+      ? `${p.records.length} chiusur${p.records.length===1?'a':'e'}`
+      : `${p.records.length} negoz${p.records.length===1?'io':'i'}`;
     html+=`<div class="period-card">
       <div class="period-head" onclick="togglePeriod('${pid}')">
         <div>
           <div class="period-date">${labelFn(p.key)}</div>
-          <div style="font-size:11px;color:var(--t3);margin-top:2px">${p.records.length} negoz${p.records.length===1?'io':'i'}</div>
+          <div style="font-size:11px;color:var(--t3);margin-top:2px">${subLabel}</div>
         </div>
         <div style="text-align:right">
           <div class="period-corr">${fmt(pCorr)}</div>
@@ -1947,7 +2049,7 @@ function renderTempo(){
         <span class="period-chevron" id="chev-${pid}">›</span>
       </div>
       <div class="period-body" id="${pid}">
-        ${brandRows}
+        ${groupRows}
         <div class="period-total-row">
           <div class="ptotal-cell">
             <div class="ptotal-l">Contanti</div>
