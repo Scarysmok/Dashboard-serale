@@ -229,12 +229,6 @@ body{display:flex;flex-direction:column}
 .tempo-toggle.on{background:#2563eb12;color:var(--acc);border-color:var(--acc)}
 .tempo-toggle::before{content:'';width:14px;height:14px;border-radius:3px;border:1.5px solid currentColor;flex-shrink:0;background:transparent;transition:background .15s}
 .tempo-toggle.on::before{background:var(--acc);border-color:var(--acc);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%23fff' d='M6 11.5L2 7.5l1.5-1.5L6 8.5l6.5-6.5 1.5 1.5z'/%3E%3C/svg%3E");background-size:11px 11px;background-position:center;background-repeat:no-repeat}
-/* Badge confronto anno-su-anno: positivo = verde, negativo = rosso.
-   Usa il prefisso "card-target" per ereditare dimensioni/font dei badge
-   esistenti, così tutti i badge nelle card di Andamento sono visivamente
-   coerenti. */
-.card-target.py-up{background:#dcfce7;color:#166534;border:1px solid #86efac}
-.card-target.py-down{background:#fee2e2;color:#991b1b;border:1px solid #fecaca}
 .tempo-seg{display:flex;gap:0;border:1px solid var(--bd2);border-radius:10px;overflow:hidden;margin-bottom:4px;flex-shrink:0}
 .tempo-btn{flex:1;padding:9px 4px;font-size:12px;font-weight:500;font-family:var(--font);background:var(--s2);color:var(--t2);border:none;cursor:pointer;transition:all .15s;-webkit-appearance:none}
 .tempo-btn.on{background:var(--acc);color:#0f0f11}
@@ -2233,7 +2227,9 @@ function shiftYearBack(dateISO, years){
 }
 // Aggregato anno-su-anno per un gruppo di record.
 // Restituisce {pct, totCur, totPy} oppure null se nessun record ha un PY
-// disponibile. pct è il delta (+/- vs PY in percento), non la ratio.
+// disponibile. pct è il RAPPORTO percentuale (totCur/totPy*100): 100% = stesso
+// dell'anno scorso, >100% = meglio, <100% = peggio. Stessa convenzione del
+// badge target così i due confronti sono visivamente coerenti (richiesta utente).
 function periodPyData(records){
   let totCur=0, totPy=0;
   for(const r of records){
@@ -2246,15 +2242,20 @@ function periodPyData(records){
     }
   }
   if(totPy <= 0) return null;
-  return {pct: (totCur - totPy)/totPy*100, totCur, totPy};
+  return {pct: totCur/totPy*100, totCur, totPy};
 }
 function periodPyBadgeHTML(records){
   const d = periodPyData(records);
   if(!d) return '';
-  const cls  = d.pct >= 0 ? 'py-up' : 'py-down';
-  const sign = d.pct >= 0 ? '+' : '';
-  const pctStr = sign + d.pct.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2}) + '%';
-  return `<div class="card-target ${cls}" title="${fmt(d.totCur)} vs ${fmt(d.totPy)} anno scorso · ${records.length} chiusur${records.length===1?'a':'e'}">${pctStr} vs PY</div>`;
+  // Stesse soglie e classi del badge target per uniformità visiva:
+  //   ≥ 95% → verde (uguale o meglio dell'anno scorso, con tolleranza 5%)
+  //   70-95% → giallo (calo 5-30%)
+  //   < 70%  → rosso (calo significativo >30%)
+  let cls='red';
+  if(d.pct >= 95) cls='green';
+  else if(d.pct >= 70) cls='yellow';
+  const pctStr = d.pct.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2}) + '%';
+  return `<div class="card-target ${cls}" title="${fmt(d.totCur)} vs ${fmt(d.totPy)} anno scorso · ${records.length} chiusur${records.length===1?'a':'e'}">${pctStr} vs 2025</div>`;
 }
 function renderTempo(){
   // Unified data set: chiusure + storico (vedi buildAndamentoRecords)
