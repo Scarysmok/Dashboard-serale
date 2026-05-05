@@ -1969,14 +1969,16 @@ function updateMissingChip(){
 }
 
 // ── TARGET BADGE ──
-// Restituisce il markup del badge percentuale realizzazione target per una
-// chiusura. Il target è espresso al NETTO IVA, quindi va confrontato con
-// netSales (corrispettivo / 1.22), NON col corrispettivo lordo.
-// Calcolo: (netSales / target) * 100, arrotondato a 2 decimali.
-// Soglie colore (richiesta utente):
-//   < 70%     → rosso   (sotto target)
-//   70-95%    → giallo  (vicino target)
-//   ≥ 95%     → verde   (target raggiunto/superato)
+// Restituisce il markup del badge "delta vs target" per una chiusura singola
+// (usato nelle card della tab CHIUSURE). Il target è espresso al NETTO IVA,
+// quindi va confrontato con netSales (corrispettivo / 1.22).
+// Formato: DELTA percentuale firmato (+/- vs target), uguale a quello della
+// tab Andamento per coerenza visiva su tutta la dashboard.
+//   delta = (netSales - target) / target * 100
+// Soglie colore (equivalenti a 95%/70% in formato ratio):
+//   ≥ -5%        → verde   (target raggiunto a meno del 5%)
+//   -30% a -5%   → giallo  (calo 5-30% sotto target)
+//   < -30%       → rosso   (calo significativo sotto target)
 // Casi speciali:
 //   target=0 (festività, negozio chiuso) → badge "TGT=0" grigio
 //   target non trovato (record incompleto) → stesso "TGT=0" grigio
@@ -1986,17 +1988,14 @@ function targetBadgeHTML(r){
   if(!tgt){
     return `<div class="card-target zero">TGT=0</div>`;
   }
-  // Net sales = corrispettivo lordo / 1.22 (rimuove IVA 22%). r.netSales è
-  // già pre-calcolato in parsePDF, ma lo ricalcolo qui per sicurezza nel caso
-  // il record arrivi senza il campo (es. record sintetici futuri).
   const net = (+r.netSales) || ((+r.corrispettivo||0) / 1.22);
-  const pct = net / tgt * 100;
+  const delta = (net - tgt) / tgt * 100;
   let cls='red';
-  if(pct >= 95) cls='green';
-  else if(pct >= 70) cls='yellow';
-  // Formato italiano: 86,01% (virgola decimale)
-  const pctStr = pct.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2}) + '%';
-  return `<div class="card-target ${cls}" title="Target NET ${fmt(tgt)} · Net sales ${fmt(net)}">${pctStr}</div>`;
+  if(delta >= -5)  cls='green';
+  else if(delta >= -30) cls='yellow';
+  const sign = delta >= 0 ? '+' : '';
+  const pctStr = sign + delta.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2}) + '%';
+  return `<div class="card-target ${cls}" title="Target NET ${fmt(tgt)} · Net sales ${fmt(net)}">${pctStr} vs TGT</div>`;
 }
 // Versione aggregata: calcola la % di realizzazione target su un GRUPPO di
 // chiusure (un giorno con più negozi, un mese intero, un anno intero, ecc.).
@@ -2022,10 +2021,15 @@ function periodTargetData(records){
 function periodTargetBadgeHTML(records){
   const d = periodTargetData(records);
   if(!d) return `<div class="card-target zero">TGT=0</div>`;
+  // Tab Andamento: formato DELTA (+/- vs target). Rispetto alla tab Chiusure
+  // (ratio "85,95%") qui mostriamo "+8,50%" o "-14,05%". Stessa convenzione
+  // del badge PY accanto, così i due confronti si leggono uguali.
+  const delta = d.pct - 100; // d.pct è il ratio: delta = ratio - 100
   let cls='red';
-  if(d.pct >= 95) cls='green';
-  else if(d.pct >= 70) cls='yellow';
-  const pctStr = d.pct.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2}) + '%';
+  if(delta >= -5)  cls='green';
+  else if(delta >= -30) cls='yellow';
+  const sign = delta >= 0 ? '+' : '';
+  const pctStr = sign + delta.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2}) + '%';
   return `<div class="card-target ${cls}" title="Target NET ${fmt(d.totTgt)} · Net sales ${fmt(d.totNet)} · ${records.length} chiusur${records.length===1?'a':'e'}">${pctStr} vs TGT</div>`;
 }
 // ── CARDS (TAB NEGOZI) ──
@@ -2247,14 +2251,17 @@ function periodPyData(records){
 function periodPyBadgeHTML(records){
   const d = periodPyData(records);
   if(!d) return '';
-  // Stesse soglie e classi del badge target per uniformità visiva:
-  //   ≥ 95% → verde (uguale o meglio dell'anno scorso, con tolleranza 5%)
-  //   70-95% → giallo (calo 5-30%)
-  //   < 70%  → rosso (calo significativo >30%)
+  // Tab Andamento: formato DELTA (+/- vs anno scorso), stesse soglie del badge
+  // target accanto per coerenza visiva.
+  //   ≥ -5%   → verde (uguale o meglio del PY, con tolleranza 5%)
+  //   -30% a -5% → giallo (calo 5-30% rispetto al PY)
+  //   < -30%  → rosso (calo significativo >30%)
+  const delta = d.pct - 100;
   let cls='red';
-  if(d.pct >= 95) cls='green';
-  else if(d.pct >= 70) cls='yellow';
-  const pctStr = d.pct.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2}) + '%';
+  if(delta >= -5)  cls='green';
+  else if(delta >= -30) cls='yellow';
+  const sign = delta >= 0 ? '+' : '';
+  const pctStr = sign + delta.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2}) + '%';
   return `<div class="card-target ${cls}" title="${fmt(d.totCur)} vs ${fmt(d.totPy)} anno scorso · ${records.length} chiusur${records.length===1?'a':'e'}">${pctStr} vs PY</div>`;
 }
 function renderTempo(){
