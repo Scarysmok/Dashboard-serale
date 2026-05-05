@@ -220,6 +220,21 @@ body{display:flex;flex-direction:column}
 .tempo-filter-label{font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
 .tempo-select{width:100%;padding:11px 38px 11px 14px;background:var(--s1);border:1px solid var(--bd2);border-radius:10px;color:var(--t1);font-family:var(--font);font-size:14px;font-weight:500;outline:none;-webkit-appearance:none;appearance:none;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238c959f' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;transition:border-color .15s}
 .tempo-select:focus,.tempo-select:hover{border-color:var(--acc)}
+/* Toggle confronti: due bottoni multi-select indipendenti. ON/OFF visivo via
+   classe .on. Niente cambio della % già mostrata, solo aggiunta/rimozione
+   del badge corrispondente nelle card di periodo. */
+.tempo-compare{display:flex;gap:8px;flex-shrink:0}
+.tempo-toggle{flex:1;padding:10px 12px;border:1px solid var(--bd2);border-radius:10px;background:var(--s2);color:var(--t2);font-family:var(--font);font-size:13px;font-weight:500;cursor:pointer;-webkit-appearance:none;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:8px}
+.tempo-toggle:active{transform:scale(.97)}
+.tempo-toggle.on{background:#2563eb12;color:var(--acc);border-color:var(--acc)}
+.tempo-toggle::before{content:'';width:14px;height:14px;border-radius:3px;border:1.5px solid currentColor;flex-shrink:0;background:transparent;transition:background .15s}
+.tempo-toggle.on::before{background:var(--acc);border-color:var(--acc);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%23fff' d='M6 11.5L2 7.5l1.5-1.5L6 8.5l6.5-6.5 1.5 1.5z'/%3E%3C/svg%3E");background-size:11px 11px;background-position:center;background-repeat:no-repeat}
+/* Badge confronto anno-su-anno: positivo = verde, negativo = rosso.
+   Usa il prefisso "card-target" per ereditare dimensioni/font dei badge
+   esistenti, così tutti i badge nelle card di Andamento sono visivamente
+   coerenti. */
+.card-target.py-up{background:#dcfce7;color:#166534;border:1px solid #86efac}
+.card-target.py-down{background:#fee2e2;color:#991b1b;border:1px solid #fecaca}
 .tempo-seg{display:flex;gap:0;border:1px solid var(--bd2);border-radius:10px;overflow:hidden;margin-bottom:4px;flex-shrink:0}
 .tempo-btn{flex:1;padding:9px 4px;font-size:12px;font-weight:500;font-family:var(--font);background:var(--s2);color:var(--t2);border:none;cursor:pointer;transition:all .15s;-webkit-appearance:none}
 .tempo-btn.on{background:var(--acc);color:#0f0f11}
@@ -500,6 +515,13 @@ body{display:flex;flex-direction:column}
             <!-- Popolato dinamicamente da setTempoBrand() -->
           </select>
         </div>
+        <div>
+          <div class="tempo-filter-label">Confronti</div>
+          <div class="tempo-compare">
+            <button class="tempo-toggle on" id="tc-tgt" onclick="toggleCompare('tgt',this)">vs Target</button>
+            <button class="tempo-toggle" id="tc-py" onclick="toggleCompare('py',this)">vs Anno scorso</button>
+          </div>
+        </div>
       </div>
       <div class="tempo-seg">
         <button class="tempo-btn on" id="tb-giorno" onclick="setTempo('giorno',this)">Giorno</button>
@@ -527,6 +549,9 @@ body{display:flex;flex-direction:column}
       <!-- Upload Excel target: visibile solo agli admin via applyRoleVisibility() -->
       <input type="file" id="targets-upload-input" accept=".xlsx,.xls" style="display:none" onchange="uploadTargetsExcel(event)"/>
       <button class="settings-btn" id="btn-targets-upload" style="display:none" onclick="document.getElementById('targets-upload-input').click()">📊 Carica Excel target</button>
+      <!-- Upload Excel storico (incassi 2025 + Jan-Apr 2026): admin only -->
+      <input type="file" id="historical-upload-input" accept=".xlsx,.xls" style="display:none" onchange="uploadHistoricalExcel(event)"/>
+      <button class="settings-btn" id="btn-historical-upload" style="display:none" onclick="document.getElementById('historical-upload-input').click()">📈 Carica Excel storico</button>
       <button class="settings-btn danger" onclick="doLogout()">⎋ Disconnetti</button>
     </div>
   </div>
@@ -542,7 +567,7 @@ body{display:flex;flex-direction:column}
   <div class="bottom-nav">
     <div class="nav-item active" id="nav-negozi" onclick="switchTab('negozi')"><div class="nav-icon">📋</div><span>Chiusure</span></div>
     <div class="nav-item" id="nav-stores" onclick="switchTab('stores')"><div class="nav-icon">🏪</div><span>Negozi</span></div>
-    <div class="nav-item" id="nav-tempo" onclick="switchTab('tempo')"><div class="nav-icon">📅</div><span>Periodo</span></div>
+    <div class="nav-item" id="nav-tempo" onclick="switchTab('tempo')"><div class="nav-icon">📈</div><span>Andamento</span></div>
     <div class="nav-item" id="nav-account" onclick="switchTab('account')" style="display:none"><div class="nav-icon">👥</div><span>Account</span></div>
     <div class="nav-item" id="nav-settings" onclick="switchTab('settings')"><div class="nav-icon">⚙️</div><span>Config</span></div>
   </div>
@@ -575,10 +600,19 @@ const CONCURRENCY = IS_MOBILE ? 4 : 12;
 // anche dopo la compressione JPEG applicata dal generatore di PDF.
 const ATTACH_MIN_SIDE=200;
 let allData=[], filter='all', filterDate=null, tempoView='giorno', syncTimer=null;
-// Filtri tab Periodo: tempoBrand=='' significa tutti i brand (filtro spento),
+// Filtri tab Andamento: tempoBrand=='' significa tutti i brand (filtro spento),
 // tempoStore=='' significa tutti i negozi del brand selezionato. Lo store
 // non può essere settato senza un brand: setTempoBrand('') resetta anche lo store.
 let tempoBrand='', tempoStore='';
+// Toggle confronti nella tab Andamento. Default: target ON (preserva il
+// comportamento già esistente dopo l'introduzione del badge target),
+// anno-scorso OFF (l'utente lo attiva quando vuole vedere il delta YoY).
+let compareTgt=true, comparePy=false;
+// Incassi storici (2025 completo + Jan-Apr 2026 per il pre-GoAudits):
+// dict {storeKey|date: netSales}. Stesso formato di targetsByKey, lookup O(1).
+// Sorgente di verità per il confronto anno-su-anno e per riempire la timeline
+// 2026 nei mesi precedenti al 23/04/2026 (data di partenza GoAudits).
+let historicalByKey={};
 let lastErrors=[];
 // Target di vendita giornalieri per (brand, location, dateISO). Caricati una
 // volta a sync da /targets, poi indicizzati con la stessa chiave normalizzata
@@ -725,12 +759,14 @@ function showDash(){
   syncTimer=setInterval(syncNow,5*60*1000);
 }
 function applyRoleVisibility(){
-  // Tab Account + bottone upload target visibili solo agli admin
+  // Tab Account + bottoni upload visibili solo agli admin
   const isAdmin = auth.user?.role==='admin';
   const navAccount=document.getElementById('nav-account');
   if(navAccount) navAccount.style.display = isAdmin ? '' : 'none';
   const btnTargets=document.getElementById('btn-targets-upload');
   if(btnTargets) btnTargets.style.display = isAdmin ? '' : 'none';
+  const btnHistorical=document.getElementById('btn-historical-upload');
+  if(btnHistorical) btnHistorical.style.display = isAdmin ? '' : 'none';
 }
 
 // ── LOGIN / REGISTER / LOGOUT ──
@@ -815,16 +851,21 @@ async function syncNow(){
   load(true,'Lettura Google Drive…');
   lastErrors=[];
   try{
-    // Lista file da Drive + cache backend + overrides + target in parallelo
-    // (latenza coperta dal request più lento). I target servono per il render
-    // della percentuale di realizzazione nelle card.
-    const [files, backendCache, overrides, targets] = await Promise.all([
+    // Lista file da Drive + cache backend + overrides + target + storico in
+    // parallelo (latenza coperta dal request più lento). Tutti questi dati
+    // servono per le viste della dashboard: pdf cache per le chiusure,
+    // overrides per le correzioni manuali, targets per il badge %
+    // realizzazione, historical per il confronto anno-su-anno e per la
+    // timeline pre-GoAudits del 2026.
+    const [files, backendCache, overrides, targets, historical] = await Promise.all([
       listFiles(),
       fetchPdfCache(),
       fetchOverrides(),
       fetchTargets(),
+      fetchHistorical(),
     ]);
     targetsByKey = targets;
+    historicalByKey = historical;
     if(!files.length){setPip('','Nessun PDF');load(false);allData=[];renderAll();return;}
 
     const localCache=loadCache();
@@ -1233,6 +1274,18 @@ async function fetchTargets(){
     return (data && typeof data==='object') ? data : {};
   }catch(e){console.warn('fetchTargets',e);return {};}
 }
+// Incassi storici (2025 + Jan-Apr 2026). Stessa struttura dei target ma il
+// valore è il net sales effettivamente incassato. Usato in tab Andamento per:
+//   1) Riempire i giorni del 2026 prima del 23/04 (pre-GoAudits)
+//   2) Confronto anno-su-anno quando il toggle "vs Anno scorso" è attivo
+async function fetchHistorical(){
+  try{
+    const r=await api('/historical');
+    if(!r.ok) return {};
+    const data=await r.json();
+    return (data && typeof data==='object') ? data : {};
+  }catch(e){console.warn('fetchHistorical',e);return {};}
+}
 // ── UPLOAD TARGET EXCEL (admin only) ──
 // Mapping per-NOME (non per posizione): per ogni nome di negozio così com'è
 // scritto nell'header dell'Excel, indica a quale (brand, location) della
@@ -1393,7 +1446,137 @@ async function uploadTargetsExcel(event){
     event.target.value = '';
   }
 }
-
+// ── UPLOAD STORICO INCASSI EXCEL (admin only) ──
+// Format atteso (long): tre colonne nell'ordine "Nome store in Dashboard",
+// "Data", "Net Sales". Una riga per ogni (negozio, data). I 30 negozi presenti
+// nei file dell'utente includono anche punti vendita non monitorati (Putignano,
+// Casamassima, S. Caterina, ecc.): vengono ignorati silenziosamente.
+//
+// Le chiavi del HISTORICAL_NAME_MAP sono i nomi nel file Excel così come sono,
+// in lowercase + trim. Il valore è la coppia (brand, location) usata dalla
+// dashboard. Se un giorno cambia il formato del nome, basta aggiornare le
+// chiavi qui — tutto il resto della pipeline resta uguale.
+const HISTORICAL_NAME_MAP = {
+  'adidas bariblu':                  ['Adidas',  'Bariblu'],
+  'adidas brindisi city (umberto)':  ['Adidas',  'Brindisi City'],
+  'adidas brindisi colonne':         ['Adidas',  'Brindisi Colonne'],
+  'adidas foggia':                   ['Adidas',  'Foggia'],
+  'adidas lecce city':               ['Adidas',  'Lecce City'],
+  'adidas rende':                    ['Adidas',  'Rende'],
+  'adidas taranto':                  ['Adidas',  'Taranto'],
+  'adidas teramo':                   ['Adidas',  'Teramo'],
+  'carpisa brindisi colonne':        ['Carpisa', 'Brindisi Colonne'],
+  'carpisa gallipoli':               ['Carpisa', 'Gallipoli'],
+  'carpisa lecce':                   ['Carpisa', 'Lecce'],
+  'carpisa ostuni':                  ['Carpisa', 'Ostuni'],
+  'carpisa surbo':                   ['Carpisa', 'Surbo'],
+  'mango bariblu':                   ['Mango',   'Bariblu'],
+  'mango foggia':                    ['Mango',   'Foggia'],
+  'mango molfetta':                  ['Mango',   'Molfetta'],
+  'mango taranto':                   ['Mango',   'Taranto'],
+  'mango teramo':                    ['Mango',   'Teramo'],
+  'yamamay lecce':                   ['Yamamay', 'Lecce'],
+  'yamamay polignano':               ['Yamamay', 'Polignano'],
+};
+async function uploadHistoricalExcel(event){
+  const file = event.target.files && event.target.files[0];
+  if(!file) return;
+  const btn = document.getElementById('btn-historical-upload');
+  const orig = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '⏳ Leggo Excel…';
+  try{
+    if(typeof XLSX === 'undefined') throw new Error('Libreria XLSX non caricata. Ricarica la pagina e riprova.');
+    const ab = await file.arrayBuffer();
+    const wb = XLSX.read(ab, {type:'array', cellDates:true});
+    if(!wb.SheetNames.length) throw new Error('File Excel vuoto.');
+    // Uso il primo foglio (i file di esempio dell'utente hanno "Foglio1").
+    // Se in futuro il file ha più fogli con la stessa struttura, posso
+    // iterare tutti i fogli — ma per ora KISS.
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const range = XLSX.utils.decode_range(ws['!ref']);
+    const norm = s => String(s==null?'':s).toLowerCase().replace(/\s+/g,' ').trim();
+    // 1) Identifica le 3 colonne richieste: nome store, data, net sales.
+    // Tollerante a piccole variazioni di header (es. "store" da solo, "incasso").
+    let nameCol=-1, dateCol=-1, valueCol=-1;
+    for(let c=0; c<=range.e.c; c++){
+      const h=norm(ws[XLSX.utils.encode_cell({r:0,c})]?.v);
+      if(!h) continue;
+      if(h.includes('nome store') || h==='store' || h==='negozio') nameCol=c;
+      else if(h==='data' || h==='date') dateCol=c;
+      else if(h.includes('net sales') || h.includes('netto') || h.includes('incasso') || h.includes('vendite')) valueCol=c;
+    }
+    if(nameCol<0) throw new Error('Colonna "Nome store in Dashboard" non trovata nella riga 1.');
+    if(dateCol<0) throw new Error('Colonna "Data" non trovata nella riga 1.');
+    if(valueCol<0) throw new Error('Colonna "Net Sales" non trovata nella riga 1.');
+    // 2) Itera sulle righe dati. Conta riconosciuti vs non riconosciuti per
+    // dare feedback chiaro all'utente nell'alert finale.
+    const entries = [];
+    const unrecognized = new Set();
+    let nullSkipped = 0;
+    for(let r=1; r<=range.e.r; r++){
+      const nameV = ws[XLSX.utils.encode_cell({r,c:nameCol})]?.v;
+      if(nameV==null) continue;
+      const nameKey = norm(nameV);
+      const mapped = HISTORICAL_NAME_MAP[nameKey];
+      if(!mapped){
+        unrecognized.add(String(nameV));
+        continue;
+      }
+      const dateV = ws[XLSX.utils.encode_cell({r,c:dateCol})]?.v;
+      if(!(dateV instanceof Date)) continue;
+      const dateStr = `${dateV.getFullYear()}-${String(dateV.getMonth()+1).padStart(2,'0')}-${String(dateV.getDate()).padStart(2,'0')}`;
+      const valueV = ws[XLSX.utils.encode_cell({r,c:valueCol})]?.v;
+      // Salto le righe con valore null/vuoto: significa "nessun dato per
+      // quel giorno-negozio", non vogliamo memorizzare 0 fittizi che
+      // poi inquinerebbero il confronto anno-su-anno.
+      if(valueV==null || valueV===''){ nullSkipped++; continue; }
+      const n = +valueV;
+      if(!isFinite(n)) continue;
+      entries.push({
+        brand: mapped[0],
+        location: mapped[1],
+        date: dateStr,
+        netSales: Math.round(n*100)/100,
+      });
+    }
+    if(!entries.length) throw new Error('Nessun dato valido estratto dal file.');
+    btn.textContent = `📤 Carico ${entries.length} record…`;
+    // replace_all=false: i record vengono fatti upsert per (brand, location, date),
+    // così posso caricare 2025.xlsx e poi 2026.xlsx (o viceversa) senza che il
+    // secondo cancelli il primo. Stessa data → vince l'ultimo upload (corretto
+    // se l'utente sta correggendo un file, regression-safe se carica in ordine).
+    const r = await api('/historical/bulk', {
+      method: 'POST',
+      body: JSON.stringify({entries, replace_all: false}),
+    });
+    if(!r.ok){
+      let detail = 'Errore '+r.status;
+      try{const e=await r.json(); if(e.detail) detail = typeof e.detail==='string'?e.detail:JSON.stringify(e.detail);}catch(_){}
+      throw new Error(detail);
+    }
+    const res = await r.json();
+    let msg = `✓ Storico incassi caricato.\n\n`;
+    msg += `Record inviati: ${entries.length}\n`;
+    msg += `Nuovi: ${res.upserted} · Aggiornati: ${res.modified}`;
+    if(nullSkipped) msg += `\nSaltati (valore vuoto): ${nullSkipped}`;
+    if(unrecognized.size){
+      const list = [...unrecognized].slice(0,5).join(', ');
+      msg += `\n\nNegozi non monitorati ignorati (${unrecognized.size}): ${list}`;
+      if(unrecognized.size>5) msg += '…';
+    }
+    alert(msg);
+    historicalByKey = await fetchHistorical();
+    renderAll();
+  }catch(e){
+    console.error('uploadHistoricalExcel', e);
+    alert('Errore upload Excel storico:\n'+(e.message||e));
+  }finally{
+    btn.disabled = false;
+    btn.textContent = orig;
+    event.target.value = '';
+  }
+}
 async function pushPdfCache(key, data){
   // Best-effort upload. Errori loggati ma non propagati: la cache backend è
   // un'ottimizzazione, non un requisito per il funzionamento.
@@ -1497,7 +1680,7 @@ function switchTab(t){
     if(nav)nav.classList.toggle('active',n===t);
   });
   // Titolo header dinamico in base alla tab
-  const titles={negozi:'Chiusure giornaliere',stores:'Negozi',tempo:'Periodo',settings:'Impostazioni',account:'Gestione utenti'};
+  const titles={negozi:'Chiusure giornaliere',stores:'Negozi',tempo:'Andamento',settings:'Impostazioni',account:'Gestione utenti'};
   const titleEl=document.getElementById('app-title');
   if(titleEl)titleEl.textContent=titles[t]||'Chiusure';
   if(t==='tempo')renderTempo();
@@ -1552,6 +1735,15 @@ function setTempoStore(loc){
   tempoStore = loc || '';
   renderTempo();
 }
+// Toggle multi-select dei confronti. Ogni bottone è indipendente:
+// l'utente può attivarne nessuno, uno o entrambi. Quando entrambi sono
+// disattivati le card mostrano solo i totali assoluti, niente badge.
+function toggleCompare(which, el){
+  if(which==='tgt') compareTgt = !compareTgt;
+  else if(which==='py') comparePy = !comparePy;
+  if(el) el.classList.toggle('on');
+  renderTempo();
+}
 
 // ── RENDER ALL ──
 function renderAll(){
@@ -1559,6 +1751,10 @@ function renderAll(){
   // Se la tab "Negozi" (saldi) è attiva, ricalcola i totali con i nuovi dati
   const storesTab=document.getElementById('tab-stores');
   if(storesTab && storesTab.style.display==='block') renderStores();
+  // Se la tab "Andamento" è attiva, ridisegna pure (può cambiare il dataset
+  // con nuovo storico o nuove chiusure parsate)
+  const tempoTab=document.getElementById('tab-tempo');
+  if(tempoTab && tempoTab.style.display==='block') renderTempo();
 }
 
 // Restituisce i record filtrati per la data selezionata (o tutti)
@@ -1974,20 +2170,103 @@ function renderCards(){
   cl.innerHTML=html;
 }
 
-// ── TAB PERIODO ──
+// ── TAB ANDAMENTO (ex Periodo) ──
 // Modalità di breakdown dentro ogni card-periodo, in base ai filtri attivi:
 //  - Nessun filtro → breakdown per BRAND (default storico)
 //  - Brand filtrato, store vuoto → breakdown per NEGOZIO (solo quelli del brand)
 //  - Brand + store specifici → nessun breakdown, solo totali del periodo
+//
+// I record qui non sono solo le chiusure parsate dai PDF: sono UNION di
+// chiusure (allData, dal 23/04/2026 in avanti) + storico (historicalByKey,
+// per coprire 2025 completo + 2026 Jan-Apr pre-GoAudits). Così la timeline
+// 2026 è completa, e la vista "Anno" mostra anche 2025 per il confronto YoY.
+function buildAndamentoRecords(){
+  const out = [];
+  const seen = new Set(); // (storeKey|date) già coperti da una chiusura
+  // 1) Tutte le chiusure parsate (sorgente preferita: hanno qa/anomaly/etc.)
+  for(const r of allData){
+    if(!r.dateISO) continue;
+    const k = storeKey(r.brand, r.location) + '|' + r.dateISO;
+    seen.add(k);
+    out.push({
+      brand: r.brand,
+      location: r.location,
+      dateISO: r.dateISO,
+      netSales: (+r.netSales) || ((+r.corrispettivo||0)/1.22),
+    });
+  }
+  // 2) Storico dove non c'è già una chiusura (la chiusura vince sempre).
+  // Filtriamo per i 20 negozi monitorati: se historicalByKey contiene altri
+  // dati (improbabile dato il loader, ma difensivo), li ignoriamo.
+  const expectedKeys = new Set(EXPECTED_STORES.map(s => storeKey(s.brand, s.location)));
+  for(const k in historicalByKey){
+    if(seen.has(k)) continue;
+    const parts = k.split('|');
+    if(parts.length !== 3) continue;
+    const sk = parts[0]+'|'+parts[1];
+    if(!expectedKeys.has(sk)) continue;
+    const v = +historicalByKey[k] || 0;
+    if(v <= 0) continue; // saltiamo zero (festività, chiusi, dati mancanti)
+    const proper = EXPECTED_STORES.find(s => storeKey(s.brand, s.location) === sk);
+    if(!proper) continue;
+    out.push({
+      brand: proper.brand,
+      location: proper.location,
+      dateISO: parts[2],
+      netSales: v,
+    });
+  }
+  return out;
+}
+// Sposta una data ISO indietro di N anni, gestendo il caso 29 feb sull'anno
+// non bisestile (mappa a 28 feb). Restituisce stringa ISO YYYY-MM-DD.
+function shiftYearBack(dateISO, years){
+  if(!dateISO) return null;
+  years = years || 1;
+  const [y, m, d] = dateISO.split('-').map(Number);
+  let py = y - years, pm = m, pd = d;
+  if(pm===2 && pd===29){
+    const isLeap = (py%4===0 && py%100!==0) || py%400===0;
+    if(!isLeap) pd = 28;
+  }
+  return `${py}-${String(pm).padStart(2,'0')}-${String(pd).padStart(2,'0')}`;
+}
+// Aggregato anno-su-anno per un gruppo di record.
+// Restituisce {pct, totCur, totPy} oppure null se nessun record ha un PY
+// disponibile. pct è il delta (+/- vs PY in percento), non la ratio.
+function periodPyData(records){
+  let totCur=0, totPy=0;
+  for(const r of records){
+    if(!r.dateISO) continue;
+    const pyKey = storeKey(r.brand, r.location) + '|' + shiftYearBack(r.dateISO);
+    const py = +historicalByKey[pyKey] || 0;
+    if(py > 0){
+      totCur += (+r.netSales) || ((+r.corrispettivo||0)/1.22);
+      totPy  += py;
+    }
+  }
+  if(totPy <= 0) return null;
+  return {pct: (totCur - totPy)/totPy*100, totCur, totPy};
+}
+function periodPyBadgeHTML(records){
+  const d = periodPyData(records);
+  if(!d) return '';
+  const cls  = d.pct >= 0 ? 'py-up' : 'py-down';
+  const sign = d.pct >= 0 ? '+' : '';
+  const pctStr = sign + d.pct.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2}) + '%';
+  return `<div class="card-target ${cls}" title="${fmt(d.totCur)} vs ${fmt(d.totPy)} anno scorso · ${records.length} chiusur${records.length===1?'a':'e'}">${pctStr} vs PY</div>`;
+}
 function renderTempo(){
-  if(!allData.length){
+  // Unified data set: chiusure + storico (vedi buildAndamentoRecords)
+  const fullData = buildAndamentoRecords();
+  if(!fullData.length){
     document.getElementById('tempo-content').innerHTML='<div class="empty-state"><div class="empty-icon">📅</div><div class="empty-text">Nessun dato disponibile</div></div>';
     return;
   }
   // 1) Applica i filtri brand + store sui record. Filtraggio progressivo:
   //    se non c'è brand, non filtra niente; con brand filtra per brand;
   //    con brand+store filtra anche per location.
-  let data = allData;
+  let data = fullData;
   if(tempoBrand) data = data.filter(r => r.brand === tempoBrand);
   if(tempoStore) data = data.filter(r => r.location === tempoStore);
   if(!data.length){
@@ -2039,42 +2318,55 @@ function renderTempo(){
   const fixedBc = tempoBrand ? brandColor(tempoBrand) : null;
   let html='';
   for(const p of sorted){
-    const pCorr = p.records.reduce((a,r)=>a+r.corrispettivo,0);
-    const pNet  = pCorr/1.22;
-    const pCash = p.records.reduce((a,r)=>a+r.contanti,0);
-    const pPOS  = p.records.reduce((a,r)=>a+r.pos,0);
+    // Net del periodo: somma netSales dei record (sia chiusure che storico
+    // hanno questo campo). Fallback su corr/1.22 per record solo-chiusura
+    // pre-parsing che potrebbero avere corrispettivo ma non netSales.
+    const pNet  = p.records.reduce((a,r)=>a+((+r.netSales)||((+r.corrispettivo||0)/1.22)),0);
+    // Contanti/POS sono valorizzati solo per le chiusure (non per lo storico):
+    // qui sommiamo "quello che c'è", per i giorni storici contano come 0.
+    const pCash = p.records.reduce((a,r)=>a+(+r.contanti||0),0);
+    const pPOS  = p.records.reduce((a,r)=>a+(+r.pos||0),0);
     const pid   = 'p_'+p.key.replace(/-/g,'');
+    // Helper: costruisce i badge di confronto (target + PY) per un gruppo di
+    // record, in base ai toggle attivi. Restituisce stringa HTML (può essere
+    // vuota se entrambi i toggle sono off, o se non c'è dato di confronto).
+    const compareBadges = (recs) => {
+      const parts = [];
+      if(compareTgt) parts.push(periodTargetBadgeHTML(recs));
+      if(comparePy){
+        const pyB = periodPyBadgeHTML(recs);
+        if(pyB) parts.push(pyB);
+      }
+      return parts.join('');
+    };
     // Costruzione righe di breakdown (vuote in modalità 'none')
     let groupRows = '';
     if(breakdownMode !== 'none'){
       groupRows = Object.entries(p.groups)
         .sort((a,b)=>a[0].localeCompare(b[0],'it'))
         .map(([name, recs])=>{
-          const gCorr = recs.reduce((a,r)=>a+r.corrispettivo,0);
-          const gNet  = gCorr/1.22;
+          const gCorr = recs.reduce((a,r)=>a+(+r.corrispettivo||0),0);
+          // Net del gruppo: usa r.netSales se presente (record da chiusure o
+          // storico hanno entrambi netSales), fallback su corr/1.22.
+          const gNet  = recs.reduce((a,r)=>a+((+r.netSales)||((+r.corrispettivo||0)/1.22)),0);
           const bc = breakdownMode==='brand' ? brandColor(name) : fixedBc;
-          // Badge % per il singolo gruppo (brand o negozio): aggrega solo i
-          // record di quel gruppo, così ogni riga mostra la propria realizzazione.
-          const groupBadge = periodTargetBadgeHTML(recs);
           return `<div class="brand-row" style="border-left:3px solid ${bc.strong};padding-left:13px">
             <span class="brand-row-name" style="color:${bc.text}">${name} <span style="font-size:11px;color:var(--t3);font-weight:normal">(${recs.length})</span></span>
             <div class="brand-row-right" style="display:flex;flex-direction:column;align-items:flex-end;gap:3px">
-              <div class="brand-row-corr">${fmt(gCorr)}</div>
-              <div class="brand-row-net">NET ${fmt(gNet)}</div>
-              ${groupBadge}
+              <div class="brand-row-net" style="font-size:13px;color:var(--green);font-weight:500">NET ${fmt(gNet)}</div>
+              ${compareBadges(recs)}
             </div>
           </div>`;
         }).join('');
     }
     // Sotto-titolo del periodo: cambia label in base al modo (negozi vs chiusure)
     const subLabel = (breakdownMode === 'none')
-      ? `${p.records.length} chiusur${p.records.length===1?'a':'e'}`
-      : `${p.records.length} negoz${p.records.length===1?'io':'i'}`;
-    // Badge % di realizzazione TGT per il periodo intero. Su giorno è la
-    // media del giorno; su mese/anno è dinamica perché include solo i giorni
-    // (per ogni negozio) per cui c'è una chiusura ricevuta — quindi cresce
-    // di pari passo numeratore e denominatore man mano che il periodo avanza.
-    const periodBadge = periodTargetBadgeHTML(p.records);
+      ? `${p.records.length} giorn${p.records.length===1?'o':'i'}`
+      : `${p.records.length} chiusur${p.records.length===1?'a':'e'}`;
+    // Badge di confronto per il periodo: target (se compareTgt) e/o vs PY
+    // (se comparePy). Entrambi sono "dinamici": includono solo i giorni-negozio
+    // per cui esiste un riferimento (target>0 oppure dato anno scorso>0).
+    const periodBadges = compareBadges(p.records);
     html+=`<div class="period-card">
       <div class="period-head" onclick="togglePeriod('${pid}')">
         <div>
@@ -2082,9 +2374,8 @@ function renderTempo(){
           <div style="font-size:11px;color:var(--t3);margin-top:2px">${subLabel}</div>
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px">
-          <div class="period-corr">${fmt(pCorr)}</div>
-          <div class="period-net">NET ${fmt(pNet)}</div>
-          ${periodBadge}
+          <div class="period-net" style="font-size:14px;color:var(--green);font-weight:500">NET ${fmt(pNet)}</div>
+          ${periodBadges}
         </div>
         <span class="period-chevron" id="chev-${pid}">›</span>
       </div>
