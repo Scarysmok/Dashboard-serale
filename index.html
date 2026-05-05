@@ -2026,7 +2026,7 @@ function periodTargetBadgeHTML(records){
   if(d.pct >= 95) cls='green';
   else if(d.pct >= 70) cls='yellow';
   const pctStr = d.pct.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2}) + '%';
-  return `<div class="card-target ${cls}" title="Target NET ${fmt(d.totTgt)} · Net sales ${fmt(d.totNet)} · ${records.length} chiusur${records.length===1?'a':'e'}">${pctStr}</div>`;
+  return `<div class="card-target ${cls}" title="Target NET ${fmt(d.totTgt)} · Net sales ${fmt(d.totNet)} · ${records.length} chiusur${records.length===1?'a':'e'}">${pctStr} vs TGT</div>`;
 }
 // ── CARDS (TAB NEGOZI) ──
 function renderCards(){
@@ -2255,7 +2255,7 @@ function periodPyBadgeHTML(records){
   if(d.pct >= 95) cls='green';
   else if(d.pct >= 70) cls='yellow';
   const pctStr = d.pct.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2}) + '%';
-  return `<div class="card-target ${cls}" title="${fmt(d.totCur)} vs ${fmt(d.totPy)} anno scorso · ${records.length} chiusur${records.length===1?'a':'e'}">${pctStr} vs 2025</div>`;
+  return `<div class="card-target ${cls}" title="${fmt(d.totCur)} vs ${fmt(d.totPy)} anno scorso · ${records.length} chiusur${records.length===1?'a':'e'}">${pctStr} vs PY</div>`;
 }
 function renderTempo(){
   // Unified data set: chiusure + storico (vedi buildAndamentoRecords)
