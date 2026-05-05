@@ -1451,6 +1451,7 @@ async function uploadTargetsExcel(event){
 // dashboard. Se un giorno cambia il formato del nome, basta aggiornare le
 // chiavi qui — tutto il resto della pipeline resta uguale.
 const HISTORICAL_NAME_MAP = {
+  // 20 negozi monitorati GoAudits
   'adidas bariblu':                  ['Adidas',  'Bariblu'],
   'adidas brindisi city (umberto)':  ['Adidas',  'Brindisi City'],
   'adidas brindisi colonne':         ['Adidas',  'Brindisi Colonne'],
@@ -1471,6 +1472,17 @@ const HISTORICAL_NAME_MAP = {
   'mango teramo':                    ['Mango',   'Teramo'],
   'yamamay lecce':                   ['Yamamay', 'Lecce'],
   'yamamay polignano':               ['Yamamay', 'Polignano'],
+  // 10 negozi NON ancora su GoAudits (dati solo storici, visibili in Andamento)
+  'carpisa bariblu':                 ['Carpisa', 'Bariblu'],
+  'carpisa casamassima':             ['Carpisa', 'Casamassima'],
+  'carpisa s. caterina':             ['Carpisa', 'S. Caterina'],
+  'carpisa sparano':                 ['Carpisa', 'Sparano'],
+  'yamamay aeroporto':               ['Yamamay', 'Aeroporto'],
+  'yamamay casamassima':             ['Yamamay', 'Casamassima'],
+  'yamamay molfetta':                ['Yamamay', 'Molfetta'],
+  'yamamay putignano':               ['Yamamay', 'Putignano'],
+  'yamamay s. caterina':             ['Yamamay', 'S. Caterina'],
+  'yamamay sparano':                 ['Yamamay', 'Sparano'],
 };
 async function uploadHistoricalExcel(event){
   const file = event.target.files && event.target.files[0];
@@ -1706,12 +1718,13 @@ function setTempoBrand(brand){
     // "Tutti i brand" → nascondo del tutto il filtro punto vendita
     if(storeWrap) storeWrap.style.display = 'none';
   }else{
-    // Costruisco la lista negozi del brand: parto da EXPECTED_STORES (per
-    // includere anche i negozi che non hanno ancora inviato chiusure) e
-    // aggiungo eventuali location nuove viste in allData (difensivo: se in
-    // futuro arrivano dati di un negozio non in EXPECTED_STORES).
+    // Costruisco la lista negozi del brand. Per la tab Andamento usiamo
+    // ALL_STORES (30) che include anche i negozi non ancora su GoAudits:
+    // in Andamento devono comparire perché abbiamo i loro dati storici.
+    // Aggiungo difensivamente eventuali location viste in allData (es. se
+    // un negozio nuovo inizia a inviare chiusure prima che lo aggiunga qui).
     const set = new Set();
-    for(const s of EXPECTED_STORES){
+    for(const s of ALL_STORES){
       if(s.brand === tempoBrand) set.add(s.location);
     }
     for(const r of allData){
@@ -1908,32 +1921,53 @@ function brandColor(name){
   return BRAND_COLORS[String(name||'').toLowerCase().trim()]||DEFAULT_BRAND_COLOR;
 }
 
-// ── ELENCO NEGOZI ATTESI ──
-// Lista hardcoded dei negozi che dovrebbero inviare la chiusura giornaliera.
-// Confrontata con allData per la data filtrata per capire chi non ha inviato.
-// Aggiornare qui quando si aprono/chiudono punti vendita.
-const EXPECTED_STORES=[
-  {brand:'Adidas',  location:'Foggia'},
-  {brand:'Adidas',  location:'Teramo'},
-  {brand:'Adidas',  location:'Bariblu'},
-  {brand:'Adidas',  location:'Rende'},
-  {brand:'Adidas',  location:'Brindisi City'},
-  {brand:'Adidas',  location:'Brindisi Colonne'},
-  {brand:'Adidas',  location:'Lecce City'},
-  {brand:'Adidas',  location:'Taranto'},
-  {brand:'Carpisa', location:'Brindisi Colonne'},
-  {brand:'Carpisa', location:'Gallipoli'},
-  {brand:'Carpisa', location:'Lecce'},
-  {brand:'Carpisa', location:'Ostuni'},
-  {brand:'Carpisa', location:'Surbo'},
-  {brand:'Mango',   location:'Taranto'},
-  {brand:'Mango',   location:'Foggia'},
-  {brand:'Mango',   location:'Teramo'},
-  {brand:'Mango',   location:'Bariblu'},
-  {brand:'Mango',   location:'Molfetta'},
-  {brand:'Yamamay', location:'Polignano'},
-  {brand:'Yamamay', location:'Lecce'},
+// ── ELENCO NEGOZI ──
+// ALL_STORES = lista completa dei punti vendita di Rino Petino (30 in totale).
+// Il flag `monitored` distingue:
+//   true  → invia chiusura giornaliera tramite GoAudits (20 negozi)
+//   false → non è ancora su GoAudits, esiste solo nei dati storici Excel
+//           caricati a mano. Apparirà solo nella tab "Andamento".
+//
+// Quando un negozio "non monitorato" inizia ad usare GoAudits, basta cambiare
+// il flag a true: comparirà automaticamente in Chiusure e Negozi (saldi) e
+// la dashboard inizierà a tracciarlo come gli altri.
+const ALL_STORES=[
+  {brand:'Adidas',  location:'Foggia',           monitored:true},
+  {brand:'Adidas',  location:'Teramo',           monitored:true},
+  {brand:'Adidas',  location:'Bariblu',          monitored:true},
+  {brand:'Adidas',  location:'Rende',            monitored:true},
+  {brand:'Adidas',  location:'Brindisi City',    monitored:true},
+  {brand:'Adidas',  location:'Brindisi Colonne', monitored:true},
+  {brand:'Adidas',  location:'Lecce City',       monitored:true},
+  {brand:'Adidas',  location:'Taranto',          monitored:true},
+  {brand:'Carpisa', location:'Brindisi Colonne', monitored:true},
+  {brand:'Carpisa', location:'Gallipoli',        monitored:true},
+  {brand:'Carpisa', location:'Lecce',            monitored:true},
+  {brand:'Carpisa', location:'Ostuni',           monitored:true},
+  {brand:'Carpisa', location:'Surbo',            monitored:true},
+  {brand:'Mango',   location:'Taranto',          monitored:true},
+  {brand:'Mango',   location:'Foggia',           monitored:true},
+  {brand:'Mango',   location:'Teramo',           monitored:true},
+  {brand:'Mango',   location:'Bariblu',          monitored:true},
+  {brand:'Mango',   location:'Molfetta',         monitored:true},
+  {brand:'Yamamay', location:'Polignano',        monitored:true},
+  {brand:'Yamamay', location:'Lecce',            monitored:true},
+  // ── Non ancora su GoAudits (dati solo storici, gestione manuale) ──
+  {brand:'Carpisa', location:'Bariblu',          monitored:false},
+  {brand:'Carpisa', location:'Casamassima',      monitored:false},
+  {brand:'Carpisa', location:'S. Caterina',      monitored:false},
+  {brand:'Carpisa', location:'Sparano',          monitored:false},
+  {brand:'Yamamay', location:'Aeroporto',        monitored:false},
+  {brand:'Yamamay', location:'Casamassima',      monitored:false},
+  {brand:'Yamamay', location:'Molfetta',         monitored:false},
+  {brand:'Yamamay', location:'Putignano',        monitored:false},
+  {brand:'Yamamay', location:'S. Caterina',      monitored:false},
+  {brand:'Yamamay', location:'Sparano',          monitored:false},
 ];
+// Negozi monitorati: usato in tab Chiusure (chip "Mancanti", filtro data),
+// in tab Negozi (saldi) e ovunque serva sapere "chi dovrebbe mandare oggi".
+// I 10 non-monitored vengono esclusi a monte: lì non ha senso mostrarli.
+const EXPECTED_STORES = ALL_STORES.filter(s => s.monitored);
 // Chiave normalizzata: case-insensitive, spazi compattati, niente trailing/leading.
 // Serve a confrontare brand+location senza farsi fregare da differenze tipografiche.
 const storeKey=(brand,location)=>
@@ -2194,18 +2228,18 @@ function buildAndamentoRecords(){
     });
   }
   // 2) Storico dove non c'è già una chiusura (la chiusura vince sempre).
-  // Filtriamo per i 20 negozi monitorati: se historicalByKey contiene altri
-  // dati (improbabile dato il loader, ma difensivo), li ignoriamo.
-  const expectedKeys = new Set(EXPECTED_STORES.map(s => storeKey(s.brand, s.location)));
+  // Filtriamo per ALL_STORES (30 = monitorati + non-monitorati):
+  // in Andamento entrano sia i 20 GoAudits sia i 10 con solo dati storici.
+  const allKeys = new Set(ALL_STORES.map(s => storeKey(s.brand, s.location)));
   for(const k in historicalByKey){
     if(seen.has(k)) continue;
     const parts = k.split('|');
     if(parts.length !== 3) continue;
     const sk = parts[0]+'|'+parts[1];
-    if(!expectedKeys.has(sk)) continue;
+    if(!allKeys.has(sk)) continue;
     const v = +historicalByKey[k] || 0;
     if(v <= 0) continue; // saltiamo zero (festività, chiusi, dati mancanti)
-    const proper = EXPECTED_STORES.find(s => storeKey(s.brand, s.location) === sk);
+    const proper = ALL_STORES.find(s => storeKey(s.brand, s.location) === sk);
     if(!proper) continue;
     out.push({
       brand: proper.brand,
