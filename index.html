@@ -105,9 +105,18 @@ body{display:flex;flex-direction:column}
 .store-card{background:var(--s1);border:1px solid var(--bd);border-radius:14px;overflow:hidden;transition:background .1s}
 .store-card:active{background:var(--s2)}
 .store-card.anomaly{border-color:#dc262640;background:#fef2f2}
-.card-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 10px}
-.card-name{font-size:14px;font-weight:600;flex:1;margin-right:8px}
-.card-date{font-family:var(--mono);font-size:11px;color:var(--t3)}
+.card-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:14px 16px 10px}
+.card-name{font-size:14px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card-date{font-family:var(--mono);font-size:11px;color:var(--t3);flex-shrink:0}
+/* Badge percentuale realizzazione target. Posizionato fra nome negozio e data,
+   colorato in base alle soglie: rosso < 70%, giallo 70-95%, verde >= 95%.
+   Casi speciali: TGT=0 (festività/chiusura programmata) → grigio neutro;
+   TGT mancante (nessun dato) → niente badge. */
+.card-target{display:inline-flex;align-items:center;font-family:var(--mono);font-size:11px;font-weight:600;padding:2px 8px;border-radius:6px;line-height:1.4;flex-shrink:0;white-space:nowrap}
+.card-target.green{background:#dcfce7;color:#166534;border:1px solid #86efac}
+.card-target.yellow{background:#fef9c3;color:#854d0e;border:1px solid #fde047}
+.card-target.red{background:#fee2e2;color:#991b1b;border:1px solid #fecaca}
+.card-target.zero{background:var(--s2);color:var(--t3);border:1px solid var(--bd)}
 .card-body{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--bd);border-top:1px solid var(--bd)}
 .card-cell{background:var(--s1);padding:10px 12px}
 .card-cell-l{font-size:10px;color:var(--t3);margin-bottom:3px;text-transform:uppercase;letter-spacing:.4px}
@@ -484,6 +493,9 @@ body{display:flex;flex-direction:column}
       <button class="settings-btn" onclick="forceResync()">⟳ Ricarica tutto (svuota cache)</button>
       <button class="settings-btn" onclick="showErrors()">🔍 Mostra errori sync</button>
       <button class="settings-btn" onclick="exportCSV()">↓ Esporta CSV</button>
+      <!-- Upload Excel target: visibile solo agli admin via applyRoleVisibility() -->
+      <input type="file" id="targets-upload-input" accept=".xlsx,.xls" style="display:none" onchange="uploadTargetsExcel(event)"/>
+      <button class="settings-btn" id="btn-targets-upload" style="display:none" onclick="document.getElementById('targets-upload-input').click()">📊 Carica Excel target</button>
       <button class="settings-btn danger" onclick="doLogout()">⎋ Disconnetti</button>
     </div>
   </div>
@@ -506,6 +518,8 @@ body{display:flex;flex-direction:column}
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<!-- SheetJS per parsing client-side dell'Excel target (admin only) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
@@ -531,6 +545,11 @@ const CONCURRENCY = IS_MOBILE ? 4 : 12;
 const ATTACH_MIN_SIDE=200;
 let allData=[], filter='all', filterDate=null, tempoView='giorno', syncTimer=null;
 let lastErrors=[];
+// Target di vendita giornalieri per (brand, location, dateISO). Caricati una
+// volta a sync da /targets, poi indicizzati con la stessa chiave normalizzata
+// di storeKey() per fare lookup O(1) durante il render delle card.
+// Forma: { "adidas|foggia|2026-05-04": 1551.03, ... }
+let targetsByKey={};
 // Stato autenticazione: user info + token cache. I token sono anche salvati
 // in localStorage per sopravvivere ai refresh della pagina.
 let auth={user:null, accessToken:null, refreshToken:null};
@@ -671,9 +690,12 @@ function showDash(){
   syncTimer=setInterval(syncNow,5*60*1000);
 }
 function applyRoleVisibility(){
-  // Tab Account visibile solo agli admin
+  // Tab Account + bottone upload target visibili solo agli admin
+  const isAdmin = auth.user?.role==='admin';
   const navAccount=document.getElementById('nav-account');
-  if(navAccount) navAccount.style.display = auth.user?.role==='admin' ? '' : 'none';
+  if(navAccount) navAccount.style.display = isAdmin ? '' : 'none';
+  const btnTargets=document.getElementById('btn-targets-upload');
+  if(btnTargets) btnTargets.style.display = isAdmin ? '' : 'none';
 }
 
 // ── LOGIN / REGISTER / LOGOUT ──
@@ -758,14 +780,16 @@ async function syncNow(){
   load(true,'Lettura Google Drive…');
   lastErrors=[];
   try{
-    // Lista file da Drive + cache backend in parallelo (latenza coperta).
-    // Carico anche le correzioni manuali ora così a fine pipeline applyOverrides
-    // ha già tutto pronto e non aggiunge un altro round-trip.
-    const [files, backendCache, overrides] = await Promise.all([
+    // Lista file da Drive + cache backend + overrides + target in parallelo
+    // (latenza coperta dal request più lento). I target servono per il render
+    // della percentuale di realizzazione nelle card.
+    const [files, backendCache, overrides, targets] = await Promise.all([
       listFiles(),
       fetchPdfCache(),
       fetchOverrides(),
+      fetchTargets(),
     ]);
+    targetsByKey = targets;
     if(!files.length){setPip('','Nessun PDF');load(false);allData=[];renderAll();return;}
 
     const localCache=loadCache();
@@ -1161,6 +1185,179 @@ async function fetchPdfCache(){
     return (data && typeof data==='object') ? data : {};
   }catch(e){console.warn('fetchPdfCache',e);return {};}
 }
+// Target giornalieri per negozio (caricati periodicamente da Excel via /targets/bulk).
+// Il backend restituisce un dict {storeKey|date: target} con la chiave già
+// normalizzata (lowercase + spazi compattati) per fare lookup diretto.
+// Non-fatale: se il backend non risponde o non ha target, le card mostrano
+// "TGT=0" come da richiesta utente.
+async function fetchTargets(){
+  try{
+    const r=await api('/targets');
+    if(!r.ok) return {};
+    const data=await r.json();
+    return (data && typeof data==='object') ? data : {};
+  }catch(e){console.warn('fetchTargets',e);return {};}
+}
+// ── UPLOAD TARGET EXCEL (admin only) ──
+// Mapping per-NOME (non per posizione): per ogni nome di negozio così com'è
+// scritto nell'header dell'Excel, indica a quale (brand, location) della
+// dashboard corrisponde. Le chiavi sono normalizzate (lowercase + spazi
+// compattati) per essere tolleranti a maiuscole/spazi extra.
+//
+// Vantaggio rispetto al matching per posizione: se domani l'Excel cambia
+// l'ordine delle colonne, aggiunge colonne in mezzo, o rimuove negozi non
+// monitorati, lo script si adatta da solo cercando i nomi nell'header.
+//
+// Per aggiungere un nuovo negozio: aggiungi una riga qui con il nome ESATTO
+// dell'header Excel (in minuscolo, spazi compattati) come chiave, e
+// [brand, location] come valore. Aggiungi anche il negozio a EXPECTED_STORES.
+const TARGETS_HEADER_MAP = {
+  'adidas bari bariblu':              ['Adidas',  'Bariblu'],
+  'adidas brindisi city (umberto)':   ['Adidas',  'Brindisi City'],
+  'adidas brindisi colonne':          ['Adidas',  'Brindisi Colonne'],
+  'adidas foggia grandapulia':        ['Adidas',  'Foggia'],
+  'adidas lecce city (trinchese)':    ['Adidas',  'Lecce City'],
+  'adidas rende metropolis':          ['Adidas',  'Rende'],
+  'adidas taranto mongolfiera':       ['Adidas',  'Taranto'],
+  'adidas teramo gran sasso':         ['Adidas',  'Teramo'],
+  'carpisa brindisi colonne':         ['Carpisa', 'Brindisi Colonne'],
+  'carpisa gallipoli city (roma)':    ['Carpisa', 'Gallipoli'],
+  'carpisa lecce city (mazzini)':     ['Carpisa', 'Lecce'],
+  'carpisa ostuni city (pola)':       ['Carpisa', 'Ostuni'],
+  'carpisa surbo mongolfiera':        ['Carpisa', 'Surbo'],
+  'mango bari bariblu':               ['Mango',   'Bariblu'],
+  'mango foggia grandapulia':         ['Mango',   'Foggia'],
+  'mango molfetta gran shopping':     ['Mango',   'Molfetta'],
+  'mango taranto porte dello jonio':  ['Mango',   'Taranto'],
+  'mango teramo gran sasso':          ['Mango',   'Teramo'],
+  'yamamay lecce city (sauro)':       ['Yamamay', 'Lecce'],
+  'yamamay polignano city (a. moro)': ['Yamamay', 'Polignano'],
+};
+// Parsa l'Excel selezionato dall'utente e POSTa i target a /targets/bulk con
+// replace_all=true (sostituisce tutto il dataset esistente in MongoDB).
+// Il parsing avviene 100% client-side via SheetJS, niente backend coinvolto
+// per la lettura del file. Solo l'admin vede questo bottone.
+async function uploadTargetsExcel(event){
+  const file = event.target.files && event.target.files[0];
+  if(!file) return;
+  const btn = document.getElementById('btn-targets-upload');
+  const orig = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '⏳ Leggo Excel…';
+  try{
+    if(typeof XLSX === 'undefined') throw new Error('Libreria XLSX non caricata. Ricarica la pagina e riprova.');
+    const ab = await file.arrayBuffer();
+    const wb = XLSX.read(ab, {type:'array', cellDates:true});
+    if(!wb.SheetNames.includes('TGT Giornaliero')){
+      throw new Error(`Foglio "TGT Giornaliero" non trovato. Fogli presenti: ${wb.SheetNames.join(', ')}`);
+    }
+    const ws = wb.Sheets['TGT Giornaliero'];
+    const range = XLSX.utils.decode_range(ws['!ref']);
+    // Helper: normalizza un testo (lowercase, spazi multipli compattati, trim).
+    // Tollerante a piccole differenze tipografiche (case, spazi extra).
+    const norm = s => String(s==null?'':s).toLowerCase().replace(/\s+/g,' ').trim();
+    // 1) Trova la riga di header e la colonna "Data" cercando una cella che
+    // contiene esattamente "Data" nelle prime 5 righe del foglio. Tutto il
+    // resto è relativo a questa posizione, così l'Excel può avere righe di
+    // intestazione vuote o un titolo in cima senza rompere il parsing.
+    let headerRowIdx = -1, dateColIdx = -1;
+    outer: for(let r = 0; r <= Math.min(range.e.r, 5); r++){
+      for(let c = 0; c <= range.e.c; c++){
+        const cell = ws[XLSX.utils.encode_cell({r, c})];
+        if(cell && norm(cell.v) === 'data'){
+          headerRowIdx = r;
+          dateColIdx = c;
+          break outer;
+        }
+      }
+    }
+    if(headerRowIdx < 0) throw new Error('Cella "Data" non trovata nelle prime 5 righe del foglio. Controlla la struttura del file.');
+    // 2) Per ogni colonna nella riga header, normalizza il testo e cerca il
+    // mapping. Le colonne non riconosciute vengono ignorate (es. negozi non
+    // monitorati, colonna TOTALE, ecc.).
+    const colToStore = {}; // colIdx → [brand, location]
+    const seen = new Set();
+    for(let c = 0; c <= range.e.c; c++){
+      const cell = ws[XLSX.utils.encode_cell({r: headerRowIdx, c})];
+      if(!cell || !cell.v) continue;
+      const key = norm(cell.v);
+      const mapped = TARGETS_HEADER_MAP[key];
+      if(mapped){
+        colToStore[c] = mapped;
+        seen.add(key);
+      }
+    }
+    const matchedCount = Object.keys(colToStore).length;
+    const expectedCount = Object.keys(TARGETS_HEADER_MAP).length;
+    if(!matchedCount){
+      throw new Error('Nessun negozio riconosciuto negli header Excel. Verifica che i nomi corrispondano a quelli attesi (es. "yamamay Polignano City (A. Moro)").');
+    }
+    // Lista negozi attesi che mancano nell'Excel (per warning informativo)
+    const missing = [];
+    for(const k of Object.keys(TARGETS_HEADER_MAP)){
+      if(!seen.has(k)) missing.push(TARGETS_HEADER_MAP[k].join(' '));
+    }
+    // 3) Itera sulle righe dati (da headerRowIdx+1 in poi). Per ogni riga,
+    // legge la data dalla colonna "Data" trovata sopra, poi i target dalle
+    // colonne riconosciute. Righe senza data valida vengono saltate (gestisce
+    // automaticamente eventuali righe vuote, totali, note in fondo al foglio).
+    const targets = [];
+    for(let r = headerRowIdx + 1; r <= range.e.r; r++){
+      const dateCell = ws[XLSX.utils.encode_cell({r, c: dateColIdx})];
+      if(!dateCell || dateCell.v == null) continue;
+      let dateStr;
+      if(dateCell.v instanceof Date){
+        const d = dateCell.v;
+        // Costruisco l'ISO dai componenti locali per evitare drift di timezone
+        // (toISOString() su mezzanotte locale di Roma può tornare il giorno prima).
+        dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      }else continue;
+      for(const colStr of Object.keys(colToStore)){
+        const c = +colStr;
+        const [brand, location] = colToStore[c];
+        const cell = ws[XLSX.utils.encode_cell({r, c})];
+        let val = 0;
+        if(cell && cell.v != null){
+          const n = +cell.v;
+          if(isFinite(n)) val = Math.round(n*100)/100;
+        }
+        targets.push({brand, location, date: dateStr, target: val});
+      }
+    }
+    if(!targets.length) throw new Error('Nessun target estratto. Verifica che il foglio contenga date e numeri.');
+    btn.textContent = `📤 Carico ${targets.length} target…`;
+    const r = await api('/targets/bulk', {
+      method: 'POST',
+      body: JSON.stringify({targets, replace_all: true}),
+    });
+    if(!r.ok){
+      let detail = 'Errore '+r.status;
+      try{const e=await r.json(); if(e.detail) detail = typeof e.detail==='string'?e.detail:JSON.stringify(e.detail);}catch(_){}
+      throw new Error(detail);
+    }
+    const res = await r.json();
+    let msg = `✓ Target caricati con successo.\n\n`;
+    msg += `Negozi riconosciuti: ${matchedCount}/${expectedCount}\n`;
+    msg += `Righe inviate: ${targets.length}\n`;
+    msg += `Nuovi: ${res.upserted} · Aggiornati: ${res.modified}`;
+    if(missing.length){
+      msg += `\n\n⚠ Attenzione: ${missing.length} negozi attesi non trovati nell'Excel:\n• ${missing.join('\n• ')}`;
+    }
+    alert(msg);
+    // Ricarica i target nella memoria locale e ridisegna le card per
+    // riflettere subito le nuove percentuali, senza aspettare il prossimo sync.
+    targetsByKey = await fetchTargets();
+    renderAll();
+  }catch(e){
+    console.error('uploadTargetsExcel', e);
+    alert('Errore upload Excel target:\n'+(e.message||e));
+  }finally{
+    btn.disabled = false;
+    btn.textContent = orig;
+    // Reset dell'input così se ricarichi lo stesso file il change scatta di nuovo
+    event.target.value = '';
+  }
+}
 
 async function pushPdfCache(key, data){
   // Best-effort upload. Errori loggati ma non propagati: la cache backend è
@@ -1508,6 +1705,30 @@ function updateMissingChip(){
   }
 }
 
+// ── TARGET BADGE ──
+// Restituisce il markup del badge percentuale realizzazione target per una
+// chiusura. Calcolo: (corrispettivo / target) * 100, arrotondato a 2 decimali.
+// Soglie colore (richiesta utente):
+//   < 70%     → rosso   (sotto target)
+//   70-95%    → giallo  (vicino target)
+//   ≥ 95%     → verde   (target raggiunto/superato)
+// Casi speciali:
+//   target=0 (festività, negozio chiuso) → badge "TGT=0" grigio
+//   target non trovato (record incompleto) → stesso "TGT=0" grigio
+function targetBadgeHTML(r){
+  const key = storeKey(r.brand, r.location) + '|' + (r.dateISO||'');
+  const tgt = +targetsByKey[key] || 0;
+  if(!tgt){
+    return `<div class="card-target zero">TGT=0</div>`;
+  }
+  const pct = (+r.corrispettivo||0) / tgt * 100;
+  let cls='red';
+  if(pct >= 95) cls='green';
+  else if(pct >= 70) cls='yellow';
+  // Formato italiano: 86,01% (virgola decimale)
+  const pctStr = pct.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2}) + '%';
+  return `<div class="card-target ${cls}" title="Target ${fmt(tgt)} · realizzato ${fmt(+r.corrispettivo||0)}">${pctStr}</div>`;
+}
 // ── CARDS (TAB NEGOZI) ──
 function renderCards(){
   const q=document.getElementById('search').value.toLowerCase();
@@ -1573,6 +1794,7 @@ function renderCards(){
       html+=`<div class="store-card${r.anomaly?' anomaly':''}" style="border-left:3px solid ${bc.strong}" onclick="openSheet(${allData.indexOf(r)})">
         <div class="card-head">
           <div class="card-name">${r.location}</div>
+          ${targetBadgeHTML(r)}
           <div class="card-date">${r.dateDisplay}</div>
         </div>
         <div class="card-body">
