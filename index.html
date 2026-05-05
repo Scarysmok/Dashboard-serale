@@ -1710,7 +1710,9 @@ function updateMissingChip(){
 
 // ── TARGET BADGE ──
 // Restituisce il markup del badge percentuale realizzazione target per una
-// chiusura. Calcolo: (corrispettivo / target) * 100, arrotondato a 2 decimali.
+// chiusura. Il target è espresso al NETTO IVA, quindi va confrontato con
+// netSales (corrispettivo / 1.22), NON col corrispettivo lordo.
+// Calcolo: (netSales / target) * 100, arrotondato a 2 decimali.
 // Soglie colore (richiesta utente):
 //   < 70%     → rosso   (sotto target)
 //   70-95%    → giallo  (vicino target)
@@ -1724,13 +1726,17 @@ function targetBadgeHTML(r){
   if(!tgt){
     return `<div class="card-target zero">TGT=0</div>`;
   }
-  const pct = (+r.corrispettivo||0) / tgt * 100;
+  // Net sales = corrispettivo lordo / 1.22 (rimuove IVA 22%). r.netSales è
+  // già pre-calcolato in parsePDF, ma lo ricalcolo qui per sicurezza nel caso
+  // il record arrivi senza il campo (es. record sintetici futuri).
+  const net = (+r.netSales) || ((+r.corrispettivo||0) / 1.22);
+  const pct = net / tgt * 100;
   let cls='red';
   if(pct >= 95) cls='green';
   else if(pct >= 70) cls='yellow';
   // Formato italiano: 86,01% (virgola decimale)
   const pctStr = pct.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2}) + '%';
-  return `<div class="card-target ${cls}" title="Target ${fmt(tgt)} · realizzato ${fmt(+r.corrispettivo||0)}">${pctStr}</div>`;
+  return `<div class="card-target ${cls}" title="Target NET ${fmt(tgt)} · Net sales ${fmt(net)}">${pctStr}</div>`;
 }
 // ── CARDS (TAB NEGOZI) ──
 function renderCards(){
