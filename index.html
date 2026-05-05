@@ -105,9 +105,12 @@ body{display:flex;flex-direction:column}
 .store-card{background:var(--s1);border:1px solid var(--bd);border-radius:14px;overflow:hidden;transition:background .1s}
 .store-card:active{background:var(--s2)}
 .store-card.anomaly{border-color:#dc262640;background:#fef2f2}
-.card-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:14px 16px 10px}
-.card-name{font-size:14px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.card-date{font-family:var(--mono);font-size:11px;color:var(--t3);flex-shrink:0}
+/* Header card a 3 colonne: nome a sinistra, badge TGT al CENTRO esatto della card,
+   data a destra. La griglia 1fr auto 1fr garantisce che il badge sia sempre centrato
+   indipendentemente dalla lunghezza del nome o della data. */
+.card-head{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;padding:14px 16px 10px}
+.card-name{font-size:14px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card-date{font-family:var(--mono);font-size:11px;color:var(--t3);text-align:right;min-width:0}
 /* Badge percentuale realizzazione target. Posizionato fra nome negozio e data,
    colorato in base alle soglie: rosso < 70%, giallo 70-95%, verde >= 95%.
    Casi speciali: TGT=0 (festività/chiusura programmata) → grigio neutro;
