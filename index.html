@@ -517,10 +517,13 @@ const API_BASE='https://dashboard-backend-ur63.onrender.com';
 // vecchi record (senza giftcard, con annull/sconti booleani) non interferiscono
 // con la nuova formula di verifica cassa.
 const CACHE_KEY='rp_cache_v5';
-// Quanti PDF scaricare/parsare in parallelo. Render free tier regge ampiamente
-// 12 connessioni concorrenti, e sul lato browser riduce a ~metà il tempo di
-// parsing dei nuovi PDF rispetto a 6.
-const CONCURRENCY=12;
+// Quanti PDF scaricare/parsare in parallelo. Su desktop 12 va benone, ma su
+// mobile (iOS Safari soprattutto) tenere 12 documenti PDF.js + ArrayBuffer
+// vivi contemporaneamente esaurisce la memoria della scheda e iOS la ricarica
+// → il caricamento riparte da zero in loop. Su mobile riduciamo a 4.
+const IS_MOBILE = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+  || (navigator.maxTouchPoints>1 && /Macintosh/i.test(navigator.userAgent)); // iPad iPadOS si maschera da Mac
+const CONCURRENCY = IS_MOBILE ? 4 : 12;
 // Lato minimo per considerare un'immagine una "foto utente": scarta loghi
 // a banner (GoAudits 572x82), mappe Google location (264x120), icone piccole.
 // Le foto scontrino/documento da smartphone sono sempre >= 200px per lato
@@ -875,25 +878,39 @@ async function fetchAndParse(file){
 
 // ── PDF PARSER ──
 async function parsePDF(ab,fname,modifiedTime,fileId){
-  const pdf=await pdfjsLib.getDocument({data:ab}).promise;
+  const loadingTask=pdfjsLib.getDocument({data:ab});
+  const pdf=await loadingTask.promise;
   let txt='';
-  for(let i=1;i<=pdf.numPages;i++){
-    const pg=await pdf.getPage(i);
-    const items=(await pg.getTextContent()).items;
-    // Raggruppa per riga fisica (coordinata Y) per non confondere Q# con valori
-    const lineMap={};
-    for(const it of items){
-      if(!it.str.trim())continue;
-      const y=Math.round(it.transform[5]/2)*2;
-      if(!lineMap[y])lineMap[y]=[];
-      lineMap[y].push({x:it.transform[4],str:it.str});
+  try{
+    for(let i=1;i<=pdf.numPages;i++){
+      const pg=await pdf.getPage(i);
+      const items=(await pg.getTextContent()).items;
+      // Raggruppa per riga fisica (coordinata Y) per non confondere Q# con valori
+      const lineMap={};
+      for(const it of items){
+        if(!it.str.trim())continue;
+        const y=Math.round(it.transform[5]/2)*2;
+        if(!lineMap[y])lineMap[y]=[];
+        lineMap[y].push({x:it.transform[4],str:it.str});
+      }
+      const ys=Object.keys(lineMap).map(Number).sort((a,b)=>b-a);
+      for(const y of ys){
+        const line=lineMap[y].sort((a,b)=>a.x-b.x).map(i=>i.str).join(' ').trim();
+        if(line) txt+=line+'\n';
+      }
+      // Libera subito i dati della pagina (font cache, image cache, structured tree)
+      try{ pg.cleanup(); }catch(_){}
     }
-    const ys=Object.keys(lineMap).map(Number).sort((a,b)=>b-a);
-    for(const y of ys){
-      const line=lineMap[y].sort((a,b)=>a.x-b.x).map(i=>i.str).join(' ').trim();
-      if(line) txt+=line+'\n';
-    }
+  } finally {
+    // CRITICO su mobile: senza destroy() PDF.js tiene aperto il worker, font
+    // cache e structured tree per ogni documento → con 200+ PDF iOS Safari
+    // esaurisce la memoria e ricarica la scheda (loop di reload da 0).
+    try{ await pdf.cleanup(); }catch(_){}
+    try{ await pdf.destroy(); }catch(_){}
+    try{ await loadingTask.destroy(); }catch(_){}
   }
+  // Aiuta il GC: rimuovi il riferimento all'ArrayBuffer (può essere 1-5 MB)
+  ab=null;
   // Ricostruisce numeri decimali spezzati su righe diverse
   txt=txt.replace(/(\d)\n\.(\d)/g,'$1.$2');
   txt=txt.replace(/(\d)\n,(\d)/g,'$1,$2');
