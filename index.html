@@ -173,7 +173,26 @@ body{display:flex;flex-direction:column}
 .store-summary .card-body{grid-template-columns:1fr 1fr}
 .store-summary.empty{background:var(--s2);border-style:dashed}
 .store-summary.empty .card-name{color:var(--t2)}
+/* Card "non attivo" (negozio non ancora su GoAudits / temporaneamente disattivato).
+   Stile più tenue rispetto a .empty per distinguerla dai negozi attivi senza chiusure. */
+.store-summary.inactive{background:#f6f7f9;border-style:solid;opacity:.85}
+.store-summary.inactive .card-name{color:var(--t2)}
+.store-summary.inactive .card-date{font-style:italic;color:var(--t3)}
 .no-data-cell{font-family:var(--mono);font-size:12px;color:var(--t3)}
+/* Toggle attivo/non-attivo nelle card della tab Negozi.
+   Posizionato in alto a destra. Click → conferma → PATCH /stores/flags. */
+.store-card-head-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.store-toggle{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;
+  padding:4px 10px;border-radius:999px;cursor:pointer;user-select:none;
+  border:1px solid transparent;transition:all .12s ease;flex-shrink:0;white-space:nowrap}
+.store-toggle.active{background:#dcfce7;color:#166534;border-color:#bbf7d0}
+.store-toggle.inactive{background:#fef3c7;color:#92400e;border-color:#fde68a}
+.store-toggle:hover{filter:brightness(.97)}
+.store-toggle:active{transform:scale(.96)}
+/* Stato readonly per utenti non admin: badge solo informativo, niente cursore */
+.store-toggle.readonly{cursor:default}
+.store-toggle.readonly:hover{filter:none}
+.store-toggle.readonly:active{transform:none}
 
 /* ── SHEET STORICO SALDO (dettaglio negozio) ── */
 .saldo-summary{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--bd);border-bottom:1px solid var(--bd)}
@@ -613,6 +632,13 @@ let lastErrors=[];
 // di storeKey() per fare lookup O(1) durante il render delle card.
 // Forma: { "adidas|foggia|2026-05-04": 1551.03, ... }
 let targetsByKey={};
+// Override del flag `monitored` per i 30 punti vendita. Caricato a sync da
+// /stores/flags. Forma: { "carpisa|bariblu": true, ... }. Se un negozio NON è
+// presente in questa mappa, vale il default in ALL_STORES. Quando l'admin
+// clicca il toggle in tab Negozi, faccio una PATCH e poi rilancio
+// recomputeExpected() + renderAll() così tutta la dashboard riflette il nuovo
+// stato (chiusure attese, KPI, mancanti).
+let storeFlagsByKey={};
 // Stato autenticazione: user info + token cache. I token sono anche salvati
 // in localStorage per sopravvivere ai refresh della pagina.
 let auth={user:null, accessToken:null, refreshToken:null};
@@ -851,15 +877,20 @@ async function syncNow(){
     // overrides per le correzioni manuali, targets per il badge %
     // realizzazione, historical per il confronto anno-su-anno e per la
     // timeline pre-GoAudits del 2026.
-    const [files, backendCache, overrides, targets, historical] = await Promise.all([
+    const [files, backendCache, overrides, targets, historical, storeFlags] = await Promise.all([
       listFiles(),
       fetchPdfCache(),
       fetchOverrides(),
       fetchTargets(),
       fetchHistorical(),
+      fetchStoreFlags(),
     ]);
     targetsByKey = targets;
     historicalByKey = historical;
+    // Applico override dei flag monitored PRIMA di calcolare missing/KPI così
+    // tutta la pipeline di rendering parte con la lista negozi attesi corretta.
+    storeFlagsByKey = storeFlags;
+    recomputeExpected();
     if(!files.length){setPip('','Nessun PDF');load(false);allData=[];renderAll();return;}
 
     const localCache=loadCache();
@@ -1279,6 +1310,18 @@ async function fetchHistorical(){
     const data=await r.json();
     return (data && typeof data==='object') ? data : {};
   }catch(e){console.warn('fetchHistorical',e);return {};}
+}
+// Override del flag monitored per i 30 negozi (vedi commento globale storeFlagsByKey).
+// Non-fatale: se la GET fallisce torno {} e i default di ALL_STORES restano
+// sovrani. Il backend deve essere ridepoyato con l'endpoint /stores/flags;
+// finché non lo è, la chiamata torna 404 e silenziamo il warning.
+async function fetchStoreFlags(){
+  try{
+    const r=await api('/stores/flags');
+    if(!r.ok) return {};
+    const data=await r.json();
+    return (data && typeof data==='object') ? data : {};
+  }catch(e){console.warn('fetchStoreFlags',e);return {};}
 }
 // ── UPLOAD TARGET EXCEL (admin only) ──
 // Mapping per-NOME (non per posizione): per ogni nome di negozio così com'è
@@ -1968,6 +2011,9 @@ const ALL_STORES=[
   {brand:'Yamamay', location:'Polignano',        monitored:true},
   {brand:'Yamamay', location:'Lecce',            monitored:true},
   // ── Non ancora su GoAudits (dati solo storici, gestione manuale) ──
+  // Stato di default: attivabili dalla tab Negozi (admin) tramite toggle.
+  // L'override vivo è in MongoDB (collection store_flags), il valore qui sotto
+  // è solo il default in caso un negozio non abbia mai avuto override.
   {brand:'Carpisa', location:'Bariblu',          monitored:false},
   {brand:'Carpisa', location:'Casamassima',      monitored:false},
   {brand:'Carpisa', location:'S. Caterina',      monitored:false},
@@ -1979,10 +2025,34 @@ const ALL_STORES=[
   {brand:'Yamamay', location:'S. Caterina',      monitored:false},
   {brand:'Yamamay', location:'Sparano',          monitored:false},
 ];
-// Negozi monitorati: usato in tab Chiusure (chip "Mancanti", filtro data),
-// in tab Negozi (saldi) e ovunque serva sapere "chi dovrebbe mandare oggi".
-// I 10 non-monitored vengono esclusi a monte: lì non ha senso mostrarli.
-const EXPECTED_STORES = ALL_STORES.filter(s => s.monitored);
+// Negozi attivi (= "chiusure attese oggi"): usato in tab Chiusure (chip
+// "Mancanti", filtro data), in tab Negozi (saldi) e ovunque serva sapere
+// "chi dovrebbe mandare oggi".
+// È DINAMICO: ricalcolato da recomputeExpected() che combina:
+//   - il default in ALL_STORES (campo `monitored` hardcoded)
+//   - l'override in storeFlagsByKey (caricato da /stores/flags al sync)
+// Quando l'admin attiva/disattiva un negozio dal toggle in tab Negozi:
+//   1. PATCH /stores/flags
+//   2. aggiorno storeFlagsByKey
+//   3. recomputeExpected()
+//   4. renderAll() — tutta la dashboard si aggiorna (KPI, chip Mancanti, ecc.)
+let EXPECTED_STORES = ALL_STORES.filter(s => s.monitored);
+// Determina se un negozio (brand, location) è attualmente attivo. Usa l'override
+// in storeFlagsByKey se presente, altrimenti il default in ALL_STORES.
+function isStoreMonitored(brand, location){
+  const k = storeKey(brand, location);
+  if(Object.prototype.hasOwnProperty.call(storeFlagsByKey, k)){
+    return !!storeFlagsByKey[k];
+  }
+  const def = ALL_STORES.find(s => storeKey(s.brand, s.location) === k);
+  return def ? !!def.monitored : false;
+}
+// Ricalcola la lista EXPECTED_STORES applicando gli override caricati dal
+// backend ai default di ALL_STORES. Da chiamare DOPO ogni mutazione di
+// storeFlagsByKey (login, sync, toggle manuale).
+function recomputeExpected(){
+  EXPECTED_STORES = ALL_STORES.filter(s => isStoreMonitored(s.brand, s.location));
+}
 // Chiave normalizzata: case-insensitive, spazi compattati, niente trailing/leading.
 // Serve a confrontare brand+location senza farsi fregare da differenze tipografiche.
 const storeKey=(brand,location)=>
@@ -2462,12 +2532,17 @@ function togglePeriod(id){
   if(chev)chev.classList.toggle('open',open);
 }
 
-// ── TAB NEGOZI (saldi cumulati per ognuno dei 20 punti vendita) ──
-// Per ogni negozio della lista EXPECTED_STORES:
-//   - Fondocassa = valore della chiusura più recente ricevuta
-//   - Da-versare cumulato = sum(daVersare) - sum(versato) di tutte le chiusure
-// Negozi che non hanno mai inviato una chiusura compaiono in card grigia.
+// ── TAB NEGOZI (saldi cumulati per i 30 punti vendita) ──
+// Mostra TUTTI i 30 negozi mappati (ALL_STORES), non solo i 20 attivi.
+// Per ognuno:
+//   - Se ATTIVO  → card normale: fondocassa + da-versare cumulato (calcolati
+//                   dalle chiusure GoAudits ricevute) + toggle "ATTIVO"
+//   - Se NON ATTIVO → card più tenue, senza valori, + toggle "NON ATTIVO"
+// Toggle visibile a tutti, ma cliccabile solo se admin (chi clicca un toggle
+// diverso dal proprio ruolo riceve un alert "Solo admin..."). La PATCH è
+// comunque protetta lato backend: se uno smanetta col DOM, fallisce in 403.
 function renderStores(){
+  const isAdmin = auth && auth.user && auth.user.role === 'admin';
   // 1) Indicizzo le chiusure ricevute per chiave brand|location
   const byStore={};
   for(const r of allData){
@@ -2475,15 +2550,17 @@ function renderStores(){
     if(!byStore[k]) byStore[k]=[];
     byStore[k].push(r);
   }
-  // 2) Raggruppo i 20 negozi attesi per brand mantenendo l'ordine della lista
+  // 2) Raggruppo i 30 negozi per brand mantenendo l'ordine della lista
   const grouped={};
-  for(const s of EXPECTED_STORES){
+  for(const s of ALL_STORES){
     if(!grouped[s.brand]) grouped[s.brand]=[];
     grouped[s.brand].push(s);
   }
 
-  // Aggregati globali per la summary in cima
-  let totFondo=0, totSaldo=0, storesWithData=0;
+  // Aggregati globali per la summary in cima.
+  // I non-attivi NON contribuiscono al totale fondocassa/saldo (anche se
+  // teoricamente non avrebbero chiusure GoAudits, è più pulito ignorarli).
+  let totFondo=0, totSaldo=0, storesWithData=0, activeCount=0;
 
   let html='';
   for(const [brand,stores] of Object.entries(grouped)){
@@ -2494,6 +2571,41 @@ function renderStores(){
     for(const s of stores){
       const k=storeKey(s.brand,s.location);
       const records=byStore[k]||[];
+      const monitored = isStoreMonitored(s.brand, s.location);
+      if(monitored) activeCount++;
+
+      // Toggle HTML (sempre presente, in alto a destra del card head).
+      // Cliccabile solo da admin; per gli altri utenti è readonly (mostra solo
+      // lo stato attuale).
+      const toggleCls = monitored ? 'active' : 'inactive';
+      const toggleTxt = monitored ? 'ATTIVO' : 'NON ATTIVO';
+      const tBrand = s.brand.replace(/'/g,"\\'");
+      const tLoc   = s.location.replace(/'/g,"\\'");
+      const toggleAttr = isAdmin
+        ? `onclick="event.stopPropagation();toggleStoreActive('${tBrand}','${tLoc}')" title="Click per cambiare stato"`
+        : `class="store-toggle ${toggleCls} readonly" title="Solo admin"`;
+      const toggleHtml = isAdmin
+        ? `<span class="store-toggle ${toggleCls}" ${toggleAttr}>${toggleTxt}</span>`
+        : `<span ${toggleAttr}>${toggleTxt}</span>`;
+
+      if(!monitored){
+        // Card "non attivo": niente fondocassa/saldo, niente onclick (non ha
+        // senso aprire lo sheet del dettaglio: non ci sono chiusure).
+        sectionHtml += `<div class="store-card store-summary inactive" style="border-left:3px solid ${bc.strong}">
+          <div class="card-head">
+            <div class="store-card-head-row">
+              <div>
+                <div class="card-name">${s.location}</div>
+                <div class="card-date">non riceve chiusure</div>
+              </div>
+              ${toggleHtml}
+            </div>
+          </div>
+        </div>`;
+        continue;
+      }
+
+      // Calcoli per i negozi ATTIVI
       let fondo=0, sumDV=0, sumV=0, lastDisp='', lastISO='';
       for(const r of records){
         sumDV += r.daVersare||0;
@@ -2513,43 +2625,43 @@ function renderStores(){
       // verde se negativo (ha versato più del dovuto), neutro se zero
       const saldoCls = saldo>0.01 ? 'r' : (saldo<-0.01 ? 'g' : '');
 
-      // Escape singoli apici nel parametro location per evitare break dell'onclick
-      const onclick = `onclick="openStoreSheet('${s.brand.replace(/'/g,"\\'")}','${s.location.replace(/'/g,"\\'")}')"`;
-      if(isEmpty){
-        sectionHtml += `<div class="store-card store-summary empty" style="border-left:3px dashed ${bc.strong}" ${onclick}>
-          <div class="card-head">
-            <div class="card-name">${s.location}</div>
-            <div class="card-date">Nessuna chiusura ricevuta</div>
-          </div>
-          <div class="card-body">
-            <div class="card-cell">
-              <div class="card-cell-l">Fondocassa</div>
-              <div class="card-cell-v no-data-cell">—</div>
+      // L'onclick apre lo sheet di dettaglio. Lo metto sull'intera card.
+      // Il toggle ha `event.stopPropagation()` per non aprire lo sheet quando
+      // l'admin clicca proprio sul badge attivo/non-attivo.
+      const onclick = `onclick="openStoreSheet('${tBrand}','${tLoc}')"`;
+      const cardCls = isEmpty ? 'store-card store-summary empty' : 'store-card store-summary';
+      const borderStyle = isEmpty ? `border-left:3px dashed ${bc.strong}` : `border-left:3px solid ${bc.strong}`;
+      const dateText = isEmpty
+        ? 'Nessuna chiusura ricevuta'
+        : `aggiornato ${lastDisp} · ${records.length} chiusur${records.length===1?'a':'e'}`;
+      const fondoCell = isEmpty
+        ? `<div class="card-cell-v no-data-cell">—</div>`
+        : `<div class="card-cell-v">${fmt(fondo)}</div>`;
+      const saldoCell = isEmpty
+        ? `<div class="card-cell-v no-data-cell">—</div>`
+        : `<div class="card-cell-v ${saldoCls}">${fmt(saldo)}</div>`;
+
+      sectionHtml += `<div class="${cardCls}" style="${borderStyle}" ${onclick}>
+        <div class="card-head">
+          <div class="store-card-head-row">
+            <div>
+              <div class="card-name">${s.location}</div>
+              <div class="card-date">${dateText}</div>
             </div>
-            <div class="card-cell">
-              <div class="card-cell-l">Da versare cumulato</div>
-              <div class="card-cell-v no-data-cell">—</div>
-            </div>
+            ${toggleHtml}
           </div>
-        </div>`;
-      }else{
-        sectionHtml += `<div class="store-card store-summary" style="border-left:3px solid ${bc.strong}" ${onclick}>
-          <div class="card-head">
-            <div class="card-name">${s.location}</div>
-            <div class="card-date">aggiornato ${lastDisp} · ${records.length} chiusur${records.length===1?'a':'e'}</div>
+        </div>
+        <div class="card-body">
+          <div class="card-cell">
+            <div class="card-cell-l">Fondocassa</div>
+            ${fondoCell}
           </div>
-          <div class="card-body">
-            <div class="card-cell">
-              <div class="card-cell-l">Fondocassa</div>
-              <div class="card-cell-v">${fmt(fondo)}</div>
-            </div>
-            <div class="card-cell">
-              <div class="card-cell-l">Da versare cumulato</div>
-              <div class="card-cell-v ${saldoCls}">${fmt(saldo)}</div>
-            </div>
+          <div class="card-cell">
+            <div class="card-cell-l">Da versare cumulato</div>
+            ${saldoCell}
           </div>
-        </div>`;
-      }
+        </div>
+      </div>`;
     }
 
     totFondo+=bFondo; totSaldo+=bSaldo;
@@ -2560,12 +2672,14 @@ function renderStores(){
     </div>` + sectionHtml;
   }
 
-  // Summary in cima: totali generali
+  // Summary in cima: totali generali. "X su Y attivi" mostra ora i negozi
+  // ATTIVI (su 30 mappati totali), non più i negozi con dati su attivi.
+  // Sotto a Fondocassa metto entrambe le info: "su {activeCount} attivi · {storesWithData} hanno dati"
   document.getElementById('stores-summary').innerHTML = `
     <div class="ssum-card">
       <div class="ssum-l">Fondocassa totale</div>
       <div class="ssum-v">${fmt(totFondo)}</div>
-      <div class="ssum-s">${storesWithData} su ${EXPECTED_STORES.length} negozi attivi</div>
+      <div class="ssum-s">${activeCount} su ${ALL_STORES.length} negozi attivi</div>
     </div>
     <div class="ssum-card">
       <div class="ssum-l">Da versare cumulato</div>
@@ -2573,6 +2687,47 @@ function renderStores(){
       <div class="ssum-s">${totSaldo>0.01?'residuo da depositare':totSaldo<-0.01?'versato in eccesso':'in pareggio'}</div>
     </div>`;
   document.getElementById('stores-list').innerHTML = html;
+}
+
+// Toggle attivo/non-attivo per un punto vendita (tab Negozi → click sul badge).
+// Solo admin. Conferma esplicita prima di scrivere a backend.
+//   1. Mostra confirm() con il nuovo stato target
+//   2. PATCH /stores/flags { brand, location, monitored: !current }
+//   3. Aggiorna lo stato locale (storeFlagsByKey) + EXPECTED_STORES
+//   4. Re-render globale così KPI / chip Mancanti / Chiusure attese rispecchiano
+//      subito il nuovo stato senza bisogno di ricaricare la pagina.
+async function toggleStoreActive(brand, location){
+  if(!auth || !auth.user || auth.user.role !== 'admin'){
+    alert('Solo gli admin possono attivare o disattivare un negozio.');
+    return;
+  }
+  const current = isStoreMonitored(brand, location);
+  const next    = !current;
+  const action  = next ? 'ATTIVARE' : 'DISATTIVARE';
+  const desc    = next
+    ? `Il negozio ${brand} ${location} comparirà tra le chiusure attese giornaliere e nel conteggio dei mancanti.`
+    : `Il negozio ${brand} ${location} non comparirà più tra le chiusure attese giornaliere e non comparirà più tra i mancanti.`;
+  if(!confirm(`Vuoi ${action} il negozio ${brand} — ${location}?\n\n${desc}`)) return;
+
+  try{
+    const r = await api('/stores/flags', {
+      method:'PATCH',
+      body: JSON.stringify({ brand, location, monitored: next }),
+    });
+    if(!r.ok){
+      const err = await r.text();
+      throw new Error(err.slice(0,200));
+    }
+    // Aggiorno la mappa locale con la stessa chiave normalizzata che usa il
+    // backend (storeKey): brand+location lowercased + spazi compattati.
+    const k = storeKey(brand, location);
+    storeFlagsByKey[k] = next;
+    recomputeExpected();
+    renderAll();
+  }catch(e){
+    console.error('toggleStoreActive', e);
+    alert('Errore aggiornamento stato negozio: ' + (e.message||'sconosciuto'));
+  }
 }
 
 // ── TAB ACCOUNT (admin only) ──
