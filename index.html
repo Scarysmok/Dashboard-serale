@@ -633,11 +633,19 @@ let lastErrors=[];
 // Forma: { "adidas|foggia|2026-05-04": 1551.03, ... }
 let targetsByKey={};
 // Override del flag `monitored` per i 30 punti vendita. Caricato a sync da
-// /stores/flags. Forma: { "carpisa|bariblu": true, ... }. Se un negozio NON è
-// presente in questa mappa, vale il default in ALL_STORES. Quando l'admin
-// clicca il toggle in tab Negozi, faccio una PATCH e poi rilancio
-// recomputeExpected() + renderAll() così tutta la dashboard riflette il nuovo
-// stato (chiusure attese, KPI, mancanti).
+// /stores/flags.
+// Forma: {
+//   "carpisa|bariblu": { monitored: true,  activeFrom: "2026-05-06" },
+//   "yamamay|aeroporto": { monitored: false, activeFrom: null },
+//   ...
+// }
+// Se un negozio NON è presente in questa mappa, vale il default in ALL_STORES.
+// `activeFrom` è la data in cui è stato attivato (set dal backend alla
+// transizione false→true). Serve a NON mostrare come "mancanti" date precedenti
+// all'attivazione (es. attivo Bariblu il 06/05 → 05/05 e prima ignorano Bariblu).
+// Quando l'admin clicca il toggle in tab Negozi, faccio una PATCH e poi
+// rilancio recomputeExpected() + renderAll() così tutta la dashboard riflette
+// il nuovo stato (chiusure attese, KPI, mancanti).
 let storeFlagsByKey={};
 // Stato autenticazione: user info + token cache. I token sono anche salvati
 // in localStorage per sopravvivere ai refresh della pagina.
@@ -1315,12 +1323,28 @@ async function fetchHistorical(){
 // Non-fatale: se la GET fallisce torno {} e i default di ALL_STORES restano
 // sovrani. Il backend deve essere ridepoyato con l'endpoint /stores/flags;
 // finché non lo è, la chiamata torna 404 e silenziamo il warning.
+//
+// Lo shape del payload è {key: {monitored, active_from}}. Se per caso il
+// backend ne ritorna uno vecchio (boolean diretto, da una build precedente),
+// lo convertiamo qui in {monitored: bool, activeFrom: null} per evitare
+// di rompere il frontend durante un rolling deploy.
 async function fetchStoreFlags(){
   try{
     const r=await api('/stores/flags');
     if(!r.ok) return {};
     const data=await r.json();
-    return (data && typeof data==='object') ? data : {};
+    if(!data || typeof data !== 'object') return {};
+    const out = {};
+    for(const k in data){
+      const v = data[k];
+      if(v && typeof v === 'object'){
+        out[k] = { monitored: !!v.monitored, activeFrom: v.active_from || null };
+      }else{
+        // shape vecchio: bool puro
+        out[k] = { monitored: !!v, activeFrom: null };
+      }
+    }
+    return out;
   }catch(e){console.warn('fetchStoreFlags',e);return {};}
 }
 // ── UPLOAD TARGET EXCEL (admin only) ──
@@ -2037,15 +2061,37 @@ const ALL_STORES=[
 //   3. recomputeExpected()
 //   4. renderAll() — tutta la dashboard si aggiorna (KPI, chip Mancanti, ecc.)
 let EXPECTED_STORES = ALL_STORES.filter(s => s.monitored);
-// Determina se un negozio (brand, location) è attualmente attivo. Usa l'override
-// in storeFlagsByKey se presente, altrimenti il default in ALL_STORES.
-function isStoreMonitored(brand, location){
+// Determina se un negozio (brand, location) era attivo IN UNA DATA SPECIFICA.
+// `dateISO` è opzionale (formato 'YYYY-MM-DD'); se omesso, ritorna lo stato
+// attuale (= "oggi"). Logica:
+//   - Se c'è un override in storeFlagsByKey:
+//       * monitored=false   → non attivo
+//       * monitored=true e:
+//           - nessun activeFrom o activeFrom <= dateISO → attivo
+//           - activeFrom > dateISO                       → NON attivo (era stato
+//             attivato dopo la data richiesta, retroattivamente non vale).
+//   - Senza override: usa il default da ALL_STORES (il flag `monitored` hardcoded).
+// Lo string-compare su date 'YYYY-MM-DD' funziona come confronto cronologico.
+function isStoreMonitoredOn(brand, location, dateISO){
   const k = storeKey(brand, location);
-  if(Object.prototype.hasOwnProperty.call(storeFlagsByKey, k)){
-    return !!storeFlagsByKey[k];
+  const flag = storeFlagsByKey[k];
+  if(flag && typeof flag === 'object'){
+    if(!flag.monitored) return false;
+    if(dateISO && flag.activeFrom && flag.activeFrom > dateISO) return false;
+    return true;
   }
+  // Backcompat: vecchio shape boolean diretto. Non dovrebbe più esistere dopo
+  // fetchStoreFlags ma copro il caso per robustezza.
+  if(typeof flag === 'boolean') return flag;
+  // Nessun override: default da ALL_STORES. Non c'è una data di attivazione
+  // hardcoded per i 20 default-monitorati; valgono come "sempre attivi".
   const def = ALL_STORES.find(s => storeKey(s.brand, s.location) === k);
   return def ? !!def.monitored : false;
+}
+// Wrapper "stato attuale" — usato ovunque ci si chieda "oggi è attivo?". È solo
+// `isStoreMonitoredOn` senza data, mantenuto come API distinta per chiarezza.
+function isStoreMonitored(brand, location){
+  return isStoreMonitoredOn(brand, location);
 }
 // Ricalcola la lista EXPECTED_STORES applicando gli override caricati dal
 // backend ai default di ALL_STORES. Da chiamare DOPO ogni mutazione di
@@ -2060,10 +2106,18 @@ const storeKey=(brand,location)=>
 
 // Restituisce l'elenco dei negozi attesi che NON hanno inviato la chiusura
 // per la data passata. Se non c'è una data, ritorna [].
+//
+// IMPORTANTE: date-aware. Per la data `date` consideriamo solo i negozi che
+// erano attivi IN QUELLA DATA (controllando l'`activeFrom`). Se attivi
+// Carpisa Bariblu il 06/05/2026, il 05/05/2026 NON lo conta come mancante
+// perché non era ancora attivo. Lo string-compare 'YYYY-MM-DD' funziona come
+// confronto cronologico.
 function getMissingStores(date){
   if(!date) return [];
   const present=new Set(allData.filter(r=>r.dateISO===date).map(r=>storeKey(r.brand,r.location)));
-  return EXPECTED_STORES.filter(s=>!present.has(storeKey(s.brand,s.location)));
+  return ALL_STORES
+    .filter(s => isStoreMonitoredOn(s.brand, s.location, date))
+    .filter(s => !present.has(storeKey(s.brand,s.location)));
 }
 
 // Aggiorna label e stato del chip "Mancanti" in base al filtro data attivo.
@@ -2539,10 +2593,11 @@ function togglePeriod(id){
 //                   dalle chiusure GoAudits ricevute) + toggle "ATTIVO"
 //   - Se NON ATTIVO → card più tenue, senza valori, + toggle "NON ATTIVO"
 // Toggle visibile a tutti, ma cliccabile solo se admin (chi clicca un toggle
-// diverso dal proprio ruolo riceve un alert "Solo admin..."). La PATCH è
-// comunque protetta lato backend: se uno smanetta col DOM, fallisce in 403.
+// senza permessi riceve un alert "Solo admin..."). La PATCH è comunque
+// protetta lato backend: se uno smanetta col DOM, fallisce in 403.
 function renderStores(){
-  const isAdmin = auth && auth.user && auth.user.role === 'admin';
+  const role = auth && auth.user ? auth.user.role : null;
+  const canToggle = role === 'admin';
   // 1) Indicizzo le chiusure ricevute per chiave brand|location
   const byStore={};
   for(const r of allData){
@@ -2575,18 +2630,15 @@ function renderStores(){
       if(monitored) activeCount++;
 
       // Toggle HTML (sempre presente, in alto a destra del card head).
-      // Cliccabile solo da admin; per gli altri utenti è readonly (mostra solo
-      // lo stato attuale).
+      // Cliccabile solo da admin; per gli altri utenti è readonly (mostra
+      // solo lo stato attuale, niente click).
       const toggleCls = monitored ? 'active' : 'inactive';
       const toggleTxt = monitored ? 'ATTIVO' : 'NON ATTIVO';
       const tBrand = s.brand.replace(/'/g,"\\'");
       const tLoc   = s.location.replace(/'/g,"\\'");
-      const toggleAttr = isAdmin
-        ? `onclick="event.stopPropagation();toggleStoreActive('${tBrand}','${tLoc}')" title="Click per cambiare stato"`
-        : `class="store-toggle ${toggleCls} readonly" title="Solo admin"`;
-      const toggleHtml = isAdmin
-        ? `<span class="store-toggle ${toggleCls}" ${toggleAttr}>${toggleTxt}</span>`
-        : `<span ${toggleAttr}>${toggleTxt}</span>`;
+      const toggleHtml = canToggle
+        ? `<span class="store-toggle ${toggleCls}" onclick="event.stopPropagation();toggleStoreActive('${tBrand}','${tLoc}')" title="Click per cambiare stato">${toggleTxt}</span>`
+        : `<span class="store-toggle ${toggleCls} readonly" title="Solo admin">${toggleTxt}</span>`;
 
       if(!monitored){
         // Card "non attivo": niente fondocassa/saldo, niente onclick (non ha
@@ -2690,12 +2742,14 @@ function renderStores(){
 }
 
 // Toggle attivo/non-attivo per un punto vendita (tab Negozi → click sul badge).
-// Solo admin. Conferma esplicita prima di scrivere a backend.
+// Permesso: solo admin (gli editor NON possono attivare/disattivare negozi).
+// Conferma esplicita prima di scrivere a backend.
 //   1. Mostra confirm() con il nuovo stato target
 //   2. PATCH /stores/flags { brand, location, monitored: !current }
-//   3. Aggiorna lo stato locale (storeFlagsByKey) + EXPECTED_STORES
-//   4. Re-render globale così KPI / chip Mancanti / Chiusure attese rispecchiano
-//      subito il nuovo stato senza bisogno di ricaricare la pagina.
+//   3. Aggiorna lo stato locale (storeFlagsByKey) col valore restituito
+//      dal backend (incluso il nuovo activeFrom alla prima attivazione)
+//   4. recomputeExpected() + renderAll() — KPI / chip Mancanti / Chiusure
+//      attese rispecchiano subito il nuovo stato senza bisogno di reload.
 async function toggleStoreActive(brand, location){
   if(!auth || !auth.user || auth.user.role !== 'admin'){
     alert('Solo gli admin possono attivare o disattivare un negozio.');
@@ -2705,7 +2759,7 @@ async function toggleStoreActive(brand, location){
   const next    = !current;
   const action  = next ? 'ATTIVARE' : 'DISATTIVARE';
   const desc    = next
-    ? `Il negozio ${brand} ${location} comparirà tra le chiusure attese giornaliere e nel conteggio dei mancanti.`
+    ? `Il negozio ${brand} ${location} sarà considerato attivo a partire DA OGGI: comparirà tra le chiusure attese e nei mancanti solo per le date a partire da oggi (le date precedenti restano invariate).`
     : `Il negozio ${brand} ${location} non comparirà più tra le chiusure attese giornaliere e non comparirà più tra i mancanti.`;
   if(!confirm(`Vuoi ${action} il negozio ${brand} — ${location}?\n\n${desc}`)) return;
 
@@ -2718,10 +2772,16 @@ async function toggleStoreActive(brand, location){
       const err = await r.text();
       throw new Error(err.slice(0,200));
     }
-    // Aggiorno la mappa locale con la stessa chiave normalizzata che usa il
-    // backend (storeKey): brand+location lowercased + spazi compattati.
+    const data = await r.json();  // { ok, brand, location, monitored, active_from }
+    // Aggiorno la mappa locale con la chiave normalizzata che usa anche il
+    // backend (storeKey: brand+location lowercased + spazi compattati).
+    // Salvo entrambe le info (monitored + activeFrom) dal payload del backend
+    // così il frontend riflette esattamente lo stato persistito.
     const k = storeKey(brand, location);
-    storeFlagsByKey[k] = next;
+    storeFlagsByKey[k] = {
+      monitored: !!data.monitored,
+      activeFrom: data.active_from || null,
+    };
     recomputeExpected();
     renderAll();
   }catch(e){
