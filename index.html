@@ -2605,11 +2605,16 @@ function renderStores(){
     if(!byStore[k]) byStore[k]=[];
     byStore[k].push(r);
   }
-  // 2) Raggruppo i 30 negozi per brand mantenendo l'ordine della lista
+  // 2) Raggruppo i 30 negozi per brand. Dentro ogni brand prima i monitorati
+  //    (in ordine di ALL_STORES), poi i non monitorati (idem). Così
+  //    quando un negozio passa da non-attivo ad attivo "salta" sopra ai
+  //    non-attivi e si ricongiunge al blocco di quelli attivi: niente
+  //    alternanza visiva attivo/non-attivo/attivo.
   const grouped={};
   for(const s of ALL_STORES){
-    if(!grouped[s.brand]) grouped[s.brand]=[];
-    grouped[s.brand].push(s);
+    if(!grouped[s.brand]) grouped[s.brand]={active:[], inactive:[]};
+    const monitored = isStoreMonitored(s.brand, s.location);
+    (monitored ? grouped[s.brand].active : grouped[s.brand].inactive).push(s);
   }
 
   // Aggregati globali per la summary in cima.
@@ -2618,7 +2623,11 @@ function renderStores(){
   let totFondo=0, totSaldo=0, storesWithData=0, activeCount=0;
 
   let html='';
-  for(const [brand,stores] of Object.entries(grouped)){
+  for(const [brand,group] of Object.entries(grouped)){
+    // Iterare i monitorati prima dei non-monitorati: si evita l'alternanza
+    // visiva quando un negozio che era inattivo viene attivato e dovrebbe
+    // "salire" sopra agli altri non-attivi.
+    const stores = [...group.active, ...group.inactive];
     const bc=brandColor(brand);
     let bFondo=0, bSaldo=0;
 
