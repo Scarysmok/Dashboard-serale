@@ -2747,6 +2747,41 @@ function renderTempo(){
   };
   const DAYS_IT = ['Dom','Lun','Mar','Mer','Gio','Ven','Sab'];
 
+  // 6b) Helper PY: shifta una data indietro di 1 anno gestendo il 29 feb.
+  //     Restituisce 'YYYY-MM-DD' o null se non c'è dato per la data shiftata.
+  const shiftYearBackISO = (iso) => {
+    const [y, m, d] = iso.split('-').map(Number);
+    let py = y - 1, pd = d;
+    if(m === 2 && d === 29){
+      const leap = (py % 4 === 0 && py % 100 !== 0) || py % 400 === 0;
+      if(!leap) pd = 28;
+    }
+    return `${py}-${String(m).padStart(2,'0')}-${String(pd).padStart(2,'0')}`;
+  };
+  // Net dell'anno precedente per un dato anno/mese/giorno. Ritorna null se
+  // non ci sono dati per il periodo shiftato (es. dati 2024 non caricati).
+  const pyNetForYear  = (yr) => {
+    const prev = years[String(+yr - 1)];
+    return prev ? prev.netPast : null;
+  };
+  const pyNetForMonth = (mo) => {
+    const [y, m] = mo.split('-');
+    const prev = years[String(+y - 1)];
+    if(!prev || !prev.months[String(+y - 1) + '-' + m]) return null;
+    return prev.months[String(+y - 1) + '-' + m].netPast;
+  };
+  const pyNetForDay = (iso) => {
+    const k = shiftYearBackISO(iso);
+    return dailySums[k] ? dailySums[k].net : null;
+  };
+  // Costruisce il badge "vs PY" data una coppia net corrente / net anno scorso.
+  // Restituisce stringa HTML (può essere vuota se non c'è dato di confronto).
+  const pyBadge = (curNet, pyNet, label = 'vs PY') => {
+    if(pyNet == null || pyNet <= 0) return '';
+    const dlt = (curNet - pyNet) / pyNet * 100;
+    return `<span class="am-badge ${badgeCls(dlt)}">${fmtPctSign(dlt)} ${label}</span>`;
+  };
+
   // 7) Render
   let html = '';
   // Anni in ordine decrescente: anno corrente prima
@@ -2760,19 +2795,40 @@ function renderTempo(){
     // Cifra principale + badge per l'anno
     let yMain = '', yBadge = '', ySub = '';
     if(yStatus === 'past'){
-      yMain = `<div class="am-row-net">€ ${fmt(y.netPast)} NET</div>`;
+      yMain = `<div class="am-row-net">${fmt(y.netPast)} NET</div>`;
       if(compareTgt && y.tgtPast > 0){
         const dlt = (y.netPast - y.tgtPast) / y.tgtPast * 100;
-        yBadge = `<span class="am-badge ${badgeCls(dlt)}">${fmtPctSign(dlt)} vs TGT</span>`;
+        yBadge += `<span class="am-badge ${badgeCls(dlt)}">${fmtPctSign(dlt)} vs TGT</span>`;
       }
+      if(comparePy) yBadge += pyBadge(y.netPast, pyNetForYear(yr));
     } else if(yStatus === 'future'){
-      yMain = `<div class="am-row-net future">target € ${fmt(y.tgtAll)}</div>`;
+      yMain = `<div class="am-row-net future">target ${fmt(y.tgtAll)}</div>`;
     } else {
-      yMain = `<div class="am-row-net partial">€ ${fmt(y.netPast)} / € ${fmt(y.tgtAll)} NET</div>`;
+      yMain = `<div class="am-row-net partial">${fmt(y.netPast)} / ${fmt(y.tgtAll)} NET</div>`;
       ySub = 'consuntivo + previsionale';
       if(compareTgt && y.tgtPast > 0){
         const dlt = (y.netPast - y.tgtPast) / y.tgtPast * 100;
-        yBadge = `<span class="am-badge ${badgeCls(dlt)}">${fmtPctSign(dlt)} vs TGT (parziale)</span>`;
+        yBadge += `<span class="am-badge ${badgeCls(dlt)}">${fmtPctSign(dlt)} vs TGT (parziale)</span>`;
+      }
+      // PY a livello anno-in-corso: confronto i giorni passati di quest'anno
+      // con gli stessi giorni dell'anno scorso. Per semplicità uso il netPast
+      // dell'anno precedente nel mese corrispondente e prima.
+      if(comparePy){
+        // Calcola il PY come somma dei giorni passati dell'anno precedente fino
+        // alla data odierna (perché altrimenti confronterei un parziale vs un
+        // totale annuale). Lo storico 2025 ha tutti i 365 giorni, quindi devo
+        // sommare solo i giorni <= todayISO_pyShifted.
+        const todayPyISO = shiftYearBackISO(todayISO);
+        const prev = years[String(+yr - 1)];
+        if(prev){
+          let pyNetParziale = 0;
+          for(const pmKey of Object.keys(prev.months)){
+            for(const pd of prev.months[pmKey].days){
+              if(pd.dateISO <= todayPyISO) pyNetParziale += pd.net;
+            }
+          }
+          yBadge += pyBadge(y.netPast, pyNetParziale, 'vs PY (parziale)');
+        }
       }
     }
     const yMarker = yStatus === 'current' ? ' <span class="am-today-marker">in corso</span>' : '';
@@ -2798,20 +2854,35 @@ function renderTempo(){
 
       let mMain = '', mBadge = '', mSub = `${m.days.length} giorni`;
       if(mStatus === 'past'){
-        mMain = `<div class="am-row-net">€ ${fmt(m.netPast)} NET</div>`;
+        mMain = `<div class="am-row-net">${fmt(m.netPast)} NET</div>`;
         if(compareTgt && m.tgtPast > 0){
           const dlt = (m.netPast - m.tgtPast) / m.tgtPast * 100;
-          mBadge = `<span class="am-badge ${badgeCls(dlt)}">${fmtPctSign(dlt)} vs TGT</span>`;
+          mBadge += `<span class="am-badge ${badgeCls(dlt)}">${fmtPctSign(dlt)} vs TGT</span>`;
         }
+        if(comparePy) mBadge += pyBadge(m.netPast, pyNetForMonth(mk));
       } else if(mStatus === 'future'){
-        mMain = `<div class="am-row-net future">target € ${fmt(m.tgtAll)}</div>`;
+        mMain = `<div class="am-row-net future">target ${fmt(m.tgtAll)}</div>`;
         mSub = `${m.days.length} giorni · solo previsionale`;
       } else {
-        mMain = `<div class="am-row-net partial">€ ${fmt(m.netPast)} / € ${fmt(m.tgtAll)} NET</div>`;
+        mMain = `<div class="am-row-net partial">${fmt(m.netPast)} / ${fmt(m.tgtAll)} NET</div>`;
         mSub = `${m.days.length} giorni · ${m.daysPast} consuntivati · ${m.daysFuture} previsionali`;
         if(compareTgt && m.tgtPast > 0){
           const dlt = (m.netPast - m.tgtPast) / m.tgtPast * 100;
-          mBadge = `<span class="am-badge ${badgeCls(dlt)}">${fmtPctSign(dlt)} vs TGT (parziale)</span>`;
+          mBadge += `<span class="am-badge ${badgeCls(dlt)}">${fmtPctSign(dlt)} vs TGT (parziale)</span>`;
+        }
+        // PY mese-in-corso: somma i giorni passati di questo mese e confronta
+        // con la stessa porzione del mese dell'anno scorso.
+        if(comparePy){
+          const [py, pmm] = mk.split('-');
+          const prevMo = years[String(+py - 1)] && years[String(+py - 1)].months[String(+py - 1) + '-' + pmm];
+          if(prevMo){
+            const todayPyISO = shiftYearBackISO(todayISO);
+            let pyNetParziale = 0;
+            for(const pd of prevMo.days){
+              if(pd.dateISO <= todayPyISO) pyNetParziale += pd.net;
+            }
+            mBadge += pyBadge(m.netPast, pyNetParziale, 'vs PY (parziale)');
+          }
         }
       }
       const mMarker = mStatus === 'current' ? ' <span class="am-today-marker">in corso</span>' : '';
@@ -2838,16 +2909,17 @@ function renderTempo(){
           const dayLabel = `${DAYS_IT[jsDate.getDay()]} ${d.dateISO.slice(8,10)}/${d.dateISO.slice(5,7)}`;
           let dMain = '', dBadge = '';
           if(d.isFuture){
-            dMain = `<div class="am-row-net future-only">target € ${fmt(d.tgt)}</div>`;
+            dMain = `<div class="am-row-net future-only">target ${fmt(d.tgt)}</div>`;
           } else if(d.isToday){
-            dMain = `<div class="am-row-net partial">€ ${fmt(d.net)} / € ${fmt(d.tgt)} NET</div>`;
+            dMain = `<div class="am-row-net partial">${fmt(d.net)} / ${fmt(d.tgt)} NET</div>`;
             dBadge = `<span class="am-badge muted">in corso</span>`;
           } else {
-            dMain = `<div class="am-row-net">€ ${fmt(d.net)} NET</div>`;
+            dMain = `<div class="am-row-net">${fmt(d.net)} NET</div>`;
             if(compareTgt && d.tgt > 0){
               const dlt = (d.net - d.tgt) / d.tgt * 100;
-              dBadge = `<span class="am-badge ${badgeCls(dlt)}">${fmtPctSign(dlt)} vs TGT</span>`;
+              dBadge += `<span class="am-badge ${badgeCls(dlt)}">${fmtPctSign(dlt)} vs TGT</span>`;
             }
+            if(comparePy) dBadge += pyBadge(d.net, pyNetForDay(d.dateISO));
           }
           const dMarker = d.isToday ? ' <span class="am-today-marker">oggi</span>' : '';
           html += `<div class="am-day-row ${d.isFuture ? 'future' : ''}">
