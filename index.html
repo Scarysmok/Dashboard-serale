@@ -7,7 +7,12 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta name="theme-color" content="#fafbfc"/>
 <title>Chiusure · Rino Petino</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<!-- Nunito (rounded Apple-style) per testo + numeri. Pesi richiesti:
+     300 (mai), 400 (testo base), 500 (label/sub), 600 (card values),
+     700 (KPI grandi, header), 800 (saldo cumulato, accent). -->
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
 <style>
 :root{
   /* Tema chiaro: bianco pulito con grigi delicati per la gerarchia visiva */
@@ -27,7 +32,12 @@
   --t1:#1f2328;
   --t2:#57606a;
   --t3:#8c959f;
-  --font:'DM Sans',sans-serif;--mono:'DM Mono',monospace;
+  /* Nunito ovunque — testo e numeri. Look "Apple-style rounded": cifre
+     tonde, "0" pieno senza slash, x-height ampio. Mono e font puntano allo
+     stesso family — la separazione delle variabili rimane per non rompere
+     i selettori CSS che leggono `var(--mono)` su date/valori. */
+  --font:'Nunito',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+  --mono:'Nunito',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
   --safe-top:env(safe-area-inset-top,0px);
   --safe-bot:env(safe-area-inset-bottom,0px);
 }
