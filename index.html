@@ -256,47 +256,81 @@ body{display:flex;flex-direction:column}
 .week-days{background:linear-gradient(to right,var(--s2) 0,var(--s2) 4px,var(--s1) 4px)}
 .week-days .saldo-row{padding-left:28px}
 
-/* ── TEMPO TAB ── */
+/* ── ANDAMENTO TAB (v2: gerarchica anno → mesi → giorni) ────────────────
+   Layout: in alto i filtri (Brand multi-select, Punto Vendita multi-select,
+   toggle vs Target/vs Anno scorso), poi una sezione di Year cards
+   espandibili. Ciascun anno → mesi → giorni.
+   Convenzione: prefisso .am- (Andamento) per evitare collisioni con altri
+   stili della dashboard. */
 .tempo-wrap{padding:16px;display:flex;flex-direction:column;gap:12px;padding-bottom:32px}
-/* Filtri brand + punto vendita: due dropdown impilati. Lo store è hidden
-   finché non viene scelto un brand specifico, in modo da non confondere
-   l'utente con un secondo filtro che non ha opzioni. */
-.tempo-filters{display:flex;flex-direction:column;gap:8px;flex-shrink:0}
-.tempo-filter-label{font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
-.tempo-select{width:100%;padding:11px 38px 11px 14px;background:var(--s1);border:1px solid var(--bd2);border-radius:10px;color:var(--t1);font-family:var(--font);font-size:14px;font-weight:500;outline:none;-webkit-appearance:none;appearance:none;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%238c959f' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;transition:border-color .15s}
-.tempo-select:focus,.tempo-select:hover{border-color:var(--acc)}
-/* Toggle confronti: due bottoni multi-select indipendenti. ON/OFF visivo via
-   classe .on. Niente cambio della % già mostrata, solo aggiunta/rimozione
-   del badge corrispondente nelle card di periodo. */
-.tempo-compare{display:flex;gap:8px;flex-shrink:0}
-.tempo-toggle{flex:1;padding:10px 12px;border:1px solid var(--bd2);border-radius:10px;background:var(--s2);color:var(--t2);font-family:var(--font);font-size:13px;font-weight:500;cursor:pointer;-webkit-appearance:none;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:8px}
+
+/* — Filtri multi-select (chip dropdown con checkbox) — */
+.tempo-filters{display:flex;flex-wrap:wrap;gap:8px;flex-shrink:0;align-items:center;position:relative;z-index:5}
+.am-filter-btn{display:flex;align-items:center;gap:6px;padding:9px 12px;border-radius:10px;border:1px solid var(--bd2);background:var(--s2);font-family:var(--font);font-size:13px;font-weight:600;color:var(--t1);cursor:pointer;transition:all .12s;min-height:38px;position:relative;-webkit-appearance:none}
+.am-filter-btn:hover{background:var(--s3)}
+.am-filter-btn.has-sel{background:#dbeafe;border-color:var(--acc);color:var(--acc)}
+.am-filter-btn .am-count{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--acc);color:#fff;font-size:11px;font-weight:700;margin-left:4px}
+.am-filter-btn .am-arrow{font-size:9px;color:var(--t3);margin-left:2px;transition:transform .15s}
+.am-filter-btn.open .am-arrow{transform:rotate(180deg)}
+.am-filter-panel{position:absolute;top:46px;background:#fff;border:1px solid var(--bd);border-radius:12px;padding:6px;box-shadow:0 8px 24px rgba(0,0,0,.08);min-width:240px;max-height:340px;overflow-y:auto;display:none;z-index:50;font-family:var(--font)}
+.am-filter-panel.open{display:block}
+.am-filter-opt{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;cursor:pointer;font-size:13px;color:var(--t1);transition:background .1s}
+.am-filter-opt:hover{background:var(--s2)}
+.am-filter-opt input{margin:0;cursor:pointer;accent-color:var(--acc)}
+.am-filter-opt .am-bcolor{display:inline-block;width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.am-filter-divider{height:1px;background:var(--bd);margin:4px 0}
+.am-filter-grouphead{font-size:10px;color:var(--t3);padding:6px 10px 2px;text-transform:uppercase;letter-spacing:.5px;font-weight:700}
+.am-filter-actions{display:flex;gap:6px;padding:8px 4px 4px;border-top:1px solid var(--bd);margin-top:4px;flex-wrap:wrap}
+.am-filter-action{flex:1;min-width:60px;padding:7px 10px;border-radius:6px;background:var(--s2);font-size:12px;font-weight:600;color:var(--t2);cursor:pointer;text-align:center;border:none;font-family:var(--font);transition:background .12s}
+.am-filter-action:hover{background:var(--s3)}
+.am-filter-action.primary{flex:1.5;background:var(--acc);color:#fff}
+.am-filter-action.primary:hover{background:#1d4ed8}
+
+/* — Toggle vs Target / vs Anno scorso (mantenuti dalla v1) — */
+.tempo-compare{display:flex;gap:8px;flex-shrink:0;margin-left:auto}
+.tempo-toggle{padding:9px 12px;border:1px solid var(--bd2);border-radius:10px;background:var(--s2);color:var(--t2);font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer;-webkit-appearance:none;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:6px}
 .tempo-toggle:active{transform:scale(.97)}
-.tempo-toggle.on{background:#2563eb12;color:var(--acc);border-color:var(--acc)}
+.tempo-toggle.on{background:#dbeafe;color:var(--acc);border-color:var(--acc)}
 .tempo-toggle::before{content:'';width:14px;height:14px;border-radius:3px;border:1.5px solid currentColor;flex-shrink:0;background:transparent;transition:background .15s}
 .tempo-toggle.on::before{background:var(--acc);border-color:var(--acc);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%23fff' d='M6 11.5L2 7.5l1.5-1.5L6 8.5l6.5-6.5 1.5 1.5z'/%3E%3C/svg%3E");background-size:11px 11px;background-position:center;background-repeat:no-repeat}
-.tempo-seg{display:flex;gap:0;border:1px solid var(--bd2);border-radius:10px;overflow:hidden;margin-bottom:4px;flex-shrink:0}
-.tempo-btn{flex:1;padding:9px 4px;font-size:12px;font-weight:500;font-family:var(--font);background:var(--s2);color:var(--t2);border:none;cursor:pointer;transition:all .15s;-webkit-appearance:none}
-.tempo-btn.on{background:var(--acc);color:#0f0f11}
-.tempo-btn:not(:last-child){border-right:1px solid var(--bd2)}
-.period-card{background:var(--s1);border:1px solid var(--bd);border-radius:14px;overflow:hidden;margin-bottom:10px}
-.period-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;cursor:pointer;user-select:none}
-.period-date{font-size:14px;font-weight:600}
-.period-corr{font-family:var(--mono);font-size:13px;color:var(--green)}
-.period-net{font-family:var(--mono);font-size:11px;color:var(--blue)}
-.period-chevron{font-size:16px;color:var(--t3);transition:transform .2s}
-.period-chevron.open{transform:rotate(90deg)}
-.period-body{display:none;border-top:1px solid var(--bd)}
-.period-body.open{display:block}
-.brand-row{display:flex;justify-content:space-between;align-items:center;padding:11px 16px;border-bottom:1px solid var(--bd)}
-.brand-row:last-child{border-bottom:none}
-.brand-row-name{font-size:13px;font-weight:500}
-.brand-row-right{text-align:right}
-.brand-row-corr{font-family:var(--mono);font-size:13px;color:var(--green)}
-.brand-row-net{font-family:var(--mono);font-size:11px;color:var(--blue)}
-.period-total-row{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--bd);border-top:1px solid var(--bd)}
-.ptotal-cell{background:var(--s2);padding:10px 16px}
-.ptotal-l{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px}
-.ptotal-v{font-family:var(--mono);font-size:12px;font-weight:500}
+
+/* — Cards gerarchiche: anno (top), mese (livello 2), giorno (livello 3) — */
+.am-card{background:var(--s1);border:1px solid var(--bd);border-radius:12px;margin-bottom:8px;overflow:hidden}
+.am-card-row{display:grid;grid-template-columns:24px 1fr auto;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;user-select:none;transition:background .1s}
+.am-card-row:hover{background:#f7f8fa}
+.am-card-row:active{background:var(--s2)}
+.am-chev{font-size:12px;color:var(--t3);transition:transform .2s;display:inline-block;width:24px;text-align:center;flex-shrink:0}
+.am-chev.open{transform:rotate(90deg)}
+.am-row-title{font-size:16px;font-weight:700;letter-spacing:-0.01em}
+.am-row-sub{font-size:12px;color:var(--t3);font-weight:500;margin-top:2px}
+.am-row-right{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.am-row-net{font-size:15px;font-weight:600;color:var(--green);text-align:right;white-space:nowrap}
+.am-row-net.future{color:var(--t2)}
+.am-row-net.partial{color:var(--blue)}
+.am-row-tgt{font-size:11px;color:var(--t3);text-align:right;font-weight:500}
+.am-badge{display:inline-flex;align-items:center;font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;line-height:1.4;white-space:nowrap}
+.am-badge.green {background:#dcfce7;color:#166534}
+.am-badge.yellow{background:#fef3c7;color:#92400e}
+.am-badge.red   {background:#fee2e2;color:#991b1b}
+.am-badge.muted {background:#f3f4f6;color:var(--t3);font-weight:600}
+.am-today-marker{display:inline-flex;align-items:center;background:var(--acc);color:#fff;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;margin-left:8px;letter-spacing:.4px;text-transform:uppercase;vertical-align:middle}
+.am-children{display:none;border-top:1px solid var(--bd);background:#fafbfc}
+.am-children.open{display:block}
+.am-child-row{display:grid;grid-template-columns:24px 1fr auto;gap:12px;padding:11px 16px;border-bottom:1px solid var(--bd);align-items:center;cursor:pointer;transition:background .1s}
+.am-child-row:last-child{border-bottom:none}
+.am-child-row:hover{background:#f4f5f7}
+.am-child-row .am-row-title{font-size:14px;font-weight:600}
+.am-child-row .am-row-sub{font-size:11px}
+.am-child-row .am-row-net{font-size:13px;font-weight:600}
+.am-child-row.future .am-row-title{color:var(--t2);font-weight:500}
+/* Day rows: foglie. Niente expand, niente chevron, niente cursor pointer. */
+.am-day-row{display:grid;grid-template-columns:36px 1fr auto;gap:12px;padding:9px 16px 9px 36px;border-bottom:1px solid var(--bd);background:#fefefe;align-items:center;font-size:13px;cursor:default}
+.am-day-row:last-child{border-bottom:none}
+.am-day-row .am-row-title{font-size:13px;font-weight:600}
+.am-day-row.future .am-row-title{color:var(--t2);font-weight:500}
+.am-day-row .am-row-net{font-size:12px}
+.am-day-row .am-row-net.future-only{color:var(--t3);font-style:italic}
+
 .empty-state{text-align:center;padding:48px 24px;color:var(--t3)}
 .empty-icon{font-size:40px;margin-bottom:12px;opacity:.5}
 .empty-text{font-size:14px}
@@ -534,41 +568,44 @@ body{display:flex;flex-direction:column}
     </div>
   </div>
 
-  <!-- TAB TEMPO -->
+  <!-- TAB ANDAMENTO (v2: gerarchica anno → mesi → giorni) -->
   <div class="scroll-area" id="tab-tempo" style="display:none">
     <div class="tempo-wrap">
-      <!-- Filtro 1 — Brand. "Tutti i brand" è il default. -->
-      <!-- Filtro 2 — Punto vendita. Visibile solo dopo aver scelto un brand,
-           con opzioni dinamiche calcolate dai negozi attesi del brand. -->
+      <!-- Filtri: Brand multi-select + Punto Vendita multi-select + toggle.
+           Il pannello dei filtri viene popolato da renderAmFilterPanels()
+           subito dopo il fetch dei dati, così riflette esattamente quello
+           che è disponibile (30 negozi mappati). -->
       <div class="tempo-filters">
-        <div>
-          <div class="tempo-filter-label">Brand</div>
-          <select class="tempo-select" id="tempo-brand" onchange="setTempoBrand(this.value)">
-            <option value="">Tutti i brand</option>
-            <option value="Adidas">Adidas</option>
-            <option value="Carpisa">Carpisa</option>
-            <option value="Mango">Mango</option>
-            <option value="Yamamay">Yamamay</option>
-          </select>
-        </div>
-        <div id="tempo-store-wrap" style="display:none">
-          <div class="tempo-filter-label">Punto vendita</div>
-          <select class="tempo-select" id="tempo-store" onchange="setTempoStore(this.value)">
-            <!-- Popolato dinamicamente da setTempoBrand() -->
-          </select>
-        </div>
-        <div>
-          <div class="tempo-filter-label">Confronti</div>
-          <div class="tempo-compare">
-            <button class="tempo-toggle on" id="tc-tgt" onclick="toggleCompare('tgt',this)">vs Target</button>
-            <button class="tempo-toggle" id="tc-py" onclick="toggleCompare('py',this)">vs Anno scorso</button>
+        <div style="position:relative">
+          <button class="am-filter-btn" id="am-btn-brand" onclick="toggleAmPanel('brand')">
+            <span>Brand</span><span class="am-count" id="am-cnt-brand">tutti</span><span class="am-arrow">▾</span>
+          </button>
+          <div class="am-filter-panel" id="am-panel-brand">
+            <div id="am-panel-brand-list"></div>
+            <div class="am-filter-actions">
+              <button class="am-filter-action" onclick="setAmAll('brand', true)">Tutti</button>
+              <button class="am-filter-action" onclick="setAmAll('brand', false)">Nessuno</button>
+              <button class="am-filter-action primary" onclick="applyAmFilter('brand')">Applica</button>
+            </div>
           </div>
         </div>
-      </div>
-      <div class="tempo-seg">
-        <button class="tempo-btn on" id="tb-giorno" onclick="setTempo('giorno',this)">Giorno</button>
-        <button class="tempo-btn" id="tb-mese" onclick="setTempo('mese',this)">Mese</button>
-        <button class="tempo-btn" id="tb-anno" onclick="setTempo('anno',this)">Anno</button>
+        <div style="position:relative">
+          <button class="am-filter-btn" id="am-btn-store" onclick="toggleAmPanel('store')">
+            <span>Punto vendita</span><span class="am-count" id="am-cnt-store">tutti</span><span class="am-arrow">▾</span>
+          </button>
+          <div class="am-filter-panel" id="am-panel-store" style="left:120px">
+            <div id="am-panel-store-list"></div>
+            <div class="am-filter-actions">
+              <button class="am-filter-action" onclick="setAmAll('store', true)">Tutti</button>
+              <button class="am-filter-action" onclick="setAmAll('store', false)">Nessuno</button>
+              <button class="am-filter-action primary" onclick="applyAmFilter('store')">Applica</button>
+            </div>
+          </div>
+        </div>
+        <div class="tempo-compare">
+          <button class="tempo-toggle on" id="tc-tgt" onclick="toggleCompare('tgt',this)">vs Target</button>
+          <button class="tempo-toggle" id="tc-py" onclick="toggleCompare('py',this)">vs Anno scorso</button>
+        </div>
       </div>
       <div id="tempo-content"></div>
     </div>
@@ -641,11 +678,19 @@ const CONCURRENCY = IS_MOBILE ? 4 : 12;
 // Le foto scontrino/documento da smartphone sono sempre >= 200px per lato
 // anche dopo la compressione JPEG applicata dal generatore di PDF.
 const ATTACH_MIN_SIDE=200;
-let allData=[], filter='all', filterDate=null, tempoView='giorno', syncTimer=null;
-// Filtri tab Andamento: tempoBrand=='' significa tutti i brand (filtro spento),
-// tempoStore=='' significa tutti i negozi del brand selezionato. Lo store
-// non può essere settato senza un brand: setTempoBrand('') resetta anche lo store.
-let tempoBrand='', tempoStore='';
+let allData=[], filter='all', filterDate=null, syncTimer=null;
+// Filtri tab Andamento (v2 — gerarchica con multi-select):
+//   - tempoBrands  : array di brand attivi. Vuoto = tutti i brand.
+//   - tempoStores  : array di location attive. Vuoto = tutti gli store dei
+//                    brand attivi.
+//   - amExpanded   : Set di chiavi (es. "y2026", "m2026-05") attualmente
+//                    espanse nell'albero. Persiste tra render così l'utente
+//                    non perde lo stato quando cambia filtro.
+// Default: anno+mese correnti espansi, tutto il resto chiuso.
+let tempoBrands=[], tempoStores=[];
+const _todayY = new Date().getFullYear();
+const _todayM = String(new Date().getMonth()+1).padStart(2,'0');
+let amExpanded = new Set(['y'+_todayY, 'm'+_todayY+'-'+_todayM]);
 // Toggle confronti nella tab Andamento. Default: target ON (preserva il
 // comportamento già esistente dopo l'introduzione del badge target),
 // anno-scorso OFF (l'utente lo attiva quando vuole vedere il delta YoY).
@@ -757,6 +802,11 @@ function clearAuth(){
 // Per chi ha l'auto-login (token in localStorage), il ping gira in parallelo
 // con /auth/me, quindi non aiuta ma non danneggia: i due request condividono
 // lo stesso wake-up del backend.
+// Listener globale: chiude i pannelli filtri Andamento se si clicca fuori.
+// Registrato qui (non dentro l'IIFE) così è attivo dal primo paint, non
+// dipende dal completamento del login.
+document.addEventListener('click', _onAmDocClick);
+
 (async function(){
   // Fire-and-forget warm-up. Non await, non blocca, errori loggati e basta.
   fetch(API_BASE+'/', {credentials:'include'}).catch(e=>console.debug('warmup',e));
@@ -1808,49 +1858,144 @@ function closeSheet(e){
   if(!e||e.target===document.getElementById('sheet'))
     document.getElementById('sheet').classList.remove('show');
 }
-function setTempo(v,el){
-  tempoView=v;
-  document.querySelectorAll('.tempo-btn').forEach(b=>b.classList.remove('on'));
-  el.classList.add('on');
-  renderTempo();
-}
-// ── FILTRI TAB PERIODO (brand → punto vendita a cascata) ──
-// Quando l'utente sceglie un brand, popoliamo dinamicamente il dropdown
-// "Punto vendita" con i soli negozi di quel brand (presi da EXPECTED_STORES
-// più eventuali altri visti nei dati reali, se mai dovessero esistere).
-// Cambiare brand resetta sempre il filtro store: non avrebbe senso mantenere
-// un negozio di un brand diverso da quello appena scelto.
-function setTempoBrand(brand){
-  tempoBrand = brand || '';
-  tempoStore = '';
-  const storeWrap = document.getElementById('tempo-store-wrap');
-  const storeSel  = document.getElementById('tempo-store');
-  if(!tempoBrand){
-    // "Tutti i brand" → nascondo del tutto il filtro punto vendita
-    if(storeWrap) storeWrap.style.display = 'none';
-  }else{
-    // Costruisco la lista negozi del brand. Per la tab Andamento usiamo
-    // ALL_STORES (30) che include anche i negozi non ancora su GoAudits:
-    // in Andamento devono comparire perché abbiamo i loro dati storici.
-    // Aggiungo difensivamente eventuali location viste in allData (es. se
-    // un negozio nuovo inizia a inviare chiusure prima che lo aggiunga qui).
-    const set = new Set();
-    for(const s of ALL_STORES){
-      if(s.brand === tempoBrand) set.add(s.location);
-    }
-    for(const r of allData){
-      if(r.brand === tempoBrand && r.location) set.add(r.location);
-    }
-    const stores = [...set].sort((a,b)=>a.localeCompare(b,'it'));
-    storeSel.innerHTML = '<option value="">Tutti i negozi</option>' +
-      stores.map(s=>`<option value="${attrEsc(s)}">${attrEsc(s)}</option>`).join('');
-    storeSel.value = '';
-    if(storeWrap) storeWrap.style.display = '';
+// ── FILTRI TAB ANDAMENTO (v2: multi-select chip dropdown) ──
+// Apre/chiude il pannello del filtro indicato (brand o store), chiudendo
+// l'altro se aperto. Click esterno → chiude tutti (gestito dal listener
+// globale qui sotto).
+function toggleAmPanel(name){
+  document.querySelectorAll('.am-filter-panel').forEach(p => {
+    if(p.id === 'am-panel-' + name) p.classList.toggle('open');
+    else p.classList.remove('open');
+  });
+  document.querySelectorAll('.am-filter-btn').forEach(b => {
+    if(b.id === 'am-btn-' + name) b.classList.toggle('open');
+    else b.classList.remove('open');
+  });
+  // Quando apro il pannello store, lo (ri)popolo dinamicamente in base ai
+  // brand attualmente attivi: così se l'utente ha cambiato brand poco prima,
+  // vede subito la lista negozi giusta.
+  if(name === 'store'){
+    const panel = document.getElementById('am-panel-store');
+    if(panel.classList.contains('open')) renderAmStorePanel();
   }
+}
+// Click fuori dai pannelli → chiusura. Registrato in fondo allo script.
+function _onAmDocClick(e){
+  if(e.target.closest('.am-filter-btn') || e.target.closest('.am-filter-panel')) return;
+  document.querySelectorAll('.am-filter-panel').forEach(p => p.classList.remove('open'));
+  document.querySelectorAll('.am-filter-btn').forEach(b => b.classList.remove('open'));
+}
+// Spunta o de-spunta tutto in un pannello. Solo UI: l'utente conferma con Applica.
+function setAmAll(name, checked){
+  document.querySelectorAll('#am-panel-' + name + '-list input[type=checkbox]').forEach(cb => cb.checked = checked);
+  // Aggiorno il counter del button per dare feedback immediato.
+  updAmCounter(name);
+}
+// Conferma la selezione del pannello (chiude il dropdown e ricalcola la
+// gerarchia di Andamento). Lettura del DOM: legge tutti i checkbox spuntati.
+function applyAmFilter(name){
+  const checked = Array.from(
+    document.querySelectorAll('#am-panel-' + name + '-list input[type=checkbox]:checked')
+  ).map(cb => cb.value);
+  if(name === 'brand'){
+    tempoBrands = checked;
+    // Reset store: i negozi disponibili dipendono dai brand attivi.
+    // Se l'utente aveva spuntato negozi di un brand che ora non è più attivo,
+    // li rimuovo per coerenza.
+    if(tempoBrands.length > 0){
+      const allowed = new Set(
+        ALL_STORES.filter(s => tempoBrands.includes(s.brand))
+                  .map(s => s.location.toLowerCase())
+      );
+      tempoStores = tempoStores.filter(loc => allowed.has(loc.toLowerCase()));
+    }
+    // Ri-render del pannello store così riflette i nuovi brand attivi.
+    renderAmStorePanel();
+  } else if(name === 'store'){
+    tempoStores = checked;
+  }
+  // Chiudo il pannello e ricalcolo lo zucchero (counter + render).
+  document.getElementById('am-panel-' + name).classList.remove('open');
+  document.getElementById('am-btn-' + name).classList.remove('open');
+  updAmCounter('brand');
+  updAmCounter('store');
   renderTempo();
 }
-function setTempoStore(loc){
-  tempoStore = loc || '';
+// Aggiorna il counter dentro il pulsante in base alle spunte attuali.
+// Mostra "tutti" se tutto è spuntato (o nessuno è spuntato → equivalente).
+function updAmCounter(name){
+  const list = document.querySelectorAll('#am-panel-' + name + '-list input[type=checkbox]');
+  const checked = Array.from(list).filter(cb => cb.checked).length;
+  const total = list.length;
+  const cnt = document.getElementById('am-cnt-' + name);
+  const btn = document.getElementById('am-btn-' + name);
+  if(!cnt || !btn) return;
+  if(checked === 0 || checked === total){
+    cnt.textContent = 'tutti';
+    btn.classList.remove('has-sel');
+  } else {
+    cnt.textContent = String(checked);
+    btn.classList.add('has-sel');
+  }
+}
+// Costruisce la lista checkbox dei brand. Spunta SOLO i brand già in
+// tempoBrands, altrimenti tutti (= "tutti i brand attivi" = nessun filtro).
+function renderAmBrandPanel(){
+  const list = document.getElementById('am-panel-brand-list');
+  if(!list) return;
+  const brands = [...new Set(ALL_STORES.map(s => s.brand))].sort((a,b)=>a.localeCompare(b,'it'));
+  const sel = new Set(tempoBrands);
+  const allOn = sel.size === 0; // 0 selezioni = "tutti i brand"
+  list.innerHTML = brands.map(b => {
+    const checked = (allOn || sel.has(b)) ? 'checked' : '';
+    const c = brandColor(b);
+    return `<label class="am-filter-opt">
+      <input type="checkbox" value="${attrEsc(b)}" ${checked} onchange="updAmCounter('brand')">
+      <span class="am-bcolor" style="background:${c.strong}"></span>${attrEsc(b)}
+    </label>`;
+  }).join('');
+  updAmCounter('brand');
+}
+// Costruisce la lista checkbox degli store. Mostra solo gli store dei brand
+// attualmente attivi. Raggruppa per brand con header. Spunta solo i tempoStores
+// (vuoto = "tutti").
+function renderAmStorePanel(){
+  const list = document.getElementById('am-panel-store-list');
+  if(!list) return;
+  const activeBrands = (tempoBrands.length === 0)
+    ? new Set(ALL_STORES.map(s => s.brand))
+    : new Set(tempoBrands);
+  const sel = new Set(tempoStores.map(s => s.toLowerCase()));
+  const allOn = sel.size === 0;
+  // Raggruppo per brand mantenendo l'ordine dei brand attivi
+  const grouped = {};
+  for(const s of ALL_STORES){
+    if(!activeBrands.has(s.brand)) continue;
+    if(!grouped[s.brand]) grouped[s.brand] = [];
+    grouped[s.brand].push(s.location);
+  }
+  let html = '';
+  const brandKeys = Object.keys(grouped).sort((a,b)=>a.localeCompare(b,'it'));
+  brandKeys.forEach((b, i) => {
+    if(i > 0) html += '<div class="am-filter-divider"></div>';
+    html += `<div class="am-filter-grouphead">${attrEsc(b)}</div>`;
+    const stores = grouped[b].slice().sort((a,b)=>a.localeCompare(b,'it'));
+    for(const loc of stores){
+      const checked = (allOn || sel.has(loc.toLowerCase())) ? 'checked' : '';
+      html += `<label class="am-filter-opt">
+        <input type="checkbox" value="${attrEsc(loc)}" ${checked} onchange="updAmCounter('store')">
+        ${attrEsc(loc)}
+      </label>`;
+    }
+  });
+  list.innerHTML = html;
+  updAmCounter('store');
+}
+// Espande/collassa una riga della gerarchia (anno o mese). Persiste su
+// amExpanded così il render successivo ricorda lo stato.
+function toggleAmRow(key){
+  if(amExpanded.has(key)) amExpanded.delete(key);
+  else amExpanded.add(key);
   renderTempo();
 }
 // Toggle multi-select dei confronti. Ogni bottone è indipendente:
@@ -2473,153 +2618,251 @@ function periodPyBadgeHTML(records){
   const pctStr = sign + delta.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2}) + '%';
   return `<div class="card-target ${cls}" title="${fmt(d.totCur)} vs ${fmt(d.totPy)} anno scorso · ${records.length} chiusur${records.length===1?'a':'e'}">${pctStr} vs PY</div>`;
 }
+// ── RENDER TAB ANDAMENTO (v2: gerarchica anno → mese → giorno) ──────────
+// Costruisce un albero anno → mese → giorno includendo tutti i giorni per
+// cui c'è almeno un dato (NET o target). I giorni futuri (con solo target)
+// appaiono in grigio con label "target € X".
+//   - Anno/mese passato → NET reale + delta vs TGT (verde/giallo/rosso)
+//   - Anno/mese in corso → "NET parziale / target totale" + delta vs TGT
+//                          calcolato sui soli giorni passati
+//   - Anno/mese futuro  → "target € X" in grigio, niente badge
+//   - Giorno passato    → NET + delta vs TGT
+//   - Giorno corrente   → "NET parziale / target totale" + badge "in corso"
+//   - Giorno futuro     → "target € X" in grigio, niente badge
+// I giorni NON sono espandibili (foglie). Espansione gestita da amExpanded.
 function renderTempo(){
-  // Unified data set: chiusure + storico (vedi buildAndamentoRecords)
-  const fullData = buildAndamentoRecords();
-  if(!fullData.length){
-    document.getElementById('tempo-content').innerHTML='<div class="empty-state"><div class="empty-icon">📅</div><div class="empty-text">Nessun dato disponibile</div></div>';
-    return;
-  }
-  // 1) Applica i filtri brand + store sui record. Filtraggio progressivo:
-  //    se non c'è brand, non filtra niente; con brand filtra per brand;
-  //    con brand+store filtra anche per location.
-  let data = fullData;
-  if(tempoBrand) data = data.filter(r => r.brand === tempoBrand);
-  if(tempoStore) data = data.filter(r => r.location === tempoStore);
-  if(!data.length){
-    let msg = 'Nessun dato per i filtri selezionati';
-    if(tempoBrand && tempoStore) msg = `Nessuna chiusura per ${tempoBrand} ${tempoStore}`;
-    else if(tempoBrand) msg = `Nessuna chiusura per ${tempoBrand}`;
-    document.getElementById('tempo-content').innerHTML=`<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-text">${msg}</div></div>`;
-    return;
-  }
-  // 2) Determina la modalità di breakdown
-  const breakdownMode =
-    (tempoBrand && tempoStore) ? 'none'  :  // singolo negozio: zero breakdown
-    (tempoBrand)               ? 'store' :  // brand: per negozio
-                                 'brand';   // default: per brand
-  // 3) Funzioni di chiave/label temporali (giorno/mese/anno)
-  const keyFn = r => {
-    if(!r.dateISO) return 'Data sconosciuta';
-    if(tempoView==='giorno') return r.dateISO;          // YYYY-MM-DD
-    if(tempoView==='mese')   return r.dateISO.slice(0,7); // YYYY-MM
-    return r.dateISO.slice(0,4);                          // YYYY
-  };
-  const labelFn = key => {
-    if(tempoView==='giorno'){
-      const [y,m,d]=key.split('-');
-      return `${d}/${m}/${y}`;
-    }
-    if(tempoView==='mese'){
-      const [y,m]=key.split('-');
-      return `${MESI[parseInt(m)-1]} ${y}`;
-    }
-    return key;
-  };
-  // 4) Costruisci mappa periodo → {records, breakdownGroups}
-  // breakdownGroups raggruppa per brand o per location a seconda del modo.
-  const periodi={};
-  for(const r of data){
-    const k=keyFn(r);
-    if(!periodi[k]) periodi[k]={key:k, records:[], groups:{}};
-    periodi[k].records.push(r);
-    if(breakdownMode !== 'none'){
-      const groupKey = breakdownMode==='brand' ? r.brand : r.location;
-      if(!periodi[k].groups[groupKey]) periodi[k].groups[groupKey] = [];
-      periodi[k].groups[groupKey].push(r);
-    }
-  }
-  const sorted = Object.values(periodi).sort((a,b)=>b.key.localeCompare(a.key));
-  // Colore "del brand corrente" per le righe-negozio (quando brand è selezionato).
-  // Quando il breakdown è per brand, il colore viene calcolato per ogni gruppo.
-  const fixedBc = tempoBrand ? brandColor(tempoBrand) : null;
-  let html='';
-  for(const p of sorted){
-    // Net del periodo: somma netSales dei record (sia chiusure che storico
-    // hanno questo campo). Fallback su corr/1.22 per record solo-chiusura
-    // pre-parsing che potrebbero avere corrispettivo ma non netSales.
-    const pNet  = p.records.reduce((a,r)=>a+((+r.netSales)||((+r.corrispettivo||0)/1.22)),0);
-    // Contanti/POS sono valorizzati solo per le chiusure (non per lo storico):
-    // qui sommiamo "quello che c'è", per i giorni storici contano come 0.
-    const pCash = p.records.reduce((a,r)=>a+(+r.contanti||0),0);
-    const pPOS  = p.records.reduce((a,r)=>a+(+r.pos||0),0);
-    const pid   = 'p_'+p.key.replace(/-/g,'');
-    // Helper: costruisce i badge di confronto (target + PY) per un gruppo di
-    // record, in base ai toggle attivi. Restituisce stringa HTML (può essere
-    // vuota se entrambi i toggle sono off, o se non c'è dato di confronto).
-    const compareBadges = (recs) => {
-      const parts = [];
-      if(compareTgt) parts.push(periodTargetBadgeHTML(recs));
-      if(comparePy){
-        const pyB = periodPyBadgeHTML(recs);
-        if(pyB) parts.push(pyB);
-      }
-      return parts.join('');
-    };
-    // Costruzione righe di breakdown (vuote in modalità 'none')
-    let groupRows = '';
-    if(breakdownMode !== 'none'){
-      groupRows = Object.entries(p.groups)
-        .sort((a,b)=>a[0].localeCompare(b[0],'it'))
-        .map(([name, recs])=>{
-          const gCorr = recs.reduce((a,r)=>a+(+r.corrispettivo||0),0);
-          // Net del gruppo: usa r.netSales se presente (record da chiusure o
-          // storico hanno entrambi netSales), fallback su corr/1.22.
-          const gNet  = recs.reduce((a,r)=>a+((+r.netSales)||((+r.corrispettivo||0)/1.22)),0);
-          const bc = breakdownMode==='brand' ? brandColor(name) : fixedBc;
-          return `<div class="brand-row" style="border-left:3px solid ${bc.strong};padding-left:13px">
-            <span class="brand-row-name" style="color:${bc.text}">${name} <span style="font-size:11px;color:var(--t3);font-weight:normal">(${recs.length})</span></span>
-            <div class="brand-row-right" style="display:flex;flex-direction:column;align-items:flex-end;gap:3px">
-              <div class="brand-row-net" style="font-size:13px;color:var(--green);font-weight:500">NET ${fmt(gNet)}</div>
-              ${compareBadges(recs)}
-            </div>
-          </div>`;
-        }).join('');
-    }
-    // Sotto-titolo del periodo: cambia label in base al modo (negozi vs chiusure)
-    const subLabel = (breakdownMode === 'none')
-      ? `${p.records.length} giorn${p.records.length===1?'o':'i'}`
-      : `${p.records.length} chiusur${p.records.length===1?'a':'e'}`;
-    // Badge di confronto per il periodo: target (se compareTgt) e/o vs PY
-    // (se comparePy). Entrambi sono "dinamici": includono solo i giorni-negozio
-    // per cui esiste un riferimento (target>0 oppure dato anno scorso>0).
-    const periodBadges = compareBadges(p.records);
-    html+=`<div class="period-card">
-      <div class="period-head" onclick="togglePeriod('${pid}')">
-        <div>
-          <div class="period-date">${labelFn(p.key)}</div>
-          <div style="font-size:11px;color:var(--t3);margin-top:2px">${subLabel}</div>
-        </div>
-        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px">
-          <div class="period-net" style="font-size:14px;color:var(--green);font-weight:500">NET ${fmt(pNet)}</div>
-          ${periodBadges}
-        </div>
-        <span class="period-chevron" id="chev-${pid}">›</span>
-      </div>
-      <div class="period-body" id="${pid}">
-        ${groupRows}
-        <div class="period-total-row">
-          <div class="ptotal-cell">
-            <div class="ptotal-l">Contanti</div>
-            <div class="ptotal-v">${fmt(pCash)}</div>
-          </div>
-          <div class="ptotal-cell">
-            <div class="ptotal-l">POS</div>
-            <div class="ptotal-v">${fmt(pPOS)}</div>
-          </div>
-        </div>
-      </div>
-    </div>`;
-  }
-  document.getElementById('tempo-content').innerHTML=html;
-}
+  const targetEl = document.getElementById('tempo-content');
+  if(!targetEl) return;
 
-function togglePeriod(id){
-  const body=document.getElementById(id);
-  const chev=document.getElementById('chev-'+id);
-  if(!body)return;
-  const open=body.classList.toggle('open');
-  if(chev)chev.classList.toggle('open',open);
+  // 0) Aggiorna i pannelli filtri (in caso siano cambiate le brand/store mappate
+  //    o sia il primo render dopo il login). Il render è idempotente.
+  renderAmBrandPanel();
+  renderAmStorePanel();
+
+  // 1) Risolvi filtri attivi
+  const activeBrands = (tempoBrands.length === 0)
+    ? new Set(ALL_STORES.map(s => s.brand))
+    : new Set(tempoBrands);
+  const activeStoresLow = (tempoStores.length === 0)
+    ? null
+    : new Set(tempoStores.map(s => s.toLowerCase()));
+  const matches = (brand, location) => {
+    if(!activeBrands.has(brand)) return false;
+    if(activeStoresLow && !activeStoresLow.has(String(location||'').toLowerCase())) return false;
+    return true;
+  };
+
+  // 2) "Oggi" come stringa ISO YYYY-MM-DD (locale, no UTC drift)
+  const _t = new Date();
+  const todayISO = `${_t.getFullYear()}-${String(_t.getMonth()+1).padStart(2,'0')}-${String(_t.getDate()).padStart(2,'0')}`;
+
+  // 3) Costruisci dailySums = { dateISO: { net, tgt } }
+  const dailySums = {};
+  const bucket = (d) => {
+    if(!dailySums[d]) dailySums[d] = { net: 0, tgt: 0 };
+    return dailySums[d];
+  };
+  // 3a) NET dalle chiusure GoAudits (allData)
+  for(const r of allData){
+    if(!r || !r.dateISO) continue;
+    if(!matches(r.brand, r.location)) continue;
+    const net = (+r.netSales) || ((+r.corrispettivo||0)/1.22);
+    bucket(r.dateISO).net += net;
+  }
+  // 3b) NET dallo storico (historicalByKey).
+  //     Chiave in historicalByKey: "brand|location|date" già normalizzata
+  //     (lowercased + spazi compattati). Per filtrare devo risalire alla
+  //     definizione originale di brand/location da ALL_STORES.
+  for(const k in historicalByKey){
+    const lastSep = k.lastIndexOf('|');
+    if(lastSep < 0) continue;
+    const sk = k.slice(0, lastSep);   // "brand|location"
+    const dateISO = k.slice(lastSep + 1);
+    const def = ALL_STORES.find(s => storeKey(s.brand, s.location) === sk);
+    if(!def) continue;
+    if(!matches(def.brand, def.location)) continue;
+    bucket(dateISO).net += +historicalByKey[k] || 0;
+  }
+  // 3c) Target dai targets giornalieri (targetsByKey). Stessa convenzione di chiave.
+  for(const k in targetsByKey){
+    const lastSep = k.lastIndexOf('|');
+    if(lastSep < 0) continue;
+    const sk = k.slice(0, lastSep);
+    const dateISO = k.slice(lastSep + 1);
+    const def = ALL_STORES.find(s => storeKey(s.brand, s.location) === sk);
+    if(!def) continue;
+    if(!matches(def.brand, def.location)) continue;
+    bucket(dateISO).tgt += +targetsByKey[k] || 0;
+  }
+
+  // 4) Empty state: nessun giorno con dati nei filtri scelti
+  const allDates = Object.keys(dailySums);
+  if(allDates.length === 0){
+    targetEl.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-text">Nessun dato per i filtri selezionati</div></div>`;
+    return;
+  }
+
+  // 5) Aggrega per anno → mese → giorno. Ogni livello tiene NET passato,
+  //    target passato, target totale (per mostrare "in corso / totale").
+  const years = {};
+  for(const dateISO of allDates.sort()){
+    const yr = dateISO.slice(0,4);
+    const mo = dateISO.slice(0,7);
+    if(!years[yr]) years[yr] = { yr, months:{}, netPast:0, tgtPast:0, tgtAll:0, daysPast:0, daysFuture:0 };
+    if(!years[yr].months[mo]) years[yr].months[mo] = { mo, days:[], netPast:0, tgtPast:0, tgtAll:0, daysPast:0, daysFuture:0 };
+    const d = dailySums[dateISO];
+    const isFuture = dateISO > todayISO;
+    const isToday  = dateISO === todayISO;
+    const dayObj = { dateISO, isFuture, isToday, net: d.net, tgt: d.tgt };
+    const m = years[yr].months[mo];
+    m.days.push(dayObj);
+    m.tgtAll += d.tgt;
+    years[yr].tgtAll += d.tgt;
+    if(!isFuture){
+      m.netPast += d.net;
+      m.tgtPast += d.tgt;
+      m.daysPast++;
+      years[yr].netPast += d.net;
+      years[yr].tgtPast += d.tgt;
+      years[yr].daysPast++;
+    } else {
+      m.daysFuture++;
+      years[yr].daysFuture++;
+    }
+  }
+
+  // 6) Helper di rendering
+  const fmtPctSign = (delta) => {
+    const sign = delta >= 0 ? '+' : '';
+    return sign + delta.toLocaleString('it-IT', {minimumFractionDigits: 1, maximumFractionDigits: 1}) + '%';
+  };
+  // Soglie: ≥ −5% verde, da −5 a −30 giallo, sotto −30 rosso.
+  const badgeCls = (delta) => delta >= -5 ? 'green' : (delta >= -30 ? 'yellow' : 'red');
+  // Stato del periodo: "past" (tutti i giorni passati), "future" (tutti
+  // futuri), "current" (mix → contiene oggi o spans il presente).
+  const periodStatus = (daysPast, daysFuture) => {
+    if(daysPast > 0 && daysFuture === 0) return 'past';
+    if(daysPast === 0 && daysFuture > 0) return 'future';
+    return 'current';
+  };
+  const DAYS_IT = ['Dom','Lun','Mar','Mer','Gio','Ven','Sab'];
+
+  // 7) Render
+  let html = '';
+  // Anni in ordine decrescente: anno corrente prima
+  const yrSorted = Object.keys(years).sort().reverse();
+  for(const yr of yrSorted){
+    const y = years[yr];
+    const yStatus = periodStatus(y.daysPast, y.daysFuture);
+    const yKey = 'y' + yr;
+    const yOpen = amExpanded.has(yKey);
+
+    // Cifra principale + badge per l'anno
+    let yMain = '', yBadge = '', ySub = '';
+    if(yStatus === 'past'){
+      yMain = `<div class="am-row-net">€ ${fmt(y.netPast)} NET</div>`;
+      if(compareTgt && y.tgtPast > 0){
+        const dlt = (y.netPast - y.tgtPast) / y.tgtPast * 100;
+        yBadge = `<span class="am-badge ${badgeCls(dlt)}">${fmtPctSign(dlt)} vs TGT</span>`;
+      }
+    } else if(yStatus === 'future'){
+      yMain = `<div class="am-row-net future">target € ${fmt(y.tgtAll)}</div>`;
+    } else {
+      yMain = `<div class="am-row-net partial">€ ${fmt(y.netPast)} / € ${fmt(y.tgtAll)} NET</div>`;
+      ySub = 'consuntivo + previsionale';
+      if(compareTgt && y.tgtPast > 0){
+        const dlt = (y.netPast - y.tgtPast) / y.tgtPast * 100;
+        yBadge = `<span class="am-badge ${badgeCls(dlt)}">${fmtPctSign(dlt)} vs TGT (parziale)</span>`;
+      }
+    }
+    const yMarker = yStatus === 'current' ? ' <span class="am-today-marker">in corso</span>' : '';
+    html += `<div class="am-card">
+      <div class="am-card-row" onclick="toggleAmRow('${yKey}')">
+        <span class="am-chev ${yOpen ? 'open' : ''}">▶</span>
+        <div>
+          <div class="am-row-title">${yr}${yMarker}</div>
+          ${ySub ? `<div class="am-row-sub">${ySub}</div>` : ''}
+        </div>
+        <div class="am-row-right">${yMain}${yBadge}</div>
+      </div>
+      <div class="am-children ${yOpen ? 'open' : ''}">`;
+
+    // Mesi in ordine crescente: gennaio → dicembre
+    const moSorted = Object.keys(y.months).sort();
+    for(const mk of moSorted){
+      const m = y.months[mk];
+      const mStatus = periodStatus(m.daysPast, m.daysFuture);
+      const mKey = 'm' + mk;
+      const mOpen = amExpanded.has(mKey);
+      const monthName = MESI[parseInt(mk.slice(5,7), 10) - 1];
+
+      let mMain = '', mBadge = '', mSub = `${m.days.length} giorni`;
+      if(mStatus === 'past'){
+        mMain = `<div class="am-row-net">€ ${fmt(m.netPast)} NET</div>`;
+        if(compareTgt && m.tgtPast > 0){
+          const dlt = (m.netPast - m.tgtPast) / m.tgtPast * 100;
+          mBadge = `<span class="am-badge ${badgeCls(dlt)}">${fmtPctSign(dlt)} vs TGT</span>`;
+        }
+      } else if(mStatus === 'future'){
+        mMain = `<div class="am-row-net future">target € ${fmt(m.tgtAll)}</div>`;
+        mSub = `${m.days.length} giorni · solo previsionale`;
+      } else {
+        mMain = `<div class="am-row-net partial">€ ${fmt(m.netPast)} / € ${fmt(m.tgtAll)} NET</div>`;
+        mSub = `${m.days.length} giorni · ${m.daysPast} consuntivati · ${m.daysFuture} previsionali`;
+        if(compareTgt && m.tgtPast > 0){
+          const dlt = (m.netPast - m.tgtPast) / m.tgtPast * 100;
+          mBadge = `<span class="am-badge ${badgeCls(dlt)}">${fmtPctSign(dlt)} vs TGT (parziale)</span>`;
+        }
+      }
+      const mMarker = mStatus === 'current' ? ' <span class="am-today-marker">in corso</span>' : '';
+      html += `<div class="am-child-row ${mStatus === 'future' ? 'future' : ''}" onclick="toggleAmRow('${mKey}')">
+        <span class="am-chev ${mOpen ? 'open' : ''}">▶</span>
+        <div>
+          <div class="am-row-title">${monthName}${mMarker}</div>
+          <div class="am-row-sub">${mSub}</div>
+        </div>
+        <div class="am-row-right">${mMain}${mBadge}</div>
+      </div>`;
+
+      // Giorni del mese (foglie, non espandibili). Renderizzati solo se
+      // il mese è espanso, per non gonfiare il DOM con migliaia di nodi
+      // per anni interi non guardati.
+      if(mOpen){
+        html += `<div class="am-children open">`;
+        // Ordine cronologico crescente all'interno del mese
+        const days = m.days.slice().sort((a,b)=>a.dateISO.localeCompare(b.dateISO));
+        for(const d of days){
+          // Costruisco la Date senza incappare in problemi di timezone:
+          // 'YYYY-MM-DDT12:00:00' è interpretato come locale → giorno corretto.
+          const jsDate = new Date(d.dateISO + 'T12:00:00');
+          const dayLabel = `${DAYS_IT[jsDate.getDay()]} ${d.dateISO.slice(8,10)}/${d.dateISO.slice(5,7)}`;
+          let dMain = '', dBadge = '';
+          if(d.isFuture){
+            dMain = `<div class="am-row-net future-only">target € ${fmt(d.tgt)}</div>`;
+          } else if(d.isToday){
+            dMain = `<div class="am-row-net partial">€ ${fmt(d.net)} / € ${fmt(d.tgt)} NET</div>`;
+            dBadge = `<span class="am-badge muted">in corso</span>`;
+          } else {
+            dMain = `<div class="am-row-net">€ ${fmt(d.net)} NET</div>`;
+            if(compareTgt && d.tgt > 0){
+              const dlt = (d.net - d.tgt) / d.tgt * 100;
+              dBadge = `<span class="am-badge ${badgeCls(dlt)}">${fmtPctSign(dlt)} vs TGT</span>`;
+            }
+          }
+          const dMarker = d.isToday ? ' <span class="am-today-marker">oggi</span>' : '';
+          html += `<div class="am-day-row ${d.isFuture ? 'future' : ''}">
+            <span></span>
+            <div><div class="am-row-title">${dayLabel}${dMarker}</div></div>
+            <div class="am-row-right">${dMain}${dBadge}</div>
+          </div>`;
+        }
+        html += `</div>`;
+      }
+    }
+
+    html += `</div></div>`;
+  }
+  targetEl.innerHTML = html;
 }
 
 // ── TAB NEGOZI (saldi cumulati per i 30 punti vendita) ──
