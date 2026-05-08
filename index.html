@@ -739,11 +739,9 @@ let allData=[], filter='all', filterDate=null, syncTimer=null;
 //   - amExpanded   : Set di chiavi (es. "y2026", "m2026-05") attualmente
 //                    espanse nell'albero. Persiste tra render così l'utente
 //                    non perde lo stato quando cambia filtro.
-// Default: anno+mese correnti espansi, tutto il resto chiuso.
+// Default: tutto collassato. L'utente decide cosa aprire.
 let tempoBrands=[], tempoStores=[];
-const _todayY = new Date().getFullYear();
-const _todayM = String(new Date().getMonth()+1).padStart(2,'0');
-let amExpanded = new Set(['y'+_todayY, 'm'+_todayY+'-'+_todayM]);
+let amExpanded = new Set();
 // Toggle confronti nella tab Andamento. Default: target ON (preserva il
 // comportamento già esistente dopo l'introduzione del badge target),
 // anno-scorso OFF (l'utente lo attiva quando vuole vedere il delta YoY).
