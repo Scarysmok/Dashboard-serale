@@ -275,6 +275,11 @@ body{display:flex;flex-direction:column}
    Convenzione: prefisso .am- (Andamento) per evitare collisioni con altri
    stili della dashboard. */
 .tempo-wrap{padding:16px;display:flex;flex-direction:column;gap:12px;padding-bottom:32px}
+/* Su iPhone riduco anche il padding orizzontale del container Andamento
+   per dare ulteriore spazio alla card e ai numeri lunghi. */
+@media (max-width:480px){
+  .tempo-wrap{padding:12px 10px 32px}
+}
 
 /* — Filtri multi-select (chip dropdown con checkbox) — */
 .tempo-filters{display:flex;flex-wrap:wrap;gap:8px;flex-shrink:0;align-items:center;position:relative;z-index:5}
@@ -298,8 +303,10 @@ body{display:flex;flex-direction:column}
 .am-filter-action.primary{flex:1.5;background:var(--acc);color:#fff}
 .am-filter-action.primary:hover{background:#1d4ed8}
 
-/* — Toggle vs Target / vs Anno scorso (mantenuti dalla v1) — */
-.tempo-compare{display:flex;gap:8px;flex-shrink:0;margin-left:auto}
+/* — Toggle vs Target / vs Anno scorso (mantenuti dalla v1).
+   `flex-basis:100%` forza i due toggle su una riga propria sotto i filtri,
+   non più appiccicati a destra (su mobile altrimenti uscivano dal viewport). */
+.tempo-compare{display:flex;gap:8px;flex-shrink:0;flex-basis:100%}
 .tempo-toggle{padding:9px 12px;border:1px solid var(--bd2);border-radius:10px;background:var(--s2);color:var(--t2);font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer;-webkit-appearance:none;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:6px}
 .tempo-toggle:active{transform:scale(.97)}
 .tempo-toggle.on{background:#dbeafe;color:var(--acc);border-color:var(--acc)}
@@ -327,20 +334,30 @@ body{display:flex;flex-direction:column}
 .am-badge.yellow{background:#fef3c7;color:#92400e}
 .am-badge.red   {background:#fee2e2;color:#991b1b}
 .am-badge.muted {background:#f3f4f6;color:var(--t3);font-weight:600}
+/* Default: marker inline (per quando è dentro al day-row "Ven 08/05 OGGI"
+   dove sta bene di fianco al titolo, riga corta). Per anno e mese in corso
+   uso una variante .block per metterlo sotto al titolo (margin-left:0,
+   margin-top:4px) — più allineato visivamente con la cifra principale. */
 .am-today-marker{display:inline-flex;align-items:center;background:var(--acc);color:#fff;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;margin-left:8px;letter-spacing:.4px;text-transform:uppercase;vertical-align:middle;white-space:nowrap}
-/* — Mobile (≤480px) — su iPhone i numeri delle KPI Andamento sono lunghi
-   ("€ 20.064.018,68"). Riduco font, allow wrap, e impedisco al marker
-   "IN CORSO" di consumare due righe. */
+.am-today-marker.block{display:inline-flex;margin:4px 0 0;width:max-content}
+/* — Mobile (≤480px) — i numeri lunghi devono stare su una riga sola.
+   Strategia: stringo padding+gap per liberare spazio orizzontale, riduco
+   leggermente il font dei numeri, e forzo white-space:nowrap così
+   "€ X / € Y NET" non spezza mai. La colonna sinistra (titolo) si
+   restringe automaticamente grazie a min-width:0. */
 @media (max-width:480px){
+  .am-card-row{padding:12px 10px;gap:6px;grid-template-columns:20px 1fr auto}
+  .am-child-row{padding:10px 10px;gap:6px;grid-template-columns:20px 1fr auto}
+  .am-day-row{padding:8px 10px 8px 28px;gap:6px;grid-template-columns:30px 1fr auto}
+  .am-card-row > div, .am-child-row > div, .am-day-row > div{min-width:0}
   .am-row-title{font-size:15px}
-  .am-row-net{font-size:13px;line-height:1.3}
-  .am-child-row .am-row-net{font-size:12px}
-  .am-day-row .am-row-net{font-size:12px}
+  .am-row-net{font-size:12px;line-height:1.3;white-space:nowrap}
+  .am-child-row .am-row-net,
+  .am-day-row .am-row-net{font-size:11px}
+  .am-row-sub{font-size:11px}
   .am-today-marker{font-size:8px;padding:2px 5px;margin-left:6px;letter-spacing:.3px}
-  .am-card-row{padding:12px 14px;gap:10px}
-  .am-child-row{padding:10px 14px;gap:10px}
-  .am-day-row{padding:8px 14px 8px 30px;gap:10px}
-  /* Più stretto = badge prendono meno spazio */
+  .am-today-marker.block{margin:3px 0 0}
+  /* Badge piccoli per non rubare spazio ai numeri */
   .am-badge{font-size:10px;padding:1px 6px}
 }
 .am-children{display:none;border-top:1px solid var(--bd);background:#fafbfc}
@@ -379,10 +396,14 @@ body{display:flex;flex-direction:column}
 .account-badge.pending{background:#fef3c7;color:#a16207}
 .account-badge.active{background:#dcfce7;color:#166534}
 /* Bottoni azione (Promuovi a editor, Promuovi admin, Disabilita, Elimina).
-   `flex-wrap:wrap` per consentire ai bottoni di andare a capo su schermi
-   stretti invece di essere tagliati fuori dal viewport (problema iPhone). */
-.account-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
-.acct-btn{padding:6px 10px;border-radius:6px;border:1px solid var(--bd2);background:var(--s2);color:var(--t1);font-family:var(--font);font-size:11px;font-weight:500;cursor:pointer;transition:background .15s;flex-shrink:0}
+   Devono stare in una sola riga: nowrap + allineati a sinistra. Su mobile
+   le dimensioni sono ridotte (vedi @media sotto) per far entrare tutti e 4
+   senza tagliare l'ultimo. */
+.account-actions{display:flex;gap:5px;flex-wrap:nowrap;justify-content:flex-start;width:100%}
+.acct-btn{padding:6px 10px;border-radius:6px;border:1px solid var(--bd2);background:var(--s2);color:var(--t1);font-family:var(--font);font-size:11px;font-weight:500;cursor:pointer;transition:background .15s;white-space:nowrap;flex-shrink:1}
+@media (max-width:480px){
+  .acct-btn{padding:5px 8px;font-size:10px;letter-spacing:-0.01em}
+}
 .acct-btn:active{background:var(--s3)}
 .acct-btn.approve{background:#dcfce7;color:#166534;border-color:#86efac}
 .acct-btn.deny{background:#fef2f2;color:var(--red);border-color:#fecaca}
@@ -2827,7 +2848,7 @@ function renderTempo(){
     // Cifra principale + badge per l'anno
     let yMain = '', yBadge = '', ySub = '';
     if(yStatus === 'past'){
-      yMain = `<div class="am-row-net">${fmt(y.netPast)} NET</div>`;
+      yMain = `<div class="am-row-net">${fmt(y.netPast)}&nbsp;NET</div>`;
       if(compareTgt && y.tgtPast > 0){
         const dlt = (y.netPast - y.tgtPast) / y.tgtPast * 100;
         yBadge += `<span class="am-badge ${badgeCls(dlt)}">${fmtPctSign(dlt)} vs TGT</span>`;
@@ -2836,7 +2857,7 @@ function renderTempo(){
     } else if(yStatus === 'future'){
       yMain = `<div class="am-row-net future">target ${fmt(y.tgtAll)}</div>`;
     } else {
-      yMain = `<div class="am-row-net partial">${fmt(y.netPast)} / ${fmt(y.tgtAll)} NET</div>`;
+      yMain = `<div class="am-row-net partial">${fmt(y.netPast)} / ${fmt(y.tgtAll)}&nbsp;NET</div>`;
       ySub = 'consuntivo + previsionale';
       if(compareTgt && y.tgtPast > 0){
         const dlt = (y.netPast - y.tgtPast) / y.tgtPast * 100;
@@ -2863,12 +2884,16 @@ function renderTempo(){
         }
       }
     }
-    const yMarker = yStatus === 'current' ? ' <span class="am-today-marker">in corso</span>' : '';
+    // Marker "IN CORSO": fuori dal titolo, su riga propria allineato a sinistra
+    // sotto la cifra dell'anno. È più ordinato del marker inline (che andava
+    // a capo con margine sinistro fuori asse).
+    const yMarker = yStatus === 'current' ? '<div class="am-today-marker block">in corso</div>' : '';
     html += `<div class="am-card">
       <div class="am-card-row" onclick="toggleAmRow('${yKey}')">
         <span class="am-chev ${yOpen ? 'open' : ''}">▶</span>
         <div>
-          <div class="am-row-title">${yr}${yMarker}</div>
+          <div class="am-row-title">${yr}</div>
+          ${yMarker}
           ${ySub ? `<div class="am-row-sub">${ySub}</div>` : ''}
         </div>
         <div class="am-row-right">${yMain}${yBadge}</div>
@@ -2886,7 +2911,7 @@ function renderTempo(){
 
       let mMain = '', mBadge = '', mSub = `${m.days.length} giorni`;
       if(mStatus === 'past'){
-        mMain = `<div class="am-row-net">${fmt(m.netPast)} NET</div>`;
+        mMain = `<div class="am-row-net">${fmt(m.netPast)}&nbsp;NET</div>`;
         if(compareTgt && m.tgtPast > 0){
           const dlt = (m.netPast - m.tgtPast) / m.tgtPast * 100;
           mBadge += `<span class="am-badge ${badgeCls(dlt)}">${fmtPctSign(dlt)} vs TGT</span>`;
@@ -2896,7 +2921,7 @@ function renderTempo(){
         mMain = `<div class="am-row-net future">target ${fmt(m.tgtAll)}</div>`;
         mSub = `${m.days.length} giorni · solo previsionale`;
       } else {
-        mMain = `<div class="am-row-net partial">${fmt(m.netPast)} / ${fmt(m.tgtAll)} NET</div>`;
+        mMain = `<div class="am-row-net partial">${fmt(m.netPast)} / ${fmt(m.tgtAll)}&nbsp;NET</div>`;
         mSub = `${m.days.length} giorni · ${m.daysPast} consuntivati · ${m.daysFuture} previsionali`;
         if(compareTgt && m.tgtPast > 0){
           const dlt = (m.netPast - m.tgtPast) / m.tgtPast * 100;
@@ -2917,11 +2942,12 @@ function renderTempo(){
           }
         }
       }
-      const mMarker = mStatus === 'current' ? ' <span class="am-today-marker">in corso</span>' : '';
+      const mMarker = mStatus === 'current' ? '<div class="am-today-marker block">in corso</div>' : '';
       html += `<div class="am-child-row ${mStatus === 'future' ? 'future' : ''}" onclick="toggleAmRow('${mKey}')">
         <span class="am-chev ${mOpen ? 'open' : ''}">▶</span>
         <div>
-          <div class="am-row-title">${monthName}${mMarker}</div>
+          <div class="am-row-title">${monthName}</div>
+          ${mMarker}
           <div class="am-row-sub">${mSub}</div>
         </div>
         <div class="am-row-right">${mMain}${mBadge}</div>
@@ -2943,10 +2969,10 @@ function renderTempo(){
           if(d.isFuture){
             dMain = `<div class="am-row-net future-only">target ${fmt(d.tgt)}</div>`;
           } else if(d.isToday){
-            dMain = `<div class="am-row-net partial">${fmt(d.net)} / ${fmt(d.tgt)} NET</div>`;
+            dMain = `<div class="am-row-net partial">${fmt(d.net)} / ${fmt(d.tgt)}&nbsp;NET</div>`;
             dBadge = `<span class="am-badge muted">in corso</span>`;
           } else {
-            dMain = `<div class="am-row-net">${fmt(d.net)} NET</div>`;
+            dMain = `<div class="am-row-net">${fmt(d.net)}&nbsp;NET</div>`;
             if(compareTgt && d.tgt > 0){
               const dlt = (d.net - d.tgt) / d.tgt * 100;
               dBadge += `<span class="am-badge ${badgeCls(dlt)}">${fmtPctSign(dlt)} vs TGT</span>`;
