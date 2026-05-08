@@ -208,6 +208,10 @@ body{display:flex;flex-direction:column}
 /* Toggle attivo/non-attivo nelle card della tab Negozi.
    Posizionato in alto a destra. Click → conferma → PATCH /stores/flags. */
 .store-card-head-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+/* Garantisce che la colonna sinistra (nome + data) possa restringersi se
+   il toggle a destra è grande, evitando overflow strani. */
+.store-card-head-row > div:first-child{min-width:0;flex:1}
+.store-card-head-row .card-date{text-align:left;white-space:normal;line-height:1.3}
 .store-toggle{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;
   padding:4px 10px;border-radius:999px;cursor:pointer;user-select:none;
   border:1px solid transparent;transition:all .12s ease;flex-shrink:0;white-space:nowrap}
@@ -219,6 +223,14 @@ body{display:flex;flex-direction:column}
 .store-toggle.readonly{cursor:default}
 .store-toggle.readonly:hover{filter:none}
 .store-toggle.readonly:active{transform:none}
+/* Mobile (≤480px): toggle + data del card più piccoli per non comprimere
+   il nome del negozio. La data ("aggiornato 07/05/2026 · 15 chiusure")
+   altrimenti va a capo su 2-3 righe. */
+@media (max-width:480px){
+  .store-toggle{font-size:10px;padding:3px 7px;letter-spacing:.3px}
+  .store-card-head-row .card-date{font-size:10px}
+  .card-name{font-size:14px}
+}
 
 /* ── SHEET STORICO SALDO (dettaglio negozio) ── */
 .saldo-summary{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--bd);border-bottom:1px solid var(--bd)}
@@ -302,9 +314,11 @@ body{display:flex;flex-direction:column}
 .am-chev{font-size:12px;color:var(--t3);transition:transform .2s;display:inline-block;width:24px;text-align:center;flex-shrink:0}
 .am-chev.open{transform:rotate(90deg)}
 .am-row-title{font-size:16px;font-weight:700;letter-spacing:-0.01em}
-.am-row-sub{font-size:12px;color:var(--t3);font-weight:500;margin-top:2px}
-.am-row-right{display:flex;flex-direction:column;align-items:flex-end;gap:4px}
-.am-row-net{font-size:15px;font-weight:600;color:var(--green);text-align:right;white-space:nowrap}
+.am-row-sub{font-size:12px;color:var(--t3);font-weight:500;margin-top:2px;line-height:1.3}
+.am-row-right{display:flex;flex-direction:column;align-items:flex-end;gap:4px;min-width:0;flex-shrink:0}
+/* I numeri sono potenzialmente lunghi (€ 20.064.018,68); su schermi stretti
+   non li forziamo nowrap — è meglio che vadano a capo che essere tagliati. */
+.am-row-net{font-size:15px;font-weight:600;color:var(--green);text-align:right;line-height:1.25}
 .am-row-net.future{color:var(--t2)}
 .am-row-net.partial{color:var(--blue)}
 .am-row-tgt{font-size:11px;color:var(--t3);text-align:right;font-weight:500}
@@ -313,7 +327,22 @@ body{display:flex;flex-direction:column}
 .am-badge.yellow{background:#fef3c7;color:#92400e}
 .am-badge.red   {background:#fee2e2;color:#991b1b}
 .am-badge.muted {background:#f3f4f6;color:var(--t3);font-weight:600}
-.am-today-marker{display:inline-flex;align-items:center;background:var(--acc);color:#fff;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;margin-left:8px;letter-spacing:.4px;text-transform:uppercase;vertical-align:middle}
+.am-today-marker{display:inline-flex;align-items:center;background:var(--acc);color:#fff;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;margin-left:8px;letter-spacing:.4px;text-transform:uppercase;vertical-align:middle;white-space:nowrap}
+/* — Mobile (≤480px) — su iPhone i numeri delle KPI Andamento sono lunghi
+   ("€ 20.064.018,68"). Riduco font, allow wrap, e impedisco al marker
+   "IN CORSO" di consumare due righe. */
+@media (max-width:480px){
+  .am-row-title{font-size:15px}
+  .am-row-net{font-size:13px;line-height:1.3}
+  .am-child-row .am-row-net{font-size:12px}
+  .am-day-row .am-row-net{font-size:12px}
+  .am-today-marker{font-size:8px;padding:2px 5px;margin-left:6px;letter-spacing:.3px}
+  .am-card-row{padding:12px 14px;gap:10px}
+  .am-child-row{padding:10px 14px;gap:10px}
+  .am-day-row{padding:8px 14px 8px 30px;gap:10px}
+  /* Più stretto = badge prendono meno spazio */
+  .am-badge{font-size:10px;padding:1px 6px}
+}
 .am-children{display:none;border-top:1px solid var(--bd);background:#fafbfc}
 .am-children.open{display:block}
 .am-child-row{display:grid;grid-template-columns:24px 1fr auto;gap:12px;padding:11px 16px;border-bottom:1px solid var(--bd);align-items:center;cursor:pointer;transition:background .1s}
@@ -349,8 +378,11 @@ body{display:flex;flex-direction:column}
 .account-badge.editor{background:#cffafe;color:#155e75}
 .account-badge.pending{background:#fef3c7;color:#a16207}
 .account-badge.active{background:#dcfce7;color:#166534}
-.account-actions{display:flex;gap:6px;flex-shrink:0}
-.acct-btn{padding:6px 10px;border-radius:6px;border:1px solid var(--bd2);background:var(--s2);color:var(--t1);font-family:var(--font);font-size:11px;font-weight:500;cursor:pointer;transition:background .15s}
+/* Bottoni azione (Promuovi a editor, Promuovi admin, Disabilita, Elimina).
+   `flex-wrap:wrap` per consentire ai bottoni di andare a capo su schermi
+   stretti invece di essere tagliati fuori dal viewport (problema iPhone). */
+.account-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.acct-btn{padding:6px 10px;border-radius:6px;border:1px solid var(--bd2);background:var(--s2);color:var(--t1);font-family:var(--font);font-size:11px;font-weight:500;cursor:pointer;transition:background .15s;flex-shrink:0}
 .acct-btn:active{background:var(--s3)}
 .acct-btn.approve{background:#dcfce7;color:#166534;border-color:#86efac}
 .acct-btn.deny{background:#fef2f2;color:var(--red);border-color:#fecaca}
