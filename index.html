@@ -2713,22 +2713,30 @@ function renderTempo(){
     if(!dailySums[d]) dailySums[d] = { net: 0, tgt: 0 };
     return dailySums[d];
   };
-  // 3a) NET dalle chiusure GoAudits (allData)
+  // 3a) NET dalle chiusure GoAudits (allData). Memorizzo anche quale (store,
+  //     giorno) è coperto da GoAudits, così a step 3b posso skippare la riga
+  //     corrispondente dello storico Excel e NON contarla due volte.
+  //     Senza questo dedup, nei giorni 22-28/04/2026 (overlap: GoAudits
+  //     ha già iniziato + storico ancora caricato) il totale risultava 2×.
+  const goAuditsKeys = new Set();
   for(const r of allData){
     if(!r || !r.dateISO) continue;
     if(!matches(r.brand, r.location)) continue;
     const net = (+r.netSales) || ((+r.corrispettivo||0)/1.22);
     bucket(r.dateISO).net += net;
+    goAuditsKeys.add(storeKey(r.brand, r.location) + '|' + r.dateISO);
   }
   // 3b) NET dallo storico (historicalByKey).
   //     Chiave in historicalByKey: "brand|location|date" già normalizzata
   //     (lowercased + spazi compattati). Per filtrare devo risalire alla
   //     definizione originale di brand/location da ALL_STORES.
+  //     Skip se la stessa (store, data) è già stata contata da GoAudits.
   for(const k in historicalByKey){
     const lastSep = k.lastIndexOf('|');
     if(lastSep < 0) continue;
     const sk = k.slice(0, lastSep);   // "brand|location"
     const dateISO = k.slice(lastSep + 1);
+    if(goAuditsKeys.has(sk + '|' + dateISO)) continue;
     const def = ALL_STORES.find(s => storeKey(s.brand, s.location) === sk);
     if(!def) continue;
     if(!matches(def.brand, def.location)) continue;
