@@ -2708,39 +2708,43 @@ function renderTempo(){
   const todayISO = `${_t.getFullYear()}-${String(_t.getMonth()+1).padStart(2,'0')}-${String(_t.getDate()).padStart(2,'0')}`;
 
   // 3) Costruisci dailySums = { dateISO: { net, tgt } }
+  // GERARCHIA DI PRIORITÀ in Andamento (decisa dall'utente):
+  //   1. Storico Excel (`Incassato YYYY.xlsx`) — è "la bibbia"
+  //   2. PDF GoAudits con override applicati (`allData`) — fallback
+  // Implementazione: itero prima lo storico, memorizzo le chiavi (store, data)
+  // coperte; poi itero allData skippando le chiavi già viste.
+  // NOTA: la sezione Chiusure conserva la sua logica (override > PDF, mai
+  // storico) perché lì lavoriamo su singole chiusure GoAudits, non aggregati.
   const dailySums = {};
   const bucket = (d) => {
     if(!dailySums[d]) dailySums[d] = { net: 0, tgt: 0 };
     return dailySums[d];
   };
-  // 3a) NET dalle chiusure GoAudits (allData). Memorizzo anche quale (store,
-  //     giorno) è coperto da GoAudits, così a step 3b posso skippare la riga
-  //     corrispondente dello storico Excel e NON contarla due volte.
-  //     Senza questo dedup, nei giorni 22-28/04/2026 (overlap: GoAudits
-  //     ha già iniziato + storico ancora caricato) il totale risultava 2×.
-  const goAuditsKeys = new Set();
-  for(const r of allData){
-    if(!r || !r.dateISO) continue;
-    if(!matches(r.brand, r.location)) continue;
-    const net = (+r.netSales) || ((+r.corrispettivo||0)/1.22);
-    bucket(r.dateISO).net += net;
-    goAuditsKeys.add(storeKey(r.brand, r.location) + '|' + r.dateISO);
-  }
-  // 3b) NET dallo storico (historicalByKey).
-  //     Chiave in historicalByKey: "brand|location|date" già normalizzata
-  //     (lowercased + spazi compattati). Per filtrare devo risalire alla
-  //     definizione originale di brand/location da ALL_STORES.
-  //     Skip se la stessa (store, data) è già stata contata da GoAudits.
+  // 3a) NET dallo storico Excel — priorità massima.
+  //     Chiave in historicalByKey: "brand|location|date" già normalizzata.
+  const historicalKeys = new Set();
   for(const k in historicalByKey){
     const lastSep = k.lastIndexOf('|');
     if(lastSep < 0) continue;
-    const sk = k.slice(0, lastSep);   // "brand|location"
+    const sk = k.slice(0, lastSep);
     const dateISO = k.slice(lastSep + 1);
-    if(goAuditsKeys.has(sk + '|' + dateISO)) continue;
     const def = ALL_STORES.find(s => storeKey(s.brand, s.location) === sk);
     if(!def) continue;
     if(!matches(def.brand, def.location)) continue;
     bucket(dateISO).net += +historicalByKey[k] || 0;
+    historicalKeys.add(sk + '|' + dateISO);
+  }
+  // 3b) NET dai PDF GoAudits (con override già applicati lato allData).
+  //     Skip se lo storico ha già coperto la stessa (store, data) → evita
+  //     il doppio conteggio nei giorni di overlap. Per i negozi non
+  //     monitorati o per giorni non presenti nell'Excel, restano solo i PDF.
+  for(const r of allData){
+    if(!r || !r.dateISO) continue;
+    if(!matches(r.brand, r.location)) continue;
+    const sk = storeKey(r.brand, r.location);
+    if(historicalKeys.has(sk + '|' + r.dateISO)) continue;
+    const net = (+r.netSales) || ((+r.corrispettivo||0)/1.22);
+    bucket(r.dateISO).net += net;
   }
   // 3c) Target dai targets giornalieri (targetsByKey). Stessa convenzione di chiave.
   for(const k in targetsByKey){
