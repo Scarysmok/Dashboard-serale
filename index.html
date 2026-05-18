@@ -681,9 +681,18 @@ body{display:flex;flex-direction:column}
       <!-- Upload Excel target: visibile solo agli admin via applyRoleVisibility() -->
       <input type="file" id="targets-upload-input" accept=".xlsx,.xls" style="display:none" onchange="uploadTargetsExcel(event)"/>
       <button class="settings-btn" id="btn-targets-upload" style="display:none" onclick="document.getElementById('targets-upload-input').click()">📊 Carica Excel target</button>
-      <!-- Upload Excel storico (incassi 2025 + Jan-Apr 2026): admin only -->
-      <input type="file" id="historical-upload-input" accept=".xlsx,.xls" style="display:none" onchange="uploadHistoricalExcel(event)"/>
-      <button class="settings-btn" id="btn-historical-upload" style="display:none" onclick="document.getElementById('historical-upload-input').click()">📈 Carica Excel storico</button>
+      <!-- Upload Excel "Storico anno precedente" (file di riferimento per confronto vs PY): admin only.
+           Tipicamente caricato una sola volta all'anno (es. tutto il 2025 a inizio 2026). Cancella e
+           ricarica l'intero anno target (currentYear-1) lasciando intatti gli altri anni. -->
+      <input type="file" id="historical-py-upload-input" accept=".xlsx,.xls" style="display:none" onchange="uploadHistoricalExcel(event, 'py')"/>
+      <button class="settings-btn" id="btn-historical-py-upload" style="display:none" onclick="document.getElementById('historical-py-upload-input').click()">📅 Storico anno scorso</button>
+      <!-- Upload Excel "Consuntivi nuovi" (incassi dell'anno corrente): admin only.
+           Caricato periodicamente con i dati aggiornati. Cancella e ricarica l'intero anno corrente:
+           il nuovo file diventa l'unica fonte di verità per l'anno in corso (sostituisce eventuali
+           dati Excel precedenti, ma non tocca i PDF GoAudits che restano fallback per i giorni
+           non coperti dall'Excel). -->
+      <input type="file" id="historical-cur-upload-input" accept=".xlsx,.xls" style="display:none" onchange="uploadHistoricalExcel(event, 'consuntivi')"/>
+      <button class="settings-btn" id="btn-historical-cur-upload" style="display:none" onclick="document.getElementById('historical-cur-upload-input').click()">💰 Consuntivi nuovi</button>
       <button class="settings-btn danger" onclick="doLogout()">⎋ Disconnetti</button>
     </div>
   </div>
@@ -923,8 +932,10 @@ function applyRoleVisibility(){
   if(navAccount) navAccount.style.display = isAdmin ? '' : 'none';
   const btnTargets=document.getElementById('btn-targets-upload');
   if(btnTargets) btnTargets.style.display = isAdmin ? '' : 'none';
-  const btnHistorical=document.getElementById('btn-historical-upload');
-  if(btnHistorical) btnHistorical.style.display = isAdmin ? '' : 'none';
+  const btnHistoricalPY=document.getElementById('btn-historical-py-upload');
+  if(btnHistoricalPY) btnHistoricalPY.style.display = isAdmin ? '' : 'none';
+  const btnHistoricalCur=document.getElementById('btn-historical-cur-upload');
+  if(btnHistoricalCur) btnHistoricalCur.style.display = isAdmin ? '' : 'none';
 }
 
 // ── LOGIN / REGISTER / LOGOUT ──
@@ -1696,10 +1707,25 @@ const HISTORICAL_NAME_MAP = {
   'yamamay s. caterina':             ['Yamamay', 'S. Caterina'],
   'yamamay sparano':                 ['Yamamay', 'Sparano'],
 };
-async function uploadHistoricalExcel(event){
+// mode: 'py'         → "Storico anno scorso" (file di riferimento, caricato una volta l'anno).
+//                       Cancella e ricarica TUTTO l'anno currentYear-1 dal file.
+// mode: 'consuntivi'  → "Consuntivi nuovi" (incassi anno corrente, aggiornati periodicamente).
+//                       Cancella e ricarica TUTTO l'anno currentYear dal file.
+// In entrambi i casi il file caricato è LA fonte di verità per il suo anno target: prima di
+// inserire, il backend cancella tutti i record con date in quell'anno. Così se sbagli a inserire
+// un negozio in un mese precedente, ti basta correggerlo nel file e ricaricare — i vecchi valori
+// spariscono. Gli anni non toccati restano intatti, e i PDF GoAudits restano fallback per i
+// giorni non coperti dall'Excel (regola "Excel è la bibbia, PDF è il fallback" in renderTempo).
+async function uploadHistoricalExcel(event, mode){
   const file = event.target.files && event.target.files[0];
   if(!file) return;
-  const btn = document.getElementById('btn-historical-upload');
+  // L'anno target dipende dal pulsante usato: PY = anno scorso, Consuntivi = anno corrente.
+  // Calcolato sul client per evitare drift se il backend è in un altro fuso orario.
+  const currentYear = new Date().getFullYear();
+  const targetYear = mode === 'py' ? currentYear - 1 : currentYear;
+  const btnId = mode === 'py' ? 'btn-historical-py-upload' : 'btn-historical-cur-upload';
+  const labelHuman = mode === 'py' ? `Storico ${targetYear}` : `Consuntivi ${targetYear}`;
+  const btn = document.getElementById(btnId);
   const orig = btn.textContent;
   btn.disabled = true;
   btn.textContent = '⏳ Leggo Excel…';
@@ -1727,11 +1753,14 @@ async function uploadHistoricalExcel(event){
     if(nameCol<0) throw new Error('Colonna "Nome store in Dashboard" non trovata nella riga 1.');
     if(dateCol<0) throw new Error('Colonna "Data" non trovata nella riga 1.');
     if(valueCol<0) throw new Error('Colonna "Net Sales" non trovata nella riga 1.');
-    // 2) Itera sulle righe dati. Conta riconosciuti vs non riconosciuti per
-    // dare feedback chiaro all'utente nell'alert finale.
+    // 2) Itera sulle righe dati. Conta riconosciuti vs non riconosciuti, date
+    // non valide (testo invece di Date Excel!) e righe dell'anno sbagliato.
+    // I conteggi vanno nell'alert finale per dare feedback chiaro all'utente.
     const entries = [];
     const unrecognized = new Set();
+    const wrongYearCounts = {}; // {YYYY: count} → diagnostica se ho sbagliato pulsante
     let nullSkipped = 0;
+    let invalidDateSkipped = 0;
     for(let r=1; r<=range.e.r; r++){
       const nameV = ws[XLSX.utils.encode_cell({r,c:nameCol})]?.v;
       if(nameV==null) continue;
@@ -1742,8 +1771,18 @@ async function uploadHistoricalExcel(event){
         continue;
       }
       const dateV = ws[XLSX.utils.encode_cell({r,c:dateCol})]?.v;
-      if(!(dateV instanceof Date)) continue;
+      // Date non valide: la cella deve essere una data Excel vera, non testo.
+      // Conto esplicitamente per avvisare nell'alert (problema frequente con
+      // export da altri sistemi che mettono le date come stringhe).
+      if(!(dateV instanceof Date)){ invalidDateSkipped++; continue; }
       const dateStr = `${dateV.getFullYear()}-${String(dateV.getMonth()+1).padStart(2,'0')}-${String(dateV.getDate()).padStart(2,'0')}`;
+      // Validazione anno: se la riga è di un anno diverso da quello target del
+      // pulsante, NON la includo. Tengo conto per fail-safe (vedi sotto).
+      const rowYear = dateV.getFullYear();
+      if(rowYear !== targetYear){
+        wrongYearCounts[rowYear] = (wrongYearCounts[rowYear] || 0) + 1;
+        continue;
+      }
       const valueV = ws[XLSX.utils.encode_cell({r,c:valueCol})]?.v;
       // Salto le righe con valore null/vuoto: significa "nessun dato per
       // quel giorno-negozio", non vogliamo memorizzare 0 fittizi che
@@ -1758,15 +1797,28 @@ async function uploadHistoricalExcel(event){
         netSales: Math.round(n*100)/100,
       });
     }
-    if(!entries.length) throw new Error('Nessun dato valido estratto dal file.');
+    // 3) Validazione difensiva: se il file contiene SOLO righe di un anno
+    // diverso (es. ho cliccato "Consuntivi nuovi" ma ho caricato il file 2025),
+    // blocco PRIMA di cancellare l'anno target (che sarebbe vuoto → wipe!).
+    // L'utente conferma esplicitamente se è davvero ciò che vuole.
+    if(!entries.length){
+      const wrongYears = Object.keys(wrongYearCounts);
+      if(wrongYears.length){
+        const detail = wrongYears.map(y => `${y}: ${wrongYearCounts[y]} righe`).join(', ');
+        throw new Error(
+          `Hai cliccato "${labelHuman}" ma il file contiene solo dati di anni diversi (${detail}).\n\n`+
+          `Verifica di aver scelto il pulsante giusto, oppure controlla che le celle Data siano in formato Data (non testo).`
+        );
+      }
+      throw new Error('Nessun dato valido estratto dal file. Controlla che le celle Data siano formato data e Net Sales numeri.');
+    }
     btn.textContent = `📤 Carico ${entries.length} record…`;
-    // replace_all=false: i record vengono fatti upsert per (brand, location, date),
-    // così posso caricare 2025.xlsx e poi 2026.xlsx (o viceversa) senza che il
-    // secondo cancelli il primo. Stessa data → vince l'ultimo upload (corretto
-    // se l'utente sta correggendo un file, regression-safe se carica in ordine).
+    // replace_years=[targetYear]: il backend cancella TUTTI i record di
+    // quell'anno prima dell'upsert. Il nuovo file è la fonte unica di verità
+    // per il suo anno. Gli altri anni restano intatti.
     const r = await api('/historical/bulk', {
       method: 'POST',
-      body: JSON.stringify({entries, replace_all: false}),
+      body: JSON.stringify({entries, replace_all: false, replace_years: [targetYear]}),
     });
     if(!r.ok){
       let detail = 'Errore '+r.status;
@@ -1774,13 +1826,19 @@ async function uploadHistoricalExcel(event){
       throw new Error(detail);
     }
     const res = await r.json();
-    let msg = `✓ Storico incassi caricato.\n\n`;
-    msg += `Record inviati: ${entries.length}\n`;
+    let msg = `✓ ${labelHuman} caricati (anno ${targetYear} sostituito).\n\n`;
+    msg += `Record inseriti: ${entries.length}\n`;
     msg += `Nuovi: ${res.upserted} · Aggiornati: ${res.modified}`;
     if(nullSkipped) msg += `\nSaltati (valore vuoto): ${nullSkipped}`;
+    if(invalidDateSkipped) msg += `\n⚠️ Saltati (cella Data non valida): ${invalidDateSkipped}`;
+    const wrongYears = Object.keys(wrongYearCounts);
+    if(wrongYears.length){
+      const detail = wrongYears.map(y => `${y}: ${wrongYearCounts[y]}`).join(', ');
+      msg += `\n⚠️ Ignorate righe di altri anni (${detail}). Usa l'altro pulsante per caricarli.`;
+    }
     if(unrecognized.size){
       const list = [...unrecognized].slice(0,5).join(', ');
-      msg += `\n\nNegozi non monitorati ignorati (${unrecognized.size}): ${list}`;
+      msg += `\n\nNegozi non in mapping ignorati (${unrecognized.size}): ${list}`;
       if(unrecognized.size>5) msg += '…';
     }
     alert(msg);
@@ -1788,7 +1846,7 @@ async function uploadHistoricalExcel(event){
     renderAll();
   }catch(e){
     console.error('uploadHistoricalExcel', e);
-    alert('Errore upload Excel storico:\n'+(e.message||e));
+    alert(`Errore upload ${labelHuman}:\n`+(e.message||e));
   }finally{
     btn.disabled = false;
     btn.textContent = orig;
