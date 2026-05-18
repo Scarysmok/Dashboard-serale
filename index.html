@@ -1669,44 +1669,91 @@ async function uploadTargetsExcel(event){
 // nei file dell'utente includono anche punti vendita non monitorati (Putignano,
 // Casamassima, S. Caterina, ecc.): vengono ignorati silenziosamente.
 //
-// Le chiavi del HISTORICAL_NAME_MAP sono i nomi nel file Excel così come sono,
-// in lowercase + trim. Il valore è la coppia (brand, location) usata dalla
-// dashboard. Se un giorno cambia il formato del nome, basta aggiornare le
-// chiavi qui — tutto il resto della pipeline resta uguale.
-const HISTORICAL_NAME_MAP = {
-  // 20 negozi monitorati GoAudits
-  'adidas bariblu':                  ['Adidas',  'Bariblu'],
-  'adidas brindisi city (umberto)':  ['Adidas',  'Brindisi City'],
-  'adidas brindisi colonne':         ['Adidas',  'Brindisi Colonne'],
-  'adidas foggia':                   ['Adidas',  'Foggia'],
-  'adidas lecce city':               ['Adidas',  'Lecce City'],
-  'adidas rende':                    ['Adidas',  'Rende'],
-  'adidas taranto':                  ['Adidas',  'Taranto'],
-  'adidas teramo':                   ['Adidas',  'Teramo'],
-  'carpisa brindisi colonne':        ['Carpisa', 'Brindisi Colonne'],
-  'carpisa gallipoli':               ['Carpisa', 'Gallipoli'],
-  'carpisa lecce':                   ['Carpisa', 'Lecce'],
-  'carpisa ostuni':                  ['Carpisa', 'Ostuni'],
-  'carpisa surbo':                   ['Carpisa', 'Surbo'],
-  'mango bariblu':                   ['Mango',   'Bariblu'],
-  'mango foggia':                    ['Mango',   'Foggia'],
-  'mango molfetta':                  ['Mango',   'Molfetta'],
-  'mango taranto':                   ['Mango',   'Taranto'],
-  'mango teramo':                    ['Mango',   'Teramo'],
-  'yamamay lecce':                   ['Yamamay', 'Lecce'],
-  'yamamay polignano':               ['Yamamay', 'Polignano'],
-  // 10 negozi NON ancora su GoAudits (dati solo storici, visibili in Andamento)
-  'carpisa bariblu':                 ['Carpisa', 'Bariblu'],
-  'carpisa casamassima':             ['Carpisa', 'Casamassima'],
-  'carpisa s. caterina':             ['Carpisa', 'S. Caterina'],
-  'carpisa sparano':                 ['Carpisa', 'Sparano'],
-  'yamamay aeroporto':               ['Yamamay', 'Aeroporto'],
-  'yamamay casamassima':             ['Yamamay', 'Casamassima'],
-  'yamamay molfetta':                ['Yamamay', 'Molfetta'],
-  'yamamay putignano':               ['Yamamay', 'Putignano'],
-  'yamamay s. caterina':             ['Yamamay', 'S. Caterina'],
-  'yamamay sparano':                 ['Yamamay', 'Sparano'],
+// MATCHER FUZZY DEL NOME NEGOZIO (Excel storico/consuntivi).
+// I file Excel reali hanno nomi più estesi e variabili rispetto ai nomi
+// canonici della dashboard (ALL_STORES). Esempi visti in produzione:
+//   "adidas Rende Metropolis"                  → Adidas / Rende
+//   "carpisa Bari Santa Caterina Mongolfiera"  → Carpisa / S. Caterina
+//   "yamamay Lecce City (Sauro)"               → Yamamay / Lecce
+//   "carpisa Bari City (Sparano)"              → Carpisa / Sparano
+// Strategia: invece di una mappa hardcoded fragile (basta un trattino o uno
+// spazio in più per saltare un negozio intero, come successo per Adidas Rende),
+// uso un match per token. Estraggo le parole significative del nome nel file
+// e cerco lo store ALL_STORES che ha più token in comune (brand obbligatorio,
+// almeno un token location). Funziona anche con nomi futuri non previsti, finché
+// il brand e la "parola identificante" della location sono presenti.
+//
+// Caso "due punti vendita stessa città stesso brand": oggi NON c'è (Brindisi
+// ha 2 Adidas ma con location distinte "City" e "Colonne", ed entrambi i nomi
+// nel file hanno il discriminatore). Quando in futuro succederà — l'utente
+// l'ha già anticipato come scenario — basterà aggiungere un override esplicito
+// in STORE_TOKEN_OVERRIDES sotto, per forzare token aggiuntivi obbligatori
+// (es. 'adidas|taranto centro' richiede la presenza della parola "centro"
+// nel nome del file, distinguendolo da "adidas Taranto Mongolfiera").
+const STORE_TOKEN_OVERRIDES = {
+  // Chiave: 'brand|location' lowercase. Valore: array di token aggiuntivi
+  // (oltre a quelli derivati automaticamente dalla location).
+  // Esempi (non attivi, ipotetici futuri):
+  // 'adidas|taranto':        ['mongolfiera'],
+  // 'adidas|taranto centro': ['centro'],
 };
+
+// Tokenizza una stringa estraendone le "parole significative" per il match:
+// lowercase, punteggiatura → spazi, spazi compressi, scartati token ≤ 1
+// carattere (così "S. Caterina" → ['caterina'] e non ['s', 'caterina'] che
+// matcherebbe qualsiasi cosa contenga 's' o 'caterina').
+function _tokenizeStoreName(str){
+  return String(str||'')
+    .toLowerCase()
+    .replace(/[.,()\-\/]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(' ')
+    .filter(t => t.length >= 2);
+}
+
+// Costruisce per ogni store di ALL_STORES la sua firma di token (brand + loc + override).
+// Chiamata una volta all'inizio di ogni upload (ALL_STORES ha 30 entries, costo trascurabile).
+function buildStoreTokens(){
+  return ALL_STORES.map(s => {
+    const overrideKey = `${s.brand.toLowerCase()}|${s.location.toLowerCase()}`;
+    const extra = (STORE_TOKEN_OVERRIDES[overrideKey] || []).map(t => t.toLowerCase());
+    return {
+      brand: s.brand,
+      location: s.location,
+      brandToken: s.brand.toLowerCase(),
+      locTokens: _tokenizeStoreName(s.location).concat(extra),
+    };
+  });
+}
+
+// Dato un nome dal file Excel, trova lo store ALL_STORES più probabile.
+// Ritorna [brand, location] oppure null. Casi null:
+//   - brand non presente nel nome
+//   - nessun token location combacia
+//   - più store hanno lo stesso score (tie ambiguo → meglio segnalare che indovinare)
+function matchStoreFromName(rawName, storeTokens){
+  const toks = new Set(_tokenizeStoreName(rawName));
+  if(!toks.size) return null;
+  let best = null, bestScore = 0, tied = false;
+  for(const s of storeTokens){
+    if(!toks.has(s.brandToken)) continue;
+    let score = 0;
+    for(const lt of s.locTokens){
+      if(toks.has(lt)) score++;
+    }
+    if(score === 0) continue;
+    if(score > bestScore){
+      bestScore = score;
+      best = s;
+      tied = false;
+    } else if(score === bestScore && best && (s.brand !== best.brand || s.location !== best.location)){
+      tied = true;
+    }
+  }
+  if(tied) return null;
+  return best ? [best.brand, best.location] : null;
+}
 // mode: 'py'         → "Storico anno scorso" (file di riferimento, caricato una volta l'anno).
 //                       Cancella e ricarica TUTTO l'anno currentYear-1 dal file.
 // mode: 'consuntivi'  → "Consuntivi nuovi" (incassi anno corrente, aggiornati periodicamente).
@@ -1756,6 +1803,10 @@ async function uploadHistoricalExcel(event, mode){
     // 2) Itera sulle righe dati. Conta riconosciuti vs non riconosciuti, date
     // non valide (testo invece di Date Excel!) e righe dell'anno sbagliato.
     // I conteggi vanno nell'alert finale per dare feedback chiaro all'utente.
+    // Il matcher fuzzy (matchStoreFromName) sostituisce il vecchio mapping
+    // hardcoded: tollera varianti come "adidas Rende Metropolis" o
+    // "carpisa Bari Santa Caterina Mongolfiera".
+    const storeTokens = buildStoreTokens();
     const entries = [];
     const unrecognized = new Set();
     const wrongYearCounts = {}; // {YYYY: count} → diagnostica se ho sbagliato pulsante
@@ -1764,8 +1815,7 @@ async function uploadHistoricalExcel(event, mode){
     for(let r=1; r<=range.e.r; r++){
       const nameV = ws[XLSX.utils.encode_cell({r,c:nameCol})]?.v;
       if(nameV==null) continue;
-      const nameKey = norm(nameV);
-      const mapped = HISTORICAL_NAME_MAP[nameKey];
+      const mapped = matchStoreFromName(nameV, storeTokens);
       if(!mapped){
         unrecognized.add(String(nameV));
         continue;
