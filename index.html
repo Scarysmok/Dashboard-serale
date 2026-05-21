@@ -502,6 +502,111 @@ body{display:flex;flex-direction:column}
 .row-cash-result.ok{color:var(--green)}
 .row-cash-result.ko{color:var(--red)}
 .row-cash-result .delta{font-family:var(--mono);font-size:14px}
+
+/* ════════════════════════════════════════════════════════════════════
+   TAB KPI (Ingressi/CR/UPT) — Q25/26/27 della checklist GoAudits
+   Layout focus singolo KPI + heatmap interna + drill-down per negozio
+   ════════════════════════════════════════════════════════════════════ */
+.kpi-wrap{padding:0 0 24px;display:flex;flex-direction:column}
+
+/* Selettore KPI (3 card cliccabili in alto) */
+.kpi-tabs{display:flex;gap:6px;padding:14px 16px 8px}
+.kpi-tab{flex:1;padding:10px 8px;border:1px solid var(--bd2);background:var(--s1);border-radius:12px;font-family:var(--font);font-size:12px;font-weight:600;color:var(--t2);cursor:pointer;-webkit-appearance:none;display:flex;flex-direction:column;align-items:center;gap:3px;transition:all .15s;min-width:0}
+.kpi-tab .kt-l{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+.kpi-tab .kt-v{font-family:var(--mono);font-size:18px;font-weight:700;color:var(--t1);overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.kpi-tab .kt-d{font-size:10px;font-weight:600}
+.kpi-tab .kt-d.up{color:var(--green)}
+.kpi-tab .kt-d.dn{color:var(--red)}
+.kpi-tab .kt-d.flat{color:var(--t3)}
+.kpi-tab.on{border-color:var(--acc);background:#2563eb0c}
+.kpi-tab.on .kt-l{color:var(--acc)}
+.kpi-tab.on .kt-v{color:var(--acc)}
+
+/* Filtri Brand + Store (multi-select dropdown) */
+.kpi-filters{display:flex;flex-wrap:wrap;gap:6px;padding:6px 16px 4px;position:relative;z-index:10}
+.kfbtn{display:flex;align-items:center;gap:5px;padding:8px 11px;border-radius:10px;border:1px solid var(--bd2);background:var(--s2);font-family:var(--font);font-size:12px;font-weight:600;color:var(--t1);cursor:pointer;-webkit-appearance:none;position:relative;min-height:34px}
+.kfbtn.has-sel{background:#dbeafe;border-color:var(--acc);color:var(--acc)}
+.kfbtn .kfcnt{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--acc);color:#fff;font-size:10px;font-weight:700}
+.kfbtn .kfarrow{font-size:9px;color:var(--t3)}
+.kfpanel{position:absolute;top:42px;left:0;background:#fff;border:1px solid var(--bd);border-radius:12px;padding:6px;box-shadow:0 8px 24px rgba(0,0,0,.12);min-width:220px;max-height:300px;overflow-y:auto;display:none;z-index:50;font-family:var(--font)}
+.kfpanel.open{display:block}
+.kfrow{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;cursor:pointer;font-size:13px}
+.kfrow:hover{background:var(--s2)}
+.kfrow input{accent-color:var(--acc);width:16px;height:16px}
+.kfactions{display:flex;gap:4px;padding:6px 4px 2px;border-top:1px solid var(--bd);margin-top:4px}
+.kfactions button{flex:1;padding:7px 8px;border:1px solid var(--bd2);background:var(--s2);border-radius:8px;font-size:11px;font-weight:600;color:var(--t2);font-family:var(--font);cursor:pointer}
+.kfactions button.primary{background:var(--acc);color:#fff;border-color:var(--acc)}
+
+/* Pill rows (granularità + range temporale) */
+.kpi-pillrow{display:flex;gap:6px;padding:6px 16px 4px;align-items:center}
+.kpi-pill{flex:1;padding:8px 6px;border:1px solid var(--bd2);background:var(--s2);border-radius:10px;font-family:var(--font);font-size:12px;font-weight:600;color:var(--t2);cursor:pointer;-webkit-appearance:none;text-align:center}
+.kpi-pill.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+
+/* Toggle confronti (vs PY / vs Brand / vs Periodo prec.) */
+.kpi-cmprow{display:flex;gap:6px;padding:8px 16px 12px;flex-wrap:wrap}
+.kpi-cmp{padding:6px 10px;border:1px solid var(--bd2);background:var(--s2);border-radius:8px;font-family:var(--font);font-size:11px;font-weight:600;color:var(--t2);cursor:pointer;-webkit-appearance:none;display:flex;align-items:center;gap:6px}
+.kpi-cmp::before{content:'';width:10px;height:10px;border-radius:2px;background:transparent;border:1.5px solid currentColor}
+.kpi-cmp.on{background:#dbeafe;color:var(--acc);border-color:var(--acc)}
+.kpi-cmp.on::before{background:var(--acc);border-color:var(--acc);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath fill='%23fff' d='M4.5 8.7L2 6.2l1-1L4.5 6.7 9 2l1 1z'/%3E%3C/svg%3E");background-size:9px 9px;background-position:center;background-repeat:no-repeat}
+
+/* View tabs (Grafico / Heatmap) */
+.kpi-viewtabs{display:flex;gap:0;padding:0 16px;border-bottom:1px solid var(--bd)}
+.kpi-vtab{flex:1;padding:11px 8px;border:none;background:transparent;font-family:var(--font);font-size:13px;font-weight:600;color:var(--t3);cursor:pointer;border-bottom:2px solid transparent;-webkit-appearance:none}
+.kpi-vtab.on{color:var(--acc);border-bottom-color:var(--acc)}
+
+/* Chart principale */
+.kpi-chart-wrap{padding:14px 14px 8px;background:var(--s1);margin:12px 12px 0;border-radius:14px;border:1px solid var(--bd)}
+.kpi-chart-title{font-size:12px;font-weight:600;color:var(--t2);margin-bottom:6px;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.kpi-chart-title .kpi-chart-sum{font-family:var(--mono);font-size:11px;color:var(--t3);font-weight:500;text-align:right;white-space:nowrap}
+.kpi-chart-box{position:relative;height:240px}
+
+/* Heatmap (negozi × tempo) */
+.kpi-hm-wrap{padding:0 12px}
+.kpi-hm-card{background:var(--s1);border:1px solid var(--bd);border-radius:14px;padding:12px;margin-top:12px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.kpi-hm-table{border-collapse:separate;border-spacing:2px;font-size:10px;font-family:var(--mono)}
+.kpi-hm-table th{background:transparent;color:var(--t3);font-weight:600;text-align:center;padding:2px 4px;font-size:9px;text-transform:uppercase;letter-spacing:.5px;writing-mode:vertical-rl;transform:rotate(180deg);height:60px;vertical-align:bottom}
+.kpi-hm-table th.row-h{writing-mode:horizontal-tb;transform:none;text-align:left;padding:4px 8px 4px 4px;width:120px;max-width:120px;color:var(--t2);font-size:10px;font-weight:600;height:auto;text-transform:none;letter-spacing:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi-hm-table td{min-width:22px;height:22px;border-radius:3px;text-align:center;color:#fff;font-weight:700;font-size:9px;cursor:default;padding:0 2px}
+.kpi-hm-table td.na{background:var(--s3);color:var(--t3)}
+.kpi-hm-legend{display:flex;align-items:center;gap:6px;justify-content:flex-end;font-size:10px;color:var(--t3);padding:8px 4px 0}
+.kpi-hl-grad{flex:0 0 120px;height:8px;border-radius:4px;background:linear-gradient(to right,#fee2e2,#fef3c7,#dcfce7,#16a34a)}
+
+/* Ranking negozi */
+.kpi-rank-wrap{padding:0 12px}
+.kpi-rank-card{background:var(--s1);border:1px solid var(--bd);border-radius:14px;padding:6px 0;margin-top:12px}
+.kpi-rank-h{padding:10px 14px 8px;font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.6px;display:flex;justify-content:space-between;align-items:center}
+.kpi-rank-h .kpi-rank-sort{font-size:10px;color:var(--acc);font-weight:700;cursor:pointer;text-transform:none;letter-spacing:0}
+.kpi-rank-row{display:flex;align-items:center;gap:10px;padding:9px 14px;border-top:1px solid var(--bd);cursor:pointer}
+.kpi-rank-row:active{background:var(--s2)}
+.kpi-rank-row:first-of-type{border-top:none}
+.kpi-rank-pos{width:22px;font-family:var(--mono);font-size:11px;color:var(--t3);font-weight:700;text-align:center;flex-shrink:0}
+.kpi-rank-name{flex:1;min-width:0}
+.kpi-rank-brand{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.4px;font-weight:600}
+.kpi-rank-loc{font-size:12px;font-weight:600;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kpi-rank-spark{flex:0 0 56px;height:24px}
+.kpi-rank-val{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--t1);text-align:right;min-width:50px;flex-shrink:0}
+.kpi-rank-delta{font-family:var(--mono);font-size:10px;font-weight:600;min-width:42px;text-align:right;flex-shrink:0}
+.kpi-rank-delta.up{color:var(--green)}
+.kpi-rank-delta.dn{color:var(--red)}
+.kpi-rank-delta.flat{color:var(--t3)}
+.kpi-rank-empty{padding:30px 16px;text-align:center;color:var(--t3);font-size:13px}
+
+/* Drill-down modal (bottom-sheet stile iOS) */
+.kpi-drill-overlay{position:fixed;inset:0;background:rgba(15,17,21,.55);display:none;align-items:flex-end;justify-content:center;z-index:200}
+.kpi-drill-overlay.open{display:flex}
+.kpi-drill-sheet{width:100%;max-width:560px;max-height:92%;background:var(--s1);border-radius:20px 20px 0 0;padding:14px 16px 32px;overflow-y:auto;animation:kpiSlideUp .22s ease}
+@keyframes kpiSlideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.kpi-drill-grip{width:40px;height:4px;border-radius:2px;background:var(--bd2);margin:0 auto 12px}
+.kpi-drill-h{display:flex;flex-direction:column;margin-bottom:14px}
+.kpi-drill-name{font-size:16px;font-weight:700;color:var(--t1)}
+.kpi-drill-brand{font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
+.kpi-drill-mini{margin-bottom:12px;background:var(--s2);border-radius:12px;padding:10px 12px}
+.kpi-drill-mini-h{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;gap:8px}
+.kpi-drill-mini-l{font-size:11px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.5px}
+.kpi-drill-mini-v{font-family:var(--mono);font-size:18px;font-weight:700;color:var(--t1);white-space:nowrap}
+.kpi-drill-mini-v .dm-delta{font-size:11px;margin-left:6px;font-weight:600}
+.kpi-drill-mini-box{height:90px;position:relative}
+.kpi-drill-close{display:block;width:100%;margin-top:8px;padding:12px;background:var(--s2);border:1px solid var(--bd2);border-radius:12px;font-family:var(--font);font-size:13px;font-weight:600;color:var(--t2);cursor:pointer}
 </style>
 </head>
 <body>
@@ -664,6 +769,115 @@ body{display:flex;flex-direction:column}
     </div>
   </div>
 
+  <!-- TAB KPI (Q25 Ingressi · Q26 CR · Q27 UPT della checklist GoAudits)
+       Layout focus singolo KPI: pill in alto per scegliere quale KPI mostrare
+       nel grafico principale. Filtri Brand+Store coerenti con Andamento.
+       Vista alternativa Heatmap (negozi × tempo) e ranking negozi a sparkline.
+       Tap su una riga della classifica → bottom-sheet con i 3 mini-chart. -->
+  <div class="scroll-area" id="tab-kpi" style="display:none">
+    <div class="kpi-wrap">
+
+      <!-- Hero + selettore KPI -->
+      <div class="kpi-tabs" id="kpi-tabs">
+        <button class="kpi-tab on" data-kpi="ingressi">
+          <span class="kt-l">Ingressi</span>
+          <span class="kt-v" id="hero-v-ingressi">—</span>
+          <span class="kt-d" id="hero-d-ingressi">—</span>
+        </button>
+        <button class="kpi-tab" data-kpi="cr">
+          <span class="kt-l">CR</span>
+          <span class="kt-v" id="hero-v-cr">—</span>
+          <span class="kt-d" id="hero-d-cr">—</span>
+        </button>
+        <button class="kpi-tab" data-kpi="upt">
+          <span class="kt-l">UPT</span>
+          <span class="kt-v" id="hero-v-upt">—</span>
+          <span class="kt-d" id="hero-d-upt">—</span>
+        </button>
+      </div>
+
+      <!-- Filtri Brand + Store -->
+      <div class="kpi-filters">
+        <div style="position:relative">
+          <button class="kfbtn" id="kfb-brand" onclick="toggleKpiPanel('brand')">
+            <span>Brand</span><span class="kfcnt" id="kfcnt-brand">tutti</span><span class="kfarrow">▾</span>
+          </button>
+          <div class="kfpanel" id="kfp-brand"></div>
+        </div>
+        <div style="position:relative">
+          <button class="kfbtn" id="kfb-store" onclick="toggleKpiPanel('store')">
+            <span>Punto vendita</span><span class="kfcnt" id="kfcnt-store">tutti</span><span class="kfarrow">▾</span>
+          </button>
+          <div class="kfpanel" id="kfp-store" style="left:120px"></div>
+        </div>
+      </div>
+
+      <!-- Granularità + range -->
+      <div class="kpi-pillrow">
+        <button class="kpi-pill" data-gran="day">Giorno</button>
+        <button class="kpi-pill on" data-gran="month">Mese</button>
+        <button class="kpi-pill" data-gran="year">Anno</button>
+      </div>
+      <div class="kpi-pillrow">
+        <button class="kpi-pill" data-range="7">7gg</button>
+        <button class="kpi-pill on" data-range="30">30gg</button>
+        <button class="kpi-pill" data-range="90">90gg</button>
+        <button class="kpi-pill" data-range="ytd">YTD</button>
+      </div>
+
+      <!-- Confronti -->
+      <div class="kpi-cmprow">
+        <button class="kpi-cmp on" data-cmp="py">vs Anno scorso</button>
+        <button class="kpi-cmp" data-cmp="brand">vs Media brand</button>
+        <button class="kpi-cmp" data-cmp="prev">vs Periodo prec.</button>
+      </div>
+
+      <!-- View tabs (Grafico/Heatmap) -->
+      <div class="kpi-viewtabs">
+        <button class="kpi-vtab on" data-view="chart">📈 Grafico</button>
+        <button class="kpi-vtab" data-view="heatmap">🔥 Heatmap</button>
+      </div>
+
+      <!-- VIEW: chart -->
+      <div id="kpi-view-chart">
+        <div class="kpi-chart-wrap">
+          <div class="kpi-chart-title">
+            <span id="kpi-chart-title-l">Ingressi</span>
+            <span class="kpi-chart-sum" id="kpi-chart-title-sum">—</span>
+          </div>
+          <div class="kpi-chart-box"><canvas id="kpiMainChart"></canvas></div>
+        </div>
+        <div class="kpi-rank-wrap">
+          <div class="kpi-rank-card">
+            <div class="kpi-rank-h">
+              <span>Classifica punti vendita</span>
+              <span class="kpi-rank-sort" id="kpi-rank-sort">▾ Valore</span>
+            </div>
+            <div id="kpi-rank-list"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- VIEW: heatmap -->
+      <div id="kpi-view-heatmap" style="display:none">
+        <div class="kpi-hm-wrap">
+          <div class="kpi-hm-card">
+            <div id="kpi-hm-content"></div>
+            <div class="kpi-hm-legend">
+              <span>basso</span><span class="kpi-hl-grad"></span><span>alto</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Drill-down modal -->
+    <div class="kpi-drill-overlay" id="kpi-drill-overlay" onclick="if(event.target===this)closeKpiDrill()">
+      <div class="kpi-drill-sheet" id="kpi-drill-sheet"></div>
+    </div>
+  </div>
+
   <!-- TAB SETTINGS -->
   <div class="scroll-area" id="tab-settings" style="display:none">
     <div class="settings-inner">
@@ -709,6 +923,7 @@ body{display:flex;flex-direction:column}
     <div class="nav-item active" id="nav-negozi" onclick="switchTab('negozi')"><div class="nav-icon">📋</div><span>Chiusure</span></div>
     <div class="nav-item" id="nav-stores" onclick="switchTab('stores')"><div class="nav-icon">🏪</div><span>Negozi</span></div>
     <div class="nav-item" id="nav-tempo" onclick="switchTab('tempo')"><div class="nav-icon">📈</div><span>Andamento</span></div>
+    <div class="nav-item" id="nav-kpi" onclick="switchTab('kpi')"><div class="nav-icon">📊</div><span>KPI</span></div>
     <div class="nav-item" id="nav-account" onclick="switchTab('account')" style="display:none"><div class="nav-icon">👥</div><span>Account</span></div>
     <div class="nav-item" id="nav-settings" onclick="switchTab('settings')"><div class="nav-icon">⚙️</div><span>Config</span></div>
   </div>
@@ -717,6 +932,11 @@ body{display:flex;flex-direction:column}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <!-- SheetJS per parsing client-side dell'Excel target (admin only) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- Chart.js v4.4.0 per tab KPI — 3 CDN in cascata per resilienza. Caricamento
+     sincrono (document.write) così quando renderKpi() parte Chart è gia disponibile. -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+<script>if(typeof Chart==='undefined'){document.write('<scr'+'ipt src="https://unpkg.com/chart.js@4.4.0/dist/chart.umd.js"></scr'+'ipt>')}</script>
+<script>if(typeof Chart==='undefined'){document.write('<scr'+'ipt src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.js"></scr'+'ipt>')}</script>
 <script>
 pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
@@ -1999,19 +2219,20 @@ function setChip(el,f){
   el.classList.add('on');renderCards();
 }
 function switchTab(t){
-  ['negozi','stores','tempo','settings','account'].forEach(n=>{
+  ['negozi','stores','tempo','kpi','settings','account'].forEach(n=>{
     const el=document.getElementById('tab-'+n);
     if(el)el.style.display=n===t?'block':'none';
     const nav=document.getElementById('nav-'+n);
     if(nav)nav.classList.toggle('active',n===t);
   });
   // Titolo header dinamico in base alla tab
-  const titles={negozi:'Chiusure giornaliere',stores:'Negozi',tempo:'Andamento',settings:'Impostazioni',account:'Gestione utenti'};
+  const titles={negozi:'Chiusure giornaliere',stores:'Negozi',tempo:'Andamento',kpi:'KPI',settings:'Impostazioni',account:'Gestione utenti'};
   const titleEl=document.getElementById('app-title');
   if(titleEl)titleEl.textContent=titles[t]||'Chiusure';
   if(t==='tempo')renderTempo();
   if(t==='stores')renderStores();
   if(t==='account')renderAccount();
+  if(t==='kpi')renderKpiAll();
 }
 function closeSheet(e){
   if(!e||e.target===document.getElementById('sheet'))
@@ -2177,6 +2398,10 @@ function renderAll(){
   // con nuovo storico o nuove chiusure parsate)
   const tempoTab=document.getElementById('tab-tempo');
   if(tempoTab && tempoTab.style.display==='block') renderTempo();
+  // Se la tab "KPI" è attiva, ricarica anche quella (i nuovi PDF possono
+  // portare nuovi valori per Q25/26/27).
+  const kpiTab=document.getElementById('tab-kpi');
+  if(kpiTab && kpiTab.style.display==='block') renderKpiAll();
 }
 
 // Restituisce i record filtrati per la data selezionata (o tutti)
@@ -4153,6 +4378,751 @@ function zoomImage(dataUrl){
   overlay.appendChild(zoomBtn);
   document.body.appendChild(overlay);
 }
+
+// ════════════════════════════════════════════════════════════════════
+// ── TAB KPI ──
+// Visualizzazione interattiva dei KPI Q25 Ingressi · Q26 CR · Q27 UPT
+// estratti dai PDF GoAudits (campo r.qa). Layout focus singolo KPI,
+// filtri Brand/Store multi-select, granularità giorno/mese/anno,
+// confronti vs PY / Media brand / Periodo precedente, vista alternativa
+// heatmap, ranking con sparkline e drill-down per negozio.
+// ════════════════════════════════════════════════════════════════════
+const kpiState = {
+  kpi: 'ingressi',          // 'ingressi' | 'cr' | 'upt'
+  gran: 'month',            // 'day' | 'month' | 'year'
+  range: '30',              // '7' | '30' | '90' | 'ytd'
+  view: 'chart',            // 'chart' | 'heatmap'
+  brands: new Set(),        // empty = tutti
+  stores: new Set(),        // keys = `${brand}|${location}` ; empty = tutti
+  compare: new Set(['py']), // 'py' | 'brand' | 'prev'
+  sort: 'val'               // 'val' | 'name'
+};
+let kpiChart = null;
+let kpiDrillCharts = [];
+
+// Parser di una singola risposta Q25/26/27 → number | null.
+// Accetta numeri in formato italiano ("1.234,56", "10,55%"), inglese
+// ("1234.56"), con/senza simboli €/%. Se la risposta contiene testo
+// (es. "Shopper track non carica") restituisce null così non distorce
+// le medie/somme.
+function kpiParseValue(raw){
+  if(raw == null) return null;
+  let s = String(raw).trim();
+  if(!s) return null;
+  s = s.replace(/[€%]/g,'').trim();
+  if(!s) return null;
+  // Se contiene lettere è testo, non un numero → ignorato
+  if(/[a-zA-Z]/.test(s)) return null;
+  const hasDot = s.includes('.'), hasComma = s.includes(',');
+  let norm;
+  if(hasDot && hasComma) norm = s.replace(/\./g,'').replace(',','.');
+  else if(hasComma)      norm = s.replace(',','.');
+  else                   norm = s;
+  const n = parseFloat(norm);
+  return isFinite(n) ? n : null;
+}
+// Estrae il valore numerico del KPI richiesto da un record (uno dei 30 PDF)
+function kpiValFromRecord(r, kpi){
+  if(!r || !r.qa) return null;
+  const qNum = {ingressi:25, cr:26, upt:27}[kpi];
+  const item = r.qa.find(x => x.n === qNum);
+  if(!item) return null;
+  return kpiParseValue(item.a);
+}
+function kpiLabel(k){
+  return {ingressi:'Ingressi', cr:'CR (Conversion Rate)', upt:'UPT (Units/Trans)'}[k];
+}
+// Formattazione human-readable del valore (per badge, tooltip, ranking)
+function kpiFmt(v, kpi){
+  if(v == null || !isFinite(v)) return '—';
+  if(kpi === 'ingressi') return Math.round(v).toLocaleString('it-IT');
+  if(kpi === 'cr') return v.toFixed(2).replace('.',',') + '%';
+  return v.toFixed(2).replace('.',',');
+}
+// Delta percentuale tra due valori; restituisce {cls, text} per UI
+function kpiDelta(curr, base){
+  if(curr == null || base == null || !isFinite(base) || base === 0) return {cls:'flat', text:'—'};
+  const pct = (curr - base) / Math.abs(base) * 100;
+  const cls = Math.abs(pct) < 0.5 ? 'flat' : (pct > 0 ? 'up' : 'dn');
+  const arrow = cls === 'up' ? '▲' : (cls === 'dn' ? '▼' : '•');
+  return {cls, text: `${arrow} ${Math.abs(pct).toFixed(1)}%`};
+}
+
+// Date helpers - based on today (dynamic, NOT hardcoded)
+function kpiToday(){ return new Date(); }
+function kpiFmtDateISO(d){ return d.toISOString().slice(0,10); }
+function kpiShiftYear(d, n){ const x = new Date(d); x.setFullYear(x.getFullYear()+n); return x; }
+function kpiDateRange(rangeKey){
+  const end = kpiToday();
+  end.setHours(23,59,59,999);
+  if(rangeKey === 'ytd'){
+    const start = new Date(end.getFullYear(),0,1);
+    return [start, end];
+  }
+  const n = +rangeKey;
+  const start = new Date(end);
+  start.setDate(start.getDate() - n + 1);
+  start.setHours(0,0,0,0);
+  return [start, end];
+}
+function kpiBucketKey(dateISO, gran){
+  if(gran === 'day') return dateISO;
+  if(gran === 'month') return dateISO.slice(0,7);
+  return dateISO.slice(0,4);
+}
+function kpiBucketLabel(key, gran){
+  if(gran === 'day'){
+    const d = new Date(key + 'T00:00:00');
+    return d.toLocaleDateString('it-IT',{day:'2-digit',month:'short'});
+  }
+  if(gran === 'month'){
+    const [y,m] = key.split('-');
+    const names = ['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
+    return `${names[+m-1]} ${y.slice(2)}`;
+  }
+  return key;
+}
+
+// Restituisce i record di allData che (a) hanno una data nel range e
+// (b) rispettano i filtri brand/store. Non filtra ancora per KPI null:
+// quello lo gestisce l'aggregatore in modo che CR/UPT con ingressi=null
+// non vengano usati come peso.
+function kpiFiltered(){
+  const [s, e] = kpiDateRange(kpiState.range);
+  const sIso = kpiFmtDateISO(s), eIso = kpiFmtDateISO(e);
+  const brandF = kpiState.brands.size ? kpiState.brands : null;
+  const storeF = kpiState.stores.size ? kpiState.stores : null;
+  return allData.filter(r => {
+    if(!r.dateISO) return false;
+    if(r.dateISO < sIso || r.dateISO > eIso) return false;
+    if(brandF && !brandF.has(r.brand)) return false;
+    if(storeF && !storeF.has(`${r.brand}|${r.location}`)) return false;
+    return true;
+  });
+}
+// Aggregazione per bucket di tempo:
+//   ingressi → somma
+//   cr/upt   → media pesata per ingressi (se disponibili) o semplice
+function kpiAggregateByBucket(records, kpi, gran){
+  const map = new Map();
+  for(const r of records){
+    const v = kpiValFromRecord(r, kpi);
+    if(v == null) continue;
+    const k = kpiBucketKey(r.dateISO, gran);
+    let b = map.get(k);
+    if(!b){ b = {sum:0, weightSum:0, count:0}; map.set(k, b); }
+    if(kpi === 'ingressi'){ b.sum += v; b.count++; }
+    else {
+      const w = kpiValFromRecord(r, 'ingressi') || 1;
+      b.sum += v * w; b.weightSum += w; b.count++;
+    }
+  }
+  const out = [];
+  for(const [k,b] of map){
+    const value = kpi === 'ingressi' ? b.sum : (b.weightSum ? b.sum / b.weightSum : 0);
+    out.push({key:k, value});
+  }
+  out.sort((a,b) => a.key < b.key ? -1 : 1);
+  return out;
+}
+// Singolo numero totale del periodo (per le hero card)
+function kpiAggregateTotal(records, kpi){
+  let sum = 0, weightSum = 0, count = 0;
+  for(const r of records){
+    const v = kpiValFromRecord(r, kpi); if(v == null) continue;
+    if(kpi === 'ingressi'){ sum += v; count++; }
+    else {
+      const w = kpiValFromRecord(r, 'ingressi') || 1;
+      sum += v * w; weightSum += w; count++;
+    }
+  }
+  if(count === 0) return null;
+  return kpi === 'ingressi' ? sum : sum / (weightSum || 1);
+}
+// Aggregazione per negozio (per ranking + heatmap)
+function kpiAggregateByStore(records, kpi){
+  const map = new Map();
+  for(const r of records){
+    const v = kpiValFromRecord(r, kpi); if(v == null) continue;
+    const k = `${r.brand}|${r.location}`;
+    let b = map.get(k);
+    if(!b){ b = {brand:r.brand, location:r.location, sum:0, weightSum:0, count:0, daily:[]}; map.set(k, b); }
+    if(kpi === 'ingressi'){ b.sum += v; b.count++; }
+    else {
+      const w = kpiValFromRecord(r, 'ingressi') || 1;
+      b.sum += v*w; b.weightSum += w; b.count++;
+    }
+    b.daily.push({date:r.dateISO, v});
+  }
+  const out = [];
+  for(const [,b] of map){
+    const value = kpi === 'ingressi' ? b.sum : (b.weightSum ? b.sum / b.weightSum : 0);
+    b.daily.sort((a,b) => a.date < b.date ? -1 : 1);
+    out.push({...b, value});
+  }
+  return out;
+}
+
+// Render hero (3 card in alto) — valore + delta "prima metà vs seconda metà"
+function kpiRenderHero(){
+  const recs = kpiFiltered();
+  const [s,e] = kpiDateRange(kpiState.range);
+  const halfMs = (e - s) / 2;
+  const midIso = kpiFmtDateISO(new Date(s.getTime() + halfMs));
+  const firstHalf = recs.filter(r => r.dateISO < midIso);
+  const secondHalf = recs.filter(r => r.dateISO >= midIso);
+  ['ingressi','cr','upt'].forEach(kpi => {
+    const tot = kpiAggregateTotal(recs, kpi);
+    const t1 = kpiAggregateTotal(firstHalf, kpi);
+    const t2 = kpiAggregateTotal(secondHalf, kpi);
+    const d = kpiDelta(t2, t1);
+    const vEl = document.getElementById('hero-v-'+kpi);
+    const dEl = document.getElementById('hero-d-'+kpi);
+    if(vEl) vEl.textContent = kpiFmt(tot, kpi);
+    if(dEl){ dEl.textContent = d.text; dEl.className = 'kt-d ' + d.cls; }
+  });
+}
+
+// Costruisce i record PY (anno scorso) per il confronto, shiftando avanti
+// la data di 1 anno così bucketKey li mette negli stessi bucket del periodo
+// corrente.
+function kpiPyShiftedFiltered(){
+  const [s,e] = kpiDateRange(kpiState.range);
+  const sPy = kpiShiftYear(s,-1), ePy = kpiShiftYear(e,-1);
+  const sIso = kpiFmtDateISO(sPy), eIso = kpiFmtDateISO(ePy);
+  const brandF = kpiState.brands.size ? kpiState.brands : null;
+  const storeF = kpiState.stores.size ? kpiState.stores : null;
+  return allData.filter(r => {
+    if(!r.dateISO) return false;
+    if(r.dateISO < sIso || r.dateISO > eIso) return false;
+    if(brandF && !brandF.has(r.brand)) return false;
+    if(storeF && !storeF.has(`${r.brand}|${r.location}`)) return false;
+    return true;
+  }).map(r => ({
+    ...r,
+    // Sposta la data avanti di 1 anno per allineare i bucket
+    dateISO: kpiFmtDateISO(kpiShiftYear(new Date(r.dateISO + 'T00:00:00'), 1))
+  }));
+}
+
+function kpiRenderChart(){
+  const recs = kpiFiltered();
+  const kpi = kpiState.kpi;
+  const series = kpiAggregateByBucket(recs, kpi, kpiState.gran);
+  const labels = series.map(s => kpiBucketLabel(s.key, kpiState.gran));
+  const values = series.map(s => +s.value.toFixed(2));
+
+  const datasets = [{
+    label: kpiLabel(kpi),
+    data: values,
+    backgroundColor: '#2563eb',
+    borderColor: '#2563eb',
+    borderWidth: 2,
+    tension: 0.3,
+    fill: false,
+    type: kpiState.gran === 'day' ? 'line' : 'bar',
+    borderRadius: 4,
+    pointRadius: kpiState.gran === 'day' ? 2 : 0
+  }];
+
+  // vs Anno scorso
+  if(kpiState.compare.has('py')){
+    const pyRecs = kpiPyShiftedFiltered();
+    const pySeries = kpiAggregateByBucket(pyRecs, kpi, kpiState.gran);
+    const pyMap = new Map(pySeries.map(p => [p.key, p.value]));
+    const pyData = series.map(s => {
+      const v = pyMap.get(s.key);
+      return v == null ? null : +v.toFixed(2);
+    });
+    datasets.push({
+      label: 'Anno scorso',
+      data: pyData,
+      type: 'line',
+      borderColor: '#8c959f',
+      backgroundColor: '#8c959f',
+      borderDash: [4,4],
+      borderWidth: 2,
+      tension: 0.3,
+      fill: false,
+      pointRadius: 0
+    });
+  }
+
+  // vs Media brand: per ogni bucket, calcolo la media degli store dei brand
+  // di interesse (se filtro su store specifici, prendo i brand di quegli store;
+  // altrimenti i brand filtrati; altrimenti tutti i brand).
+  if(kpiState.compare.has('brand')){
+    const brandsToShow = new Set();
+    if(kpiState.stores.size){
+      for(const k of kpiState.stores) brandsToShow.add(k.split('|')[0]);
+    } else if(kpiState.brands.size){
+      kpiState.brands.forEach(b => brandsToShow.add(b));
+    } else {
+      [...new Set(ALL_STORES.map(s => s.brand))].forEach(b => brandsToShow.add(b));
+    }
+    const [s,e] = kpiDateRange(kpiState.range);
+    const sIso = kpiFmtDateISO(s), eIso = kpiFmtDateISO(e);
+    const brandRecs = allData.filter(r => r.dateISO && r.dateISO>=sIso && r.dateISO<=eIso && brandsToShow.has(r.brand));
+    const byBucket = new Map();
+    for(const r of brandRecs){
+      const v = kpiValFromRecord(r, kpi); if(v == null) continue;
+      const bk = kpiBucketKey(r.dateISO, kpiState.gran);
+      const sk = `${r.brand}|${r.location}`;
+      let m = byBucket.get(bk);
+      if(!m){ m = new Map(); byBucket.set(bk, m); }
+      let a = m.get(sk);
+      if(!a){ a = {sum:0, w:0, cnt:0}; m.set(sk, a); }
+      if(kpi === 'ingressi'){ a.sum += v; a.cnt++; }
+      else {
+        const w = kpiValFromRecord(r, 'ingressi') || 1;
+        a.sum += v*w; a.w += w; a.cnt++;
+      }
+    }
+    const brandData = series.map(s => {
+      const m = byBucket.get(s.key);
+      if(!m) return null;
+      const vals = [];
+      for(const [,a] of m){
+        const v = kpi === 'ingressi' ? a.sum : (a.w ? a.sum/a.w : 0);
+        vals.push(v);
+      }
+      if(!vals.length) return null;
+      const avg = vals.reduce((x,y)=>x+y,0)/vals.length;
+      return +avg.toFixed(2);
+    });
+    datasets.push({
+      label: 'Media brand',
+      data: brandData,
+      type: 'line',
+      borderColor: '#16a34a',
+      backgroundColor: '#16a34a',
+      borderDash: [2,3],
+      borderWidth: 2,
+      tension: 0.3,
+      fill: false,
+      pointRadius: 0
+    });
+  }
+
+  // vs Periodo precedente: stesso filtro brand/store ma range shiftato indietro
+  if(kpiState.compare.has('prev')){
+    const [s,e] = kpiDateRange(kpiState.range);
+    const span = e - s;
+    const prevStart = new Date(s.getTime() - span - 24*3600*1000);
+    const prevEnd = new Date(s.getTime() - 24*3600*1000);
+    const psIso = kpiFmtDateISO(prevStart), peIso = kpiFmtDateISO(prevEnd);
+    const brandF = kpiState.brands.size ? kpiState.brands : null;
+    const storeF = kpiState.stores.size ? kpiState.stores : null;
+    const prevRecs = allData.filter(r => {
+      if(!r.dateISO) return false;
+      if(r.dateISO < psIso || r.dateISO > peIso) return false;
+      if(brandF && !brandF.has(r.brand)) return false;
+      if(storeF && !storeF.has(`${r.brand}|${r.location}`)) return false;
+      return true;
+    });
+    const prevSeries = kpiAggregateByBucket(prevRecs, kpi, kpiState.gran);
+    const prevData = series.map((_,i) => prevSeries[i] ? +prevSeries[i].value.toFixed(2) : null);
+    datasets.push({
+      label: 'Periodo prec.',
+      data: prevData,
+      type: 'line',
+      borderColor: '#ea580c',
+      backgroundColor: '#ea580c',
+      borderDash: [6,3],
+      borderWidth: 2,
+      tension: 0.3,
+      fill: false,
+      pointRadius: 0
+    });
+  }
+
+  // Titolo + sintesi sempre prima, così se Chart fallisce vedi i numeri
+  document.getElementById('kpi-chart-title-l').textContent = kpiLabel(kpi);
+  const tot = kpiAggregateTotal(recs, kpi);
+  document.getElementById('kpi-chart-title-sum').textContent =
+    (kpi === 'ingressi' ? 'Totale: ' : 'Media: ') + kpiFmt(tot, kpi);
+
+  const box = document.querySelector('#kpi-view-chart .kpi-chart-box');
+  if(typeof Chart === 'undefined'){
+    box.innerHTML = '<div style="padding:30px 16px;color:var(--red);font-size:12px;text-align:center;line-height:1.5">⚠️ Libreria grafici non caricata.<br>Controlla la connessione e ricarica la pagina.</div>';
+    return;
+  }
+  if(!series.length){
+    box.innerHTML = '<div style="padding:30px 16px;color:var(--t3);font-size:12px;text-align:center">Nessun dato KPI nel periodo selezionato</div>';
+    return;
+  }
+
+  try {
+    if(kpiChart) kpiChart.destroy();
+    // Se il canvas era stato sostituito da un messaggio, lo ricreo
+    if(!document.getElementById('kpiMainChart')){
+      box.innerHTML = '<canvas id="kpiMainChart"></canvas>';
+    }
+    const ctx = document.getElementById('kpiMainChart').getContext('2d');
+    kpiChart = new Chart(ctx, {
+      type: 'bar',
+      data: {labels, datasets},
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {mode:'index', intersect:false},
+        plugins: {
+          legend: {display:true, position:'bottom', labels:{font:{family:'Nunito',size:10}, boxWidth:10, boxHeight:10, padding:8}},
+          tooltip: {
+            callbacks: {
+              label: function(ctx){
+                const v = ctx.parsed.y;
+                return ctx.dataset.label + ': ' + (v == null ? '—' : kpiFmt(v, kpi));
+              }
+            }
+          }
+        },
+        scales: {
+          x: {ticks:{font:{family:'Nunito',size:10}}, grid:{display:false}},
+          y: {ticks:{font:{family:'Nunito',size:10}, callback:v => kpiFmt(v, kpi)}, grid:{color:'#eaecef'}}
+        }
+      }
+    });
+  } catch(e){
+    console.error('kpiRenderChart failed', e);
+    box.innerHTML = '<div style="padding:30px 16px;color:var(--red);font-size:12px;text-align:center;line-height:1.5">⚠️ Errore nel rendering del grafico:<br>'+attrEsc(e.message)+'</div>';
+  }
+}
+
+function kpiRenderRanking(){
+  const recs = kpiFiltered();
+  const stores = kpiAggregateByStore(recs, kpiState.kpi);
+  // Media brand per il delta di ogni riga
+  const brandAvg = new Map();
+  const brandAgg = new Map();
+  for(const s of stores){
+    let b = brandAgg.get(s.brand);
+    if(!b){ b = {vals:[]}; brandAgg.set(s.brand, b); }
+    b.vals.push(s.value);
+  }
+  for(const [k,b] of brandAgg){
+    brandAvg.set(k, b.vals.reduce((x,y)=>x+y,0)/b.vals.length);
+  }
+  stores.sort((a,b) => kpiState.sort === 'name'
+    ? (a.brand+a.location).localeCompare(b.brand+b.location,'it')
+    : b.value - a.value);
+  const list = document.getElementById('kpi-rank-list');
+  if(!list) return;
+  if(!stores.length){
+    list.innerHTML = '<div class="kpi-rank-empty">Nessun dato per i filtri selezionati</div>';
+    return;
+  }
+  list.innerHTML = stores.map((s,i) => {
+    const brandM = brandAvg.get(s.brand);
+    const d = kpiDelta(s.value, brandM);
+    const spark = kpiSparkline(s.daily.map(x => x.v), 56, 24);
+    const payload = JSON.stringify({brand:s.brand, location:s.location});
+    return `<div class="kpi-rank-row" onclick='openKpiDrill(${JSON.stringify(payload)})'>
+      <div class="kpi-rank-pos">${i+1}</div>
+      <div class="kpi-rank-name">
+        <div class="kpi-rank-brand">${attrEsc(s.brand)}</div>
+        <div class="kpi-rank-loc">${attrEsc(s.location)}</div>
+      </div>
+      <div class="kpi-rank-spark">${spark}</div>
+      <div class="kpi-rank-val">${kpiFmt(s.value, kpiState.kpi)}</div>
+      <div class="kpi-rank-delta ${d.cls}">${d.text}</div>
+    </div>`;
+  }).join('');
+}
+
+function kpiSparkline(vals, w, h){
+  const clean = vals.filter(v => v != null);
+  if(clean.length < 2) return `<svg width="${w}" height="${h}"></svg>`;
+  const min = Math.min(...clean), max = Math.max(...clean);
+  const range = max - min || 1;
+  const step = w / (clean.length - 1);
+  const pts = clean.map((v,i) => `${(i*step).toFixed(1)},${(h - (v-min)/range*h).toFixed(1)}`).join(' ');
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><polyline points="${pts}" fill="none" stroke="#2563eb" stroke-width="1.5"/></svg>`;
+}
+
+function kpiRenderHeatmap(){
+  const recs = kpiFiltered();
+  const stores = kpiAggregateByStore(recs, kpiState.kpi);
+  const cont = document.getElementById('kpi-hm-content');
+  if(!cont) return;
+  if(!stores.length){ cont.innerHTML = '<div class="kpi-rank-empty">Nessun dato KPI nel periodo selezionato</div>'; return; }
+
+  const buckets = new Set();
+  for(const s of stores) for(const d of s.daily) buckets.add(kpiBucketKey(d.date, kpiState.gran));
+  const bucketArr = [...buckets].sort();
+
+  // Per ogni cella store|bucket calcolo il valore aggregato
+  const cell = new Map();
+  for(const s of stores){
+    const acc = new Map();
+    for(const d of s.daily){
+      const bk = kpiBucketKey(d.date, kpiState.gran);
+      let a = acc.get(bk);
+      if(!a){ a = {sum:0, w:0, cnt:0}; acc.set(bk, a); }
+      if(kpiState.kpi === 'ingressi'){ a.sum += d.v; a.cnt++; }
+      else { a.sum += d.v; a.w++; a.cnt++; }
+    }
+    for(const [bk,a] of acc){
+      const v = kpiState.kpi === 'ingressi' ? a.sum : (a.w ? a.sum/a.w : 0);
+      cell.set(`${s.brand}|${s.location}|${bk}`, v);
+    }
+  }
+
+  // Range per scala colore globale
+  let gMin = Infinity, gMax = -Infinity;
+  for(const v of cell.values()){ if(v < gMin) gMin = v; if(v > gMax) gMax = v; }
+  function color(v){
+    if(v == null) return 'var(--s3)';
+    const t = (v - gMin) / ((gMax - gMin) || 1);
+    if(t < 0.5){
+      const k = t*2;
+      const r = Math.round(254);
+      const g = Math.round(226 - (226-243)*k);
+      const b = Math.round(226 - (226-199)*k);
+      return `rgb(${r},${g},${b})`;
+    } else {
+      const k = (t-0.5)*2;
+      const r = Math.round(254 - (254-22)*k);
+      const g = Math.round(243 - (243-163)*k);
+      const b = Math.round(199 - (199-74)*k);
+      return `rgb(${r},${g},${b})`;
+    }
+  }
+
+  // Limito a ultimi 14 bucket per mobile
+  const showBuckets = bucketArr.slice(-14);
+  stores.sort((a,b) => b.value - a.value);
+
+  let html = '<table class="kpi-hm-table"><thead><tr><th class="row-h"></th>';
+  for(const bk of showBuckets) html += `<th>${kpiBucketLabel(bk, kpiState.gran)}</th>`;
+  html += '</tr></thead><tbody>';
+  for(const s of stores){
+    html += `<tr><th class="row-h">${attrEsc(s.brand)} · ${attrEsc(s.location)}</th>`;
+    for(const bk of showBuckets){
+      const v = cell.get(`${s.brand}|${s.location}|${bk}`);
+      if(v == null){ html += '<td class="na">·</td>'; }
+      else {
+        const txt = kpiState.kpi === 'ingressi' ? Math.round(v) : v.toFixed(1);
+        const title = `${s.brand} ${s.location} · ${kpiBucketLabel(bk, kpiState.gran)}: ${kpiFmt(v, kpiState.kpi)}`;
+        html += `<td style="background:${color(v)}" title="${attrEsc(title)}">${txt}</td>`;
+      }
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  cont.innerHTML = html;
+}
+
+// Drill-down: bottom sheet con 3 mini-chart per il singolo negozio
+function openKpiDrill(payload){
+  const o = typeof payload === 'string' ? JSON.parse(payload) : payload;
+  const sheet = document.getElementById('kpi-drill-sheet');
+  const [s,e] = kpiDateRange(kpiState.range);
+  const sIso = kpiFmtDateISO(s), eIso = kpiFmtDateISO(e);
+  const recs = allData.filter(r => r.brand === o.brand && r.location === o.location && r.dateISO >= sIso && r.dateISO <= eIso);
+
+  let html = `<div class="kpi-drill-grip"></div>
+    <div class="kpi-drill-h">
+      <div class="kpi-drill-name">${attrEsc(o.location)}</div>
+      <div class="kpi-drill-brand">${attrEsc(o.brand)}</div>
+    </div>`;
+  ['ingressi','cr','upt'].forEach((kpi, idx) => {
+    const tot = kpiAggregateTotal(recs, kpi);
+    const sPy = kpiShiftYear(s,-1), ePy = kpiShiftYear(e,-1);
+    const sPyI = kpiFmtDateISO(sPy), ePyI = kpiFmtDateISO(ePy);
+    const pyRecs = allData.filter(r => r.brand === o.brand && r.location === o.location && r.dateISO >= sPyI && r.dateISO <= ePyI);
+    const totPy = kpiAggregateTotal(pyRecs, kpi);
+    const d = kpiDelta(tot, totPy);
+    html += `<div class="kpi-drill-mini">
+      <div class="kpi-drill-mini-h">
+        <span class="kpi-drill-mini-l">${kpiLabel(kpi)}</span>
+        <span class="kpi-drill-mini-v">${kpiFmt(tot, kpi)}<span class="dm-delta kpi-rank-delta ${d.cls}">${d.text}</span></span>
+      </div>
+      <div class="kpi-drill-mini-box"><canvas id="kpi-dchart-${idx}"></canvas></div>
+    </div>`;
+  });
+  html += `<button class="kpi-drill-close" onclick="closeKpiDrill()">Chiudi</button>`;
+  sheet.innerHTML = html;
+  document.getElementById('kpi-drill-overlay').classList.add('open');
+
+  kpiDrillCharts.forEach(c => c.destroy()); kpiDrillCharts = [];
+  if(typeof Chart === 'undefined') return;
+  ['ingressi','cr','upt'].forEach((kpi, idx) => {
+    const series = kpiAggregateByBucket(recs, kpi, kpiState.gran);
+    const canvas = document.getElementById('kpi-dchart-'+idx);
+    if(!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const c = new Chart(ctx, {
+      type: 'line',
+      data: {labels:series.map(s=>kpiBucketLabel(s.key,kpiState.gran)), datasets:[{
+        data: series.map(s => +s.value.toFixed(2)),
+        borderColor:'#2563eb', backgroundColor:'#2563eb20',
+        borderWidth:2, tension:0.3, fill:true, pointRadius:0
+      }]},
+      options: {
+        responsive:true, maintainAspectRatio:false,
+        plugins:{legend:{display:false}, tooltip:{callbacks:{label:c => kpiFmt(c.parsed.y, kpi)}}},
+        scales:{x:{display:false}, y:{display:false}}
+      }
+    });
+    kpiDrillCharts.push(c);
+  });
+}
+function closeKpiDrill(){
+  document.getElementById('kpi-drill-overlay').classList.remove('open');
+  kpiDrillCharts.forEach(c => c.destroy()); kpiDrillCharts = [];
+}
+
+// Filtri (panelli multi-select Brand / Store)
+function kpiBuildPanel(type){
+  const panel = document.getElementById('kfp-'+type);
+  if(!panel) return;
+  let items;
+  if(type === 'brand'){
+    const brands = [...new Set(ALL_STORES.map(s => s.brand))].sort((a,b) => a.localeCompare(b,'it'));
+    items = brands.map(b => ({key:b, label:b, checked: kpiState.brands.has(b)}));
+  } else {
+    const visible = kpiState.brands.size
+      ? ALL_STORES.filter(s => kpiState.brands.has(s.brand))
+      : ALL_STORES;
+    items = visible.map(s => {
+      const k = `${s.brand}|${s.location}`;
+      return {key:k, label:`${s.brand} · ${s.location}`, checked: kpiState.stores.has(k)};
+    });
+  }
+  let html = items.map(it => `<label class="kfrow">
+    <input type="checkbox" data-key="${attrEsc(it.key)}" ${it.checked?'checked':''}/>
+    <span>${attrEsc(it.label)}</span>
+  </label>`).join('');
+  html += `<div class="kfactions">
+    <button onclick="kpiSetAll('${type}', true)">Tutti</button>
+    <button onclick="kpiSetAll('${type}', false)">Nessuno</button>
+    <button class="primary" onclick="kpiApplyPanel('${type}')">Applica</button>
+  </div>`;
+  panel.innerHTML = html;
+}
+function toggleKpiPanel(type){
+  const panel = document.getElementById('kfp-'+type);
+  const wasOpen = panel.classList.contains('open');
+  document.querySelectorAll('.kfpanel').forEach(p => p.classList.remove('open'));
+  if(!wasOpen){ kpiBuildPanel(type); panel.classList.add('open'); }
+}
+function kpiSetAll(type, val){
+  const panel = document.getElementById('kfp-'+type);
+  panel.querySelectorAll('input[type=checkbox]').forEach(cb => cb.checked = val);
+}
+function kpiApplyPanel(type){
+  const panel = document.getElementById('kfp-'+type);
+  const set = new Set();
+  panel.querySelectorAll('input[type=checkbox]:checked').forEach(cb => set.add(cb.dataset.key));
+  if(type === 'brand'){
+    kpiState.brands = set;
+    // Pulisci store non più coerenti coi nuovi brand
+    if(kpiState.stores.size){
+      const valid = new Set();
+      for(const k of kpiState.stores){
+        const b = k.split('|')[0];
+        if(!set.size || set.has(b)) valid.add(k);
+      }
+      kpiState.stores = valid;
+    }
+  } else {
+    kpiState.stores = set;
+  }
+  panel.classList.remove('open');
+  kpiUpdateFilterUI();
+  renderKpiAll();
+}
+function kpiUpdateFilterUI(){
+  const bs = kpiState.brands.size, ss = kpiState.stores.size;
+  const bb = document.getElementById('kfb-brand');
+  const sb = document.getElementById('kfb-store');
+  if(!bb || !sb) return;
+  document.getElementById('kfcnt-brand').textContent = bs ? bs : 'tutti';
+  document.getElementById('kfcnt-store').textContent = ss ? ss : 'tutti';
+  bb.classList.toggle('has-sel', bs > 0);
+  sb.classList.toggle('has-sel', ss > 0);
+}
+
+// Master render — chiamato sia entrando in tab, sia al cambio di filtri/state
+function renderKpiAll(){
+  kpiRenderHero();
+  if(kpiState.view === 'chart'){
+    kpiRenderChart();
+    kpiRenderRanking();
+  } else {
+    kpiRenderHeatmap();
+  }
+}
+
+// Event bindings (registrati una volta sola al primo accesso alla tab)
+let kpiBound = false;
+function kpiBindEvents(){
+  if(kpiBound) return;
+  document.querySelectorAll('#kpi-tabs .kpi-tab').forEach(b => {
+    b.onclick = () => {
+      document.querySelectorAll('#kpi-tabs .kpi-tab').forEach(x => x.classList.remove('on'));
+      b.classList.add('on');
+      kpiState.kpi = b.dataset.kpi;
+      renderKpiAll();
+    };
+  });
+  document.querySelectorAll('#tab-kpi .kpi-pill[data-gran]').forEach(b => {
+    b.onclick = () => {
+      document.querySelectorAll('#tab-kpi .kpi-pill[data-gran]').forEach(x => x.classList.remove('on'));
+      b.classList.add('on');
+      kpiState.gran = b.dataset.gran;
+      renderKpiAll();
+    };
+  });
+  document.querySelectorAll('#tab-kpi .kpi-pill[data-range]').forEach(b => {
+    b.onclick = () => {
+      document.querySelectorAll('#tab-kpi .kpi-pill[data-range]').forEach(x => x.classList.remove('on'));
+      b.classList.add('on');
+      kpiState.range = b.dataset.range;
+      renderKpiAll();
+    };
+  });
+  document.querySelectorAll('#tab-kpi .kpi-cmp').forEach(b => {
+    b.onclick = () => {
+      const k = b.dataset.cmp;
+      if(kpiState.compare.has(k)) kpiState.compare.delete(k);
+      else kpiState.compare.add(k);
+      b.classList.toggle('on');
+      // Solo il grafico cambia: niente bisogno di ricalcolare hero/heatmap
+      if(kpiState.view === 'chart') kpiRenderChart();
+    };
+  });
+  document.querySelectorAll('#tab-kpi .kpi-vtab').forEach(b => {
+    b.onclick = () => {
+      document.querySelectorAll('#tab-kpi .kpi-vtab').forEach(x => x.classList.remove('on'));
+      b.classList.add('on');
+      kpiState.view = b.dataset.view;
+      document.getElementById('kpi-view-chart').style.display = kpiState.view === 'chart' ? '' : 'none';
+      document.getElementById('kpi-view-heatmap').style.display = kpiState.view === 'heatmap' ? '' : 'none';
+      renderKpiAll();
+    };
+  });
+  const sortEl = document.getElementById('kpi-rank-sort');
+  if(sortEl) sortEl.onclick = () => {
+    kpiState.sort = kpiState.sort === 'val' ? 'name' : 'val';
+    sortEl.textContent = kpiState.sort === 'val' ? '▾ Valore' : '▾ Nome';
+    kpiRenderRanking();
+  };
+  // Click fuori chiude i panelli filtro KPI
+  document.addEventListener('click', (e) => {
+    if(e.target.closest('.kfbtn') || e.target.closest('.kfpanel')) return;
+    document.querySelectorAll('.kfpanel').forEach(p => p.classList.remove('open'));
+  });
+  kpiBound = true;
+}
+// Override di renderKpiAll per assicurare il bind degli eventi al primo accesso
+const _renderKpiAllOriginal = renderKpiAll;
+renderKpiAll = function(){
+  kpiBindEvents();
+  kpiUpdateFilterUI();
+  _renderKpiAllOriginal();
+};
 
 // ── EXPORT CSV ──
 // Formato "wide": una riga per negozio+data, una colonna per ogni domanda
