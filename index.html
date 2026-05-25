@@ -980,6 +980,18 @@ let compareTgt=true, comparePy=false;
 // Sorgente di verità per il confronto anno-su-anno e per riempire la timeline
 // 2026 nei mesi precedenti al 23/04/2026 (data di partenza GoAudits).
 let historicalByKey={};
+// KPI storici letti dalle nuove colonne dell'Excel storico/consuntivi
+// (Walk-in, Quantity, Nr. Scontrini, CR, UPT). Dict separato da historicalByKey
+// perché:
+//   - non tutti i record hanno KPI (solo quelli con file nuovo)
+//   - il formato è diverso: oggetto invece di numero
+//   - viene servito da un endpoint separato (/historical/kpi) per
+//     retrocompatibilità di /historical
+// Forma: { "adidas|brindisi city|2025-01-02": {walkIn:103, quantity:8,
+//                                              scontrini:18, cr:0.1747, upt:0.4444}, ... }
+// Bibbia per la tab KPI: kpiValFromRecord controlla prima qui, poi fallback
+// su r.qa[25/26/27] del PDF GoAudits, poi null.
+let historicalKpiByKey={};
 let lastErrors=[];
 // Target di vendita giornalieri per (brand, location, dateISO). Caricati una
 // volta a sync da /targets, poi indicizzati con la stessa chiave normalizzata
@@ -1246,16 +1258,18 @@ async function syncNow(){
     // overrides per le correzioni manuali, targets per il badge %
     // realizzazione, historical per il confronto anno-su-anno e per la
     // timeline pre-GoAudits del 2026.
-    const [files, backendCache, overrides, targets, historical, storeFlags] = await Promise.all([
+    const [files, backendCache, overrides, targets, historical, historicalKpi, storeFlags] = await Promise.all([
       listFiles(),
       fetchPdfCache(),
       fetchOverrides(),
       fetchTargets(),
       fetchHistorical(),
+      fetchHistoricalKpi(),
       fetchStoreFlags(),
     ]);
     targetsByKey = targets;
     historicalByKey = historical;
+    historicalKpiByKey = historicalKpi;
     // Applico override dei flag monitored PRIMA di calcolare missing/KPI così
     // tutta la pipeline di rendering parte con la lista negozi attesi corretta.
     storeFlagsByKey = storeFlags;
@@ -1680,6 +1694,20 @@ async function fetchHistorical(){
     return (data && typeof data==='object') ? data : {};
   }catch(e){console.warn('fetchHistorical',e);return {};}
 }
+// KPI storici dal backend. Endpoint introdotto col deploy v1.2: ritorna
+// {storeKey|date: {walkIn?, quantity?, scontrini?, cr?, upt?}} solo per i
+// record che hanno almeno un campo KPI valorizzato.
+// Graceful degrade: se il backend è una versione precedente o l'endpoint
+// risponde 404/500, ritorno {} e la tab KPI continua a leggere solo dai PDF
+// GoAudits (comportamento pre-v1.2).
+async function fetchHistoricalKpi(){
+  try{
+    const r=await api('/historical/kpi');
+    if(!r.ok) return {};
+    const data=await r.json();
+    return (data && typeof data==='object') ? data : {};
+  }catch(e){console.warn('fetchHistoricalKpi',e);return {};}
+}
 // Override del flag monitored per i 30 negozi (vedi commento globale storeFlagsByKey).
 // Non-fatale: se la GET fallisce torno {} e i default di ALL_STORES restano
 // sovrani. Il backend deve essere ridepoyato con l'endpoint /stores/flags;
@@ -2008,19 +2036,37 @@ async function uploadHistoricalExcel(event, mode){
     const ws = wb.Sheets[wb.SheetNames[0]];
     const range = XLSX.utils.decode_range(ws['!ref']);
     const norm = s => String(s==null?'':s).toLowerCase().replace(/\s+/g,' ').trim();
-    // 1) Identifica le 3 colonne richieste: nome store, data, net sales.
-    // Tollerante a piccole variazioni di header (es. "store" da solo, "incasso").
+    // 1) Identifica le colonne. Le prime 3 sono OBBLIGATORIE (nome, data, net
+    // sales); le 5 KPI sono OPZIONALI — se assenti, il file viene caricato come
+    // prima (solo netSales) e i KPI restano null sul backend.
+    // Header tipico nuovo file: Store | Data | Net Sales AC | Quantity | Walk-in | Nr. Scontrini | CR | UPT
+    // Header tipico vecchio file: Nome store in Dashboard | Data | Net Sales
+    // Tollerante a varianti: matching con substring + nomi alternativi.
     let nameCol=-1, dateCol=-1, valueCol=-1;
+    let walkInCol=-1, quantityCol=-1, scontriniCol=-1, crCol=-1, uptCol=-1;
     for(let c=0; c<=range.e.c; c++){
       const h=norm(ws[XLSX.utils.encode_cell({r:0,c})]?.v);
       if(!h) continue;
       if(h.includes('nome store') || h==='store' || h==='negozio') nameCol=c;
       else if(h==='data' || h==='date') dateCol=c;
       else if(h.includes('net sales') || h.includes('netto') || h.includes('incasso') || h.includes('vendite')) valueCol=c;
+      // ── NUOVI CAMPI KPI (opzionali) ──
+      // Walk-in = Ingressi (foot traffic). Header può essere "Walk-in", "Walk in", "Ingressi", "Footfall".
+      else if(h==='walk-in' || h==='walk in' || h==='walkin' || h==='ingressi' || h==='footfall') walkInCol=c;
+      // Quantity = Unità vendute / pezzi.
+      else if(h==='quantity' || h==='quantità' || h==='unità' || h==='pezzi' || h.includes('unità vendute')) quantityCol=c;
+      // Nr. Scontrini = numero transazioni. Header può avere "n.", "nr.", "num.", "numero".
+      else if(h.includes('scontrini') || h.includes('transazioni') || h.includes('receipts')) scontriniCol=c;
+      // CR = Conversion Rate. Header esatto "cr" o variante "conversion rate".
+      else if(h==='cr' || h==='cr%' || h.includes('conversion rate') || h.includes('tasso conv')) crCol=c;
+      // UPT = Units per Transaction. Header esatto "upt" o "units per transaction".
+      else if(h==='upt' || h.includes('units per transaction') || h.includes('unità per')) uptCol=c;
     }
-    if(nameCol<0) throw new Error('Colonna "Nome store in Dashboard" non trovata nella riga 1.');
+    if(nameCol<0) throw new Error('Colonna "Store" / "Nome store in Dashboard" non trovata nella riga 1.');
     if(dateCol<0) throw new Error('Colonna "Data" non trovata nella riga 1.');
-    if(valueCol<0) throw new Error('Colonna "Net Sales" non trovata nella riga 1.');
+    if(valueCol<0) throw new Error('Colonna "Net Sales" / "Net Sales AC" non trovata nella riga 1.');
+    // Diagnostica: quante colonne KPI ho trovato. Utile per dare feedback nell'alert finale.
+    const kpiColsFound = [walkInCol,quantityCol,scontriniCol,crCol,uptCol].filter(c=>c>=0).length;
     // 2) Itera sulle righe dati. Conta riconosciuti vs non riconosciuti, date
     // non valide (testo invece di Date Excel!) e righe dell'anno sbagliato.
     // I conteggi vanno nell'alert finale per dare feedback chiaro all'utente.
@@ -2061,12 +2107,32 @@ async function uploadHistoricalExcel(event, mode){
       if(valueV==null || valueV===''){ nullSkipped++; continue; }
       const n = +valueV;
       if(!isFinite(n)) continue;
-      entries.push({
+      // Helper interno: legge una cella KPI opzionale e ritorna number o null.
+      // Tratta null/'' come "non pervenuto" (→ null al backend, esclude dal $set).
+      // Tratta lo 0 esplicito come dato valido (il negozio non ha venduto nulla).
+      const readKpi = (col) => {
+        if(col < 0) return null;
+        const v = ws[XLSX.utils.encode_cell({r,c:col})]?.v;
+        if(v==null || v==='') return null;
+        const x = +v;
+        return isFinite(x) ? x : null;
+      };
+      const entry = {
         brand: mapped[0],
         location: mapped[1],
         date: dateStr,
         netSales: Math.round(n*100)/100,
-      });
+      };
+      // KPI opzionali: aggiunti all'entry solo se valorizzati nel file. Il
+      // backend (HistoricalEntry) li accetta come Optional[float]=None.
+      // walkIn/quantity/scontrini sono interi attesi: arrotondo per pulizia.
+      // cr/upt sono decimali puri (es 0.1747): NON arrotondo, mantengo precisione.
+      const wi = readKpi(walkInCol);   if(wi!==null) entry.walkIn   = Math.round(wi);
+      const qt = readKpi(quantityCol); if(qt!==null) entry.quantity = Math.round(qt);
+      const sc = readKpi(scontriniCol);if(sc!==null) entry.scontrini= Math.round(sc);
+      const cr = readKpi(crCol);       if(cr!==null) entry.cr       = cr;
+      const up = readKpi(uptCol);      if(up!==null) entry.upt      = up;
+      entries.push(entry);
     }
     // 3) Validazione difensiva: se il file contiene SOLO righe di un anno
     // diverso (es. ho cliccato "Consuntivi nuovi" ma ho caricato il file 2025),
@@ -2100,6 +2166,17 @@ async function uploadHistoricalExcel(event, mode){
     let msg = `✓ ${labelHuman} caricati (anno ${targetYear} sostituito).\n\n`;
     msg += `Record inseriti: ${entries.length}\n`;
     msg += `Nuovi: ${res.upserted} · Aggiornati: ${res.modified}`;
+    // Feedback sulle nuove colonne KPI: utile per capire se il file è "nuovo"
+    // (con le colonne KPI) o "vecchio" (solo netSales).
+    if(kpiColsFound > 0){
+      const kpiNames = [];
+      if(walkInCol   >= 0) kpiNames.push('Ingressi');
+      if(quantityCol >= 0) kpiNames.push('Quantity');
+      if(scontriniCol>= 0) kpiNames.push('Scontrini');
+      if(crCol       >= 0) kpiNames.push('CR');
+      if(uptCol      >= 0) kpiNames.push('UPT');
+      msg += `\n📊 Anche KPI caricati: ${kpiNames.join(', ')}`;
+    }
     if(nullSkipped) msg += `\nSaltati (valore vuoto): ${nullSkipped}`;
     if(invalidDateSkipped) msg += `\n⚠️ Saltati (cella Data non valida): ${invalidDateSkipped}`;
     const wrongYears = Object.keys(wrongYearCounts);
@@ -2113,7 +2190,12 @@ async function uploadHistoricalExcel(event, mode){
       if(unrecognized.size>5) msg += '…';
     }
     alert(msg);
+    // Ricarico entrambi gli indici dal backend: netSales (per tab Andamento)
+    // e KPI storici (per tab KPI). Sono indipendenti: anche se /historical/kpi
+    // fallisce (backend non ancora aggiornato), historicalByKey si ricarica
+    // comunque e la tab Andamento continua a funzionare.
     historicalByKey = await fetchHistorical();
+    historicalKpiByKey = await fetchHistoricalKpi();
     renderAll();
   }catch(e){
     console.error('uploadHistoricalExcel', e);
@@ -4423,13 +4505,103 @@ function kpiParseValue(raw){
   const n = parseFloat(norm);
   return isFinite(n) ? n : null;
 }
-// Estrae il valore numerico del KPI richiesto da un record (uno dei 30 PDF)
+// Estrae il valore numerico del KPI richiesto da un record. Cascata:
+//   1) historicalKpiByKey[storeKey|date] — dati dall'Excel storico/consuntivi
+//      (la "bibbia" quando è valorizzato)
+//   2) r.qa[25/26/27] — dato dal PDF GoAudits (fallback)
+//   3) null — nessun dato disponibile (escluso dalle medie/somme nella tab KPI)
+//
+// CR: convenzione di scala diversa tra le due fonti.
+//   - Excel: decimale puro (0.1747 = 17,47%)
+//   - GoAudits PDF: testo tipo "10,55%" che kpiParseValue strippa a → 10.55 (numero %)
+// Per uniformare allo standard del rendering (kpiFmt('cr') fa v.toFixed(2)+'%'),
+// moltiplico per 100 quando leggo dall'Excel. Così downstream tutto si comporta uguale.
 function kpiValFromRecord(r, kpi){
-  if(!r || !r.qa) return null;
+  if(!r) return null;
+  // (1) Excel bibbia. Costruisco la chiave con la stessa logica di storeKey()
+  // (lowercase + trim + spazi compattati), poi pipe-join con la data ISO.
+  // I record sintetici "shiftati" per il confronto PY hanno _origDateISO
+  // valorizzato col vero anno del dato (es. 2025): in quel caso uso quello
+  // per il lookup, altrimenti r.dateISO normale.
+  // Difensivo su r.brand/r.location mancanti (record malformati).
+  const lookupDate = r._origDateISO || r.dateISO;
+  if(r.brand && r.location && lookupDate){
+    const key = storeKey(r.brand, r.location) + '|' + lookupDate;
+    const hkpi = historicalKpiByKey[key];
+    if(hkpi){
+      const field = {ingressi:'walkIn', cr:'cr', upt:'upt'}[kpi];
+      const v = hkpi[field];
+      if(v != null && isFinite(v)){
+        // Conversione di scala CR: Excel 0.1747 → 17.47 per uniformare con GoAudits
+        if(kpi === 'cr') return v * 100;
+        return v;
+      }
+    }
+  }
+  // (2) Fallback GoAudits PDF. Stesso comportamento di prima.
+  if(!r.qa) return null;
   const qNum = {ingressi:25, cr:26, upt:27}[kpi];
   const item = r.qa.find(x => x.n === qNum);
   if(!item) return null;
   return kpiParseValue(item.a);
+}
+// Helper: genera "pseudo-record" sintetici dai dati Excel storici per coprire
+// i giorni che non hanno PDF GoAudits. Necessario per:
+//   - Confronto PY in tab KPI: il 2025 non ha PDF GoAudits, quindi senza
+//     questa funzione la linea grigia "anno scorso" è sempre vuota
+//   - Mesi pre-23/04/2026 in tab KPI: prima di GoAudits c'era solo l'Excel,
+//     quindi senza questa funzione la timeline 2026 della tab KPI inizia ad
+//     aprile invece che a gennaio
+//
+// Parametri:
+//   sIso, eIso  : range date (inclusive, formato YYYY-MM-DD) da coprire
+//   brandF      : Set<string> brand selezionati (o null = tutti)
+//   storeF      : Set<string> "brand|location" selezionati (o null = tutti)
+//   shiftYears  : numero di anni di cui shiftare avanti la dateISO (0 = no shift).
+//                 Se shiftYears != 0, la data ORIGINALE viene preservata in
+//                 _origDateISO così kpiValFromRecord può fare lookup corretto
+//                 nell'indice historicalKpiByKey.
+//
+// Dedup: i record sintetici NON sono generati per i giorni-negozio che hanno
+// già un PDF GoAudits in quel range — per evitare di contarli due volte.
+function kpiSyntheticFromHistorical(sIso, eIso, brandF, storeF, shiftYears){
+  shiftYears = shiftYears || 0;
+  // Set delle chiavi (brand|location|date) già presenti in allData nel range:
+  // su questi non genero sintetico (sarebbe doppia contabilità).
+  const allDataKeys = new Set();
+  for(const r of allData){
+    if(!r.dateISO || r.dateISO < sIso || r.dateISO > eIso) continue;
+    allDataKeys.add(storeKey(r.brand, r.location) + '|' + r.dateISO);
+  }
+  const out = [];
+  for(const fullKey in historicalKpiByKey){
+    // fullKey è "brand_norm|location_norm|YYYY-MM-DD" → split sull'ultimo |
+    const lastPipe = fullKey.lastIndexOf('|');
+    if(lastPipe < 0) continue;
+    const date = fullKey.slice(lastPipe+1);
+    if(date < sIso || date > eIso) continue;
+    if(allDataKeys.has(fullKey)) continue;
+    const blKey = fullKey.slice(0, lastPipe);
+    // Risali al casing originale del negozio da ALL_STORES (la chiave è
+    // normalizzata, ma kpiState.brands/stores usa il casing originale).
+    const matching = ALL_STORES.find(s => storeKey(s.brand, s.location) === blKey);
+    if(!matching) continue;
+    if(brandF && !brandF.has(matching.brand)) continue;
+    if(storeF && !storeF.has(`${matching.brand}|${matching.location}`)) continue;
+    const rec = {
+      brand: matching.brand,
+      location: matching.location,
+      dateISO: date,
+      qa: [],  // niente PDF GoAudits per questo record (è sintetico)
+      _synthetic: true,
+    };
+    if(shiftYears){
+      rec._origDateISO = date;
+      rec.dateISO = kpiFmtDateISO(kpiShiftYear(new Date(date + 'T00:00:00'), shiftYears));
+    }
+    out.push(rec);
+  }
+  return out;
 }
 function kpiLabel(k){
   return {ingressi:'Ingressi', cr:'CR (Conversion Rate)', upt:'UPT (Units/Trans)'}[k];
@@ -4494,13 +4666,20 @@ function kpiFiltered(){
   const sIso = kpiFmtDateISO(s), eIso = kpiFmtDateISO(e);
   const brandF = kpiState.brands.size ? kpiState.brands : null;
   const storeF = kpiState.stores.size ? kpiState.stores : null;
-  return allData.filter(r => {
+  // Record GoAudits nel range (sorgente primaria post 23/04/2026)
+  const goRecs = allData.filter(r => {
     if(!r.dateISO) return false;
     if(r.dateISO < sIso || r.dateISO > eIso) return false;
     if(brandF && !brandF.has(r.brand)) return false;
     if(storeF && !storeF.has(`${r.brand}|${r.location}`)) return false;
     return true;
   });
+  // Sintetici da Excel storico/consuntivi per coprire i giorni senza GoAudits
+  // (es. 2026 pre-23/04, oppure tutto il 2025 se l'utente seleziona YTD su 2026
+  // ma ha caricato anche i dati 2025 — non succede di solito ma è coerente).
+  // Dedup è già gestito da kpiSyntheticFromHistorical.
+  const synthRecs = kpiSyntheticFromHistorical(sIso, eIso, brandF, storeF, 0);
+  return goRecs.concat(synthRecs);
 }
 // Aggregazione per bucket di tempo:
 //   ingressi → somma
@@ -4588,13 +4767,20 @@ function kpiRenderHero(){
 // Costruisce i record PY (anno scorso) per il confronto, shiftando avanti
 // la data di 1 anno così bucketKey li mette negli stessi bucket del periodo
 // corrente.
+// Due sorgenti:
+//   1) Record GoAudits dell'anno scorso (allData) — esistono solo se PDF era
+//      attivo a quel tempo (in pratica non c'è nulla nel 2025)
+//   2) Sintetici da historicalKpiByKey (Excel storico) — coprono tutto il 2025
+//      quando l'admin ha caricato il file con le nuove colonne KPI
+// Senza la sorgente 2, la linea grigia "vs PY" era sempre vuota per il 2026
+// (perché nel 2025 non c'era GoAudits). Dedup gestito da kpiSyntheticFromHistorical.
 function kpiPyShiftedFiltered(){
   const [s,e] = kpiDateRange(kpiState.range);
   const sPy = kpiShiftYear(s,-1), ePy = kpiShiftYear(e,-1);
   const sIso = kpiFmtDateISO(sPy), eIso = kpiFmtDateISO(ePy);
   const brandF = kpiState.brands.size ? kpiState.brands : null;
   const storeF = kpiState.stores.size ? kpiState.stores : null;
-  return allData.filter(r => {
+  const shifted = allData.filter(r => {
     if(!r.dateISO) return false;
     if(r.dateISO < sIso || r.dateISO > eIso) return false;
     if(brandF && !brandF.has(r.brand)) return false;
@@ -4603,8 +4789,14 @@ function kpiPyShiftedFiltered(){
   }).map(r => ({
     ...r,
     // Sposta la data avanti di 1 anno per allineare i bucket
+    _origDateISO: r.dateISO,
     dateISO: kpiFmtDateISO(kpiShiftYear(new Date(r.dateISO + 'T00:00:00'), 1))
   }));
+  // Sintetici dall'Excel storico per i giorni del PY range che non hanno
+  // GoAudits. shiftYears=1 → dateISO traslato a 2026, _origDateISO=2025 così
+  // kpiValFromRecord recupera il valore corretto da historicalKpiByKey.
+  const synthetic = kpiSyntheticFromHistorical(sIso, eIso, brandF, storeF, 1);
+  return shifted.concat(synthetic);
 }
 
 function kpiRenderChart(){
