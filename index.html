@@ -616,10 +616,21 @@ body{display:flex;flex-direction:column}
 .store-row{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--s1);cursor:pointer;border-bottom:1px solid var(--bd);transition:background .1s}
 .store-row:last-child{border-bottom:none}
 .store-row:active{background:var(--s2)}
-.store-row.inactive-row{opacity:.5;cursor:default;pointer-events:none}
+.store-row.inactive-row{background:var(--s2)}
+.store-row.inactive-row:active{background:var(--s2)}
+.store-row-left{flex:1;min-width:0}
 .store-row-name{font-size:14px;font-weight:600;color:var(--t1)}
+.store-row-name.dimmed{color:var(--t2);font-weight:500}
+.store-row-right{display:flex;align-items:center;gap:10px;flex-shrink:0}
 .store-row-arrow{font-size:16px;color:var(--t3)}
-.store-row-tag{font-size:10px;color:var(--t3);font-style:italic}
+/* Badge toggle attivo/non attivo */
+.srt{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:4px 10px;border-radius:999px;border:1px solid transparent;white-space:nowrap;-webkit-appearance:none;background:none;font-family:var(--font);line-height:1;transition:all .12s}
+.srt.on{background:#dcfce7;color:#166534;border-color:#bbf7d0;cursor:pointer}
+.srt.on:active{filter:brightness(.95)}
+.srt.off{background:#fef3c7;color:#92400e;border-color:#fde68a;cursor:pointer}
+.srt.off:active{filter:brightness(.95)}
+.srt.readonly{cursor:default}
+.srt.readonly:active{filter:none}
 
 /* ── DATE RANGE BAR (tab Negozi) ── */
 .stores-date-bar{padding:12px 16px 4px;display:flex;align-items:center;gap:10px}
@@ -2803,7 +2814,7 @@ const ALL_STORES=[
   {brand:'Mango',   location:'Molfetta',         monitored:true},
   {brand:'Mango',   location:'Treviso',          monitored:true},
   {brand:'Yamamay', location:'Lecce',            monitored:true},
-  {brand:'Yamamay', location:'Monopoli',         monitored:true},
+  {brand:'Yamamay', location:'Monopoli',         monitored:false},
   {brand:'Yamamay', location:'Polignano',        monitored:true},
   // ── Non ancora su GoAudits (dati solo storici, gestione manuale) ──
   // Stato di default: attivabili dalla tab Negozi (admin) tramite toggle.
@@ -3554,6 +3565,7 @@ function renderTempo(){
 // Mostra solo il nome del negozio per brand. Click → popup centrato con
 // le 4 metriche per il range di date selezionato.
 function renderStores(){
+  const isAdmin = auth && auth.user && auth.user.role === 'admin';
   const grouped={};
   for(const s of ALL_STORES){
     if(!grouped[s.brand]) grouped[s.brand]=[];
@@ -3571,15 +3583,25 @@ function renderStores(){
     for(const s of stores){
       const monitored=isStoreMonitored(s.brand,s.location);
       const tLoc=s.location.replace(/'/g,"\\'");
+
+      // Badge toggle: cliccabile solo dagli admin
+      const toggleCls=`srt ${monitored?'on':'off'}${isAdmin?'':' readonly'}`;
+      const toggleLabel=monitored?'Attivo':'Non attivo';
+      const toggleOnClick=isAdmin
+        ?`onclick="event.stopPropagation();toggleStoreActive('${tBrand}','${tLoc}')"`
+        :`title="Solo admin"`;
+      const toggleHtml=`<button class="${toggleCls}" ${toggleOnClick}>${toggleLabel}</button>`;
+
       if(monitored){
         html+=`<div class="store-row" onclick="openStorePopup('${tBrand}','${tLoc}')">
-          <span class="store-row-name">${s.location}</span>
-          <span class="store-row-arrow">›</span>
+          <div class="store-row-left"><span class="store-row-name">${s.location}</span></div>
+          <div class="store-row-right">${toggleHtml}<span class="store-row-arrow">›</span></div>
         </div>`;
       }else{
+        // Non attivo: riga non apre popup (nessun dato), ma il toggle è accessibile
         html+=`<div class="store-row inactive-row">
-          <span class="store-row-name">${s.location}</span>
-          <span class="store-row-tag">non attivo</span>
+          <div class="store-row-left"><span class="store-row-name dimmed">${s.location}</span></div>
+          <div class="store-row-right">${toggleHtml}</div>
         </div>`;
       }
     }
