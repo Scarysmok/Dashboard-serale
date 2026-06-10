@@ -607,6 +607,79 @@ body{display:flex;flex-direction:column}
 .kpi-drill-mini-v .dm-delta{font-size:11px;margin-left:6px;font-weight:600}
 .kpi-drill-mini-box{height:90px;position:relative}
 .kpi-drill-close{display:block;width:100%;margin-top:8px;padding:12px;background:var(--s2);border:1px solid var(--bd2);border-radius:12px;font-family:var(--font);font-size:13px;font-weight:600;color:var(--t2);cursor:pointer}
+
+/* ── STORE ROW (lista semplice tab Negozi) ── */
+.stores-brand-block{background:var(--s1);border:1px solid var(--bd);border-radius:14px;overflow:hidden;margin:0 16px 10px}
+.stores-brand-hd{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--bd)}
+.stores-brand-hd-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px}
+.stores-brand-hd-count{font-size:11px;color:var(--t3)}
+.store-row{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--s1);cursor:pointer;border-bottom:1px solid var(--bd);transition:background .1s}
+.store-row:last-child{border-bottom:none}
+.store-row:active{background:var(--s2)}
+.store-row.inactive-row{opacity:.5;cursor:default;pointer-events:none}
+.store-row-name{font-size:14px;font-weight:600;color:var(--t1)}
+.store-row-arrow{font-size:16px;color:var(--t3)}
+.store-row-tag{font-size:10px;color:var(--t3);font-style:italic}
+
+/* ── DATE RANGE BAR (tab Negozi) ── */
+.stores-date-bar{padding:12px 16px 4px;display:flex;align-items:center;gap:10px}
+.date-range-pill{flex:1;display:flex;align-items:center;gap:10px;padding:11px 14px;background:var(--s1);border:1px solid var(--bd);border-radius:12px;cursor:pointer;transition:background .12s;-webkit-appearance:none;font-family:var(--font)}
+.date-range-pill:active{background:var(--s2)}
+.date-range-pill.rng-active{border-color:var(--acc);background:#2563eb08}
+.drp-icon{font-size:16px;flex-shrink:0}
+.drp-text{flex:1;font-size:13px;font-weight:600;color:var(--t1);text-align:left}
+.drp-reset{font-size:20px;color:var(--t3);line-height:1;display:none;cursor:pointer;background:none;border:none;padding:0 2px;font-family:var(--font)}
+.drp-reset.show{display:block}
+
+/* ── CALENDARIO DATE RANGE ── */
+#cal-overlay{position:fixed;inset:0;z-index:260;display:none;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.45);backdrop-filter:blur(4px)}
+#cal-overlay.show{display:flex}
+.cal-sheet{background:var(--s1);border-radius:20px 20px 0 0;width:100%;max-width:480px;padding:0 0 calc(var(--safe-bot) + 8px);animation:slideup .25s cubic-bezier(.32,1,.57,1)}
+.cal-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px 10px;border-bottom:1px solid var(--bd)}
+.cal-month-title{font-size:16px;font-weight:700}
+.cal-nav{display:flex;gap:6px}
+.cal-nav-btn{width:34px;height:34px;border-radius:8px;border:1px solid var(--bd);background:var(--s2);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;-webkit-appearance:none;font-family:var(--font);transition:background .12s}
+.cal-nav-btn:active{background:var(--s3)}
+.cal-hint{font-size:12px;color:var(--t2);text-align:center;padding:8px 20px 0;min-height:28px;line-height:1.4}
+.cal-grid{padding:6px 16px 8px}
+.cal-dow{display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:2px}
+.cal-dow span{text-align:center;font-size:11px;font-weight:700;color:var(--t3);padding:4px 0;text-transform:uppercase;letter-spacing:.3px}
+.cal-days{display:grid;grid-template-columns:repeat(7,1fr);gap:1px}
+.cal-day{aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;transition:all .1s;-webkit-appearance:none;border:none;background:transparent;font-family:var(--font);color:var(--t1);position:relative}
+.cal-day:active{transform:scale(.9)}
+.cal-day.other-month{color:var(--t3);font-weight:400}
+.cal-day.today{color:var(--acc)}
+.cal-day.today::after{content:'';position:absolute;bottom:3px;left:50%;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:var(--acc)}
+.cal-day.sel-start,.cal-day.sel-end,.cal-day.sel-single{background:var(--acc);color:#fff;z-index:1}
+.cal-day.sel-start:not(.sel-single){border-radius:8px 0 0 8px}
+.cal-day.sel-end:not(.sel-single){border-radius:0 8px 8px 0}
+.cal-day.in-range{background:#2563eb15;border-radius:0;color:var(--t1)}
+.cal-day.disabled{opacity:.3;cursor:default;pointer-events:none}
+.cal-actions{display:flex;gap:10px;padding:4px 16px 0}
+.cal-btn-reset{flex:1;padding:13px;border:1px solid var(--bd2);border-radius:12px;background:var(--s2);font-family:var(--font);font-size:14px;font-weight:600;color:var(--t2);cursor:pointer;-webkit-appearance:none;transition:background .12s}
+.cal-btn-reset:active{background:var(--s3)}
+.cal-btn-apply{flex:2;padding:13px;background:var(--acc);color:#fff;border:none;border-radius:12px;font-family:var(--font);font-size:14px;font-weight:700;cursor:pointer;-webkit-appearance:none;transition:background .12s}
+.cal-btn-apply:active{background:#1d4ed8}
+.cal-btn-apply:disabled{opacity:.4;cursor:default}
+
+/* ── STORE POPUP CENTRATO ── */
+#store-popup-overlay{position:fixed;inset:0;z-index:250;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.45);backdrop-filter:blur(4px);padding:24px}
+#store-popup-overlay.show{display:flex}
+.store-popup{background:var(--s1);border-radius:20px;width:100%;max-width:340px;padding:22px 20px 18px;box-shadow:0 20px 60px rgba(0,0,0,.2);animation:popIn .2s cubic-bezier(.32,1,.57,1)}
+@keyframes popIn{from{transform:scale(.9);opacity:0}to{transform:scale(1);opacity:1}}
+.spu-header{margin-bottom:18px}
+.spu-brand{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--t3);margin-bottom:4px}
+.spu-title{font-size:18px;font-weight:700;color:var(--t1);line-height:1.2}
+.spu-sub{font-size:12px;color:var(--t3);margin-top:4px}
+.spu-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.spu-btn{padding:16px 12px 14px;border-radius:14px;border:1px solid var(--bd);background:var(--s2);cursor:pointer;font-family:var(--font);text-align:left;transition:all .12s;-webkit-appearance:none;display:flex;flex-direction:column;gap:6px}
+.spu-btn:active{transform:scale(.96);background:var(--s3)}
+.spu-btn-icon{font-size:22px;line-height:1}
+.spu-btn-l{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;font-weight:700;line-height:1}
+.spu-btn-v{font-size:16px;font-weight:700;color:var(--t1);font-family:var(--mono);line-height:1}
+.spu-btn-v.no-data{color:var(--t3);font-size:13px;font-weight:500}
+.spu-close{width:100%;padding:12px;border-radius:12px;border:1px solid var(--bd2);background:var(--s2);font-family:var(--font);font-size:14px;font-weight:600;color:var(--t2);cursor:pointer;-webkit-appearance:none;transition:background .12s}
+.spu-close:active{background:var(--s3)}
 </style>
 </head>
 <body>
@@ -628,6 +701,41 @@ body{display:flex;flex-direction:column}
       <div class="sheet-close" onclick="closeSheet()">×</div>
     </div>
     <div class="sheet-rows" id="sheet-rows"></div>
+  </div>
+</div>
+
+<!-- ── POPUP NEGOZIO (centrato) ── -->
+<div id="store-popup-overlay" onclick="if(event.target===this)closeStorePopup()">
+  <div class="store-popup">
+    <div class="spu-header">
+      <div class="spu-brand" id="spu-brand"></div>
+      <div class="spu-title" id="spu-title"></div>
+      <div class="spu-sub" id="spu-sub"></div>
+    </div>
+    <div class="spu-btns" id="spu-btns"></div>
+    <button class="spu-close" onclick="closeStorePopup()">Chiudi</button>
+  </div>
+</div>
+
+<!-- ── CALENDARIO DATE RANGE ── -->
+<div id="cal-overlay" onclick="if(event.target===this)closeCalendar()">
+  <div class="cal-sheet">
+    <div class="cal-header">
+      <div class="cal-month-title" id="cal-month-title">—</div>
+      <div class="cal-nav">
+        <button class="cal-nav-btn" onclick="calNav(-1)">‹</button>
+        <button class="cal-nav-btn" onclick="calNav(1)">›</button>
+      </div>
+    </div>
+    <div class="cal-hint" id="cal-hint">Tocca un giorno per selezionare</div>
+    <div class="cal-grid">
+      <div class="cal-dow"><span>Lu</span><span>Ma</span><span>Me</span><span>Gi</span><span>Ve</span><span>Sa</span><span>Do</span></div>
+      <div class="cal-days" id="cal-days"></div>
+    </div>
+    <div class="cal-actions">
+      <button class="cal-btn-reset" onclick="calReset()">Azzera</button>
+      <button class="cal-btn-apply" id="cal-btn-apply" onclick="applyCalendar()" disabled>Applica</button>
+    </div>
   </div>
 </div>
 
@@ -718,12 +826,16 @@ body{display:flex;flex-direction:column}
     <div class="cards-list" id="cards-list"></div>
   </div>
 
-  <!-- TAB NEGOZI (saldo per negozio: fondocassa + da-versare cumulato) -->
+  <!-- TAB NEGOZI (lista negozi + popup metriche + calendario range) -->
   <div class="scroll-area" id="tab-stores" style="display:none">
-    <div class="stores-wrap">
-      <div class="stores-summary" id="stores-summary"></div>
-      <div class="stores-list" id="stores-list"></div>
+    <div class="stores-date-bar">
+      <button class="date-range-pill" id="date-range-pill" onclick="openCalendar()">
+        <span class="drp-icon">📅</span>
+        <span class="drp-text" id="drp-text">Tutte le date</span>
+        <span class="drp-reset" id="drp-reset" onclick="event.stopPropagation();resetStoreRange()">×</span>
+      </button>
     </div>
+    <div id="stores-list" style="padding-bottom:32px"></div>
   </div>
 
   <!-- TAB ANDAMENTO (v2: gerarchica anno → mesi → giorni) -->
@@ -961,6 +1073,10 @@ const CONCURRENCY = IS_MOBILE ? 4 : 12;
 // anche dopo la compressione JPEG applicata dal generatore di PDF.
 const ATTACH_MIN_SIDE=200;
 let allData=[], filter='all', filterDate=null, syncTimer=null;
+// Stato range date per la tab Negozi (null = tutte le date)
+let storeRange={from:null,to:null};
+// Stato interno del calendario
+let calState={year:null,month:null,from:null,to:null};
 // Filtri tab Andamento (v2 — gerarchica con multi-select):
 //   - tempoBrands  : array di brand attivi. Vuoto = tutti i brand.
 //   - tempoStores  : array di location attive. Vuoto = tutti gli store dei
@@ -3428,163 +3544,47 @@ function renderTempo(){
 //   - Se ATTIVO  → card normale: fondocassa + da-versare cumulato (calcolati
 //                   dalle chiusure GoAudits ricevute) + toggle "ATTIVO"
 //   - Se NON ATTIVO → card più tenue, senza valori, + toggle "NON ATTIVO"
-// Toggle visibile a tutti, ma cliccabile solo se admin (chi clicca un toggle
-// senza permessi riceve un alert "Solo admin..."). La PATCH è comunque
-// protetta lato backend: se uno smanetta col DOM, fallisce in 403.
+// ── TAB NEGOZI: lista semplice negozi ──────────────────────────────────
+// Mostra solo il nome del negozio per brand. Click → popup centrato con
+// le 4 metriche per il range di date selezionato.
 function renderStores(){
-  const role = auth && auth.user ? auth.user.role : null;
-  const canToggle = role === 'admin';
-  // 1) Indicizzo le chiusure ricevute per chiave brand|location
-  const byStore={};
-  for(const r of allData){
-    const k=storeKey(r.brand,r.location);
-    if(!byStore[k]) byStore[k]=[];
-    byStore[k].push(r);
-  }
-  // 2) Raggruppo i 30 negozi per brand. Dentro ogni brand prima i monitorati
-  //    (in ordine di ALL_STORES), poi i non monitorati (idem). Così
-  //    quando un negozio passa da non-attivo ad attivo "salta" sopra ai
-  //    non-attivi e si ricongiunge al blocco di quelli attivi: niente
-  //    alternanza visiva attivo/non-attivo/attivo.
   const grouped={};
   for(const s of ALL_STORES){
-    if(!grouped[s.brand]) grouped[s.brand]={active:[], inactive:[]};
-    const monitored = isStoreMonitored(s.brand, s.location);
-    (monitored ? grouped[s.brand].active : grouped[s.brand].inactive).push(s);
+    if(!grouped[s.brand]) grouped[s.brand]=[];
+    grouped[s.brand].push(s);
   }
-
-  // Aggregati globali per la summary in cima.
-  // I non-attivi NON contribuiscono al totale fondocassa/saldo (anche se
-  // teoricamente non avrebbero chiusure GoAudits, è più pulito ignorarli).
-  let totFondo=0, totSaldo=0, storesWithData=0, activeCount=0;
-
   let html='';
-  for(const [brand,group] of Object.entries(grouped)){
-    // Iterare i monitorati prima dei non-monitorati: si evita l'alternanza
-    // visiva quando un negozio che era inattivo viene attivato e dovrebbe
-    // "salire" sopra agli altri non-attivi.
-    const stores = [...group.active, ...group.inactive];
+  for(const [brand, stores] of Object.entries(grouped)){
     const bc=brandColor(brand);
-    let bFondo=0, bSaldo=0;
-
-    let sectionHtml='';
-    for(const s of stores){
-      const k=storeKey(s.brand,s.location);
-      const records=byStore[k]||[];
-      const monitored = isStoreMonitored(s.brand, s.location);
-      if(monitored) activeCount++;
-
-      // Toggle HTML (sempre presente, in alto a destra del card head).
-      // Cliccabile solo da admin; per gli altri utenti è readonly (mostra
-      // solo lo stato attuale, niente click).
-      const toggleCls = monitored ? 'active' : 'inactive';
-      const toggleTxt = monitored ? 'ATTIVO' : 'NON ATTIVO';
-      const tBrand = s.brand.replace(/'/g,"\\'");
-      const tLoc   = s.location.replace(/'/g,"\\'");
-      const toggleHtml = canToggle
-        ? `<span class="store-toggle ${toggleCls}" onclick="event.stopPropagation();toggleStoreActive('${tBrand}','${tLoc}')" title="Click per cambiare stato">${toggleTxt}</span>`
-        : `<span class="store-toggle ${toggleCls} readonly" title="Solo admin">${toggleTxt}</span>`;
-
-      if(!monitored){
-        // Card "non attivo": niente fondocassa/saldo, niente onclick (non ha
-        // senso aprire lo sheet del dettaglio: non ci sono chiusure).
-        sectionHtml += `<div class="store-card store-summary inactive" style="border-left:3px solid ${bc.strong}">
-          <div class="card-head">
-            <div class="store-card-head-row">
-              <div>
-                <div class="card-name">${s.location}</div>
-                <div class="card-date">non riceve chiusure</div>
-              </div>
-              ${toggleHtml}
-            </div>
-          </div>
-        </div>`;
-        continue;
-      }
-
-      // Calcoli per i negozi ATTIVI
-      let fondo=0, sumDV=0, sumV=0, lastDisp='', lastISO='';
-      for(const r of records){
-        sumDV += r.daVersare||0;
-        sumV  += r.versato||0;
-        if(!lastISO || r.dateISO>lastISO){
-          lastISO=r.dateISO;
-          lastDisp=r.dateDisplay;
-          fondo=r.fondo||0;
-        }
-      }
-      const saldo=sumDV-sumV; // residuo da versare
-      const isEmpty=records.length===0;
-      bFondo+=fondo; bSaldo+=saldo;
-      if(!isEmpty) storesWithData++;
-
-      // Classi colore per il saldo: rosso se positivo (negozio deve ancora versare),
-      // verde se negativo (ha versato più del dovuto), neutro se zero
-      const saldoCls = saldo>0.01 ? 'r' : (saldo<-0.01 ? 'g' : '');
-
-      // L'onclick apre lo sheet di dettaglio. Lo metto sull'intera card.
-      // Il toggle ha `event.stopPropagation()` per non aprire lo sheet quando
-      // l'admin clicca proprio sul badge attivo/non-attivo.
-      const onclick = `onclick="openStoreSheet('${tBrand}','${tLoc}')"`;
-      const cardCls = isEmpty ? 'store-card store-summary empty' : 'store-card store-summary';
-      const borderStyle = isEmpty ? `border-left:3px dashed ${bc.strong}` : `border-left:3px solid ${bc.strong}`;
-      const dateText = isEmpty
-        ? 'Nessuna chiusura ricevuta'
-        : `aggiornato ${lastDisp} · ${records.length} chiusur${records.length===1?'a':'e'}`;
-      const fondoCell = isEmpty
-        ? `<div class="card-cell-v no-data-cell">—</div>`
-        : `<div class="card-cell-v">${fmt(fondo)}</div>`;
-      const saldoCell = isEmpty
-        ? `<div class="card-cell-v no-data-cell">—</div>`
-        : `<div class="card-cell-v ${saldoCls}">${fmt(saldo)}</div>`;
-
-      sectionHtml += `<div class="${cardCls}" style="${borderStyle}" ${onclick}>
-        <div class="card-head">
-          <div class="store-card-head-row">
-            <div>
-              <div class="card-name">${s.location}</div>
-              <div class="card-date">${dateText}</div>
-            </div>
-            ${toggleHtml}
-          </div>
-        </div>
-        <div class="card-body">
-          <div class="card-cell">
-            <div class="card-cell-l">Fondocassa</div>
-            ${fondoCell}
-          </div>
-          <div class="card-cell">
-            <div class="card-cell-l">Da versare cumulato</div>
-            ${saldoCell}
-          </div>
-        </div>
+    const tBrand=brand.replace(/'/g,"\\'");
+    html+=`<div class="stores-brand-block">
+      <div class="stores-brand-hd" style="background:${bc.tint}">
+        <span class="stores-brand-hd-label" style="color:${bc.text}">${brand}</span>
+        <span class="stores-brand-hd-count" style="color:${bc.text};opacity:.7">${stores.length} negoz${stores.length===1?'io':'i'}</span>
       </div>`;
+    for(const s of stores){
+      const monitored=isStoreMonitored(s.brand,s.location);
+      const tLoc=s.location.replace(/'/g,"\\'");
+      if(monitored){
+        html+=`<div class="store-row" onclick="openStorePopup('${tBrand}','${tLoc}')">
+          <span class="store-row-name">${s.location}</span>
+          <span class="store-row-arrow">›</span>
+        </div>`;
+      }else{
+        html+=`<div class="store-row inactive-row">
+          <span class="store-row-name">${s.location}</span>
+          <span class="store-row-tag">non attivo</span>
+        </div>`;
+      }
     }
-
-    totFondo+=bFondo; totSaldo+=bSaldo;
-
-    html += `<div class="brand-header" style="background:${bc.tint};border-radius:8px;padding:8px 12px">
-      <span class="brand-label" style="color:${bc.text}">${brand}</span>
-      <span class="brand-count" style="color:${bc.text};opacity:.7">${stores.length} negoz${stores.length===1?'io':'i'}</span>
-    </div>` + sectionHtml;
+    html+=`</div>`;
   }
-
-  // Summary in cima: totali generali. "X su Y attivi" mostra ora i negozi
-  // ATTIVI (su 30 mappati totali), non più i negozi con dati su attivi.
-  // Sotto a Fondocassa metto entrambe le info: "su {activeCount} attivi · {storesWithData} hanno dati"
-  document.getElementById('stores-summary').innerHTML = `
-    <div class="ssum-card">
-      <div class="ssum-l">Fondocassa totale</div>
-      <div class="ssum-v">${fmt(totFondo)}</div>
-      <div class="ssum-s">${activeCount} su ${ALL_STORES.length} negozi attivi</div>
-    </div>
-    <div class="ssum-card">
-      <div class="ssum-l">Da versare cumulato</div>
-      <div class="ssum-v ${totSaldo>0.01?'r':totSaldo<-0.01?'g':''}">${fmt(totSaldo)}</div>
-      <div class="ssum-s">${totSaldo>0.01?'residuo da depositare':totSaldo<-0.01?'versato in eccesso':'in pareggio'}</div>
-    </div>`;
-  document.getElementById('stores-list').innerHTML = html;
+  document.getElementById('stores-list').innerHTML=html;
 }
+
+// Mantengo il vecchio renderStores per compatibilità con il resto del codice
+// (es. renderAll chiama renderStores). La funzione sopra è la nuova versione.
+
 
 // Toggle attivo/non-attivo per un punto vendita (tab Negozi → click sul badge).
 // Permesso: solo admin (gli editor NON possono attivare/disattivare negozi).
@@ -3836,6 +3836,186 @@ function _buildDayRow(r){
     </div>
     <div class="saldo-row-delta ${dCls}">${dPrefix}${fmt(delta)}</div>
   </div>`;
+}
+
+// ── POPUP NEGOZIO + CALENDARIO DATE RANGE ──────────────────────────────
+
+// Apre il popup centrato con le 4 metriche per il range selezionato
+function openStorePopup(brand, location){
+  const k=storeKey(brand,location);
+  let records=allData.filter(r=>storeKey(r.brand,r.location)===k && r.dateISO);
+
+  // Filtra per range se selezionato
+  if(storeRange.from){
+    const f=storeRange.from, t=storeRange.to||storeRange.from;
+    records=records.filter(r=>r.dateISO>=f && r.dateISO<=t);
+  }
+
+  // Fondo cassa = ultimo disponibile nel range
+  const sorted=[...records].sort((a,b)=>b.dateISO.localeCompare(a.dateISO));
+  const latestFondo=sorted.length ? (sorted[0].fondo||0) : null;
+  const sumCorr=records.reduce((a,r)=>a+(r.corrispettivo||0),0);
+  const sumPOS=records.reduce((a,r)=>a+(r.pos||0),0);
+  const sumCash=records.reduce((a,r)=>a+(r.contanti||0),0);
+  const noData=records.length===0;
+
+  const subLabel=storeRange.from
+    ? (storeRange.from===storeRange.to
+        ? storeRange.from.split('-').reverse().join('/')
+        : `${storeRange.from.split('-').reverse().join('/')} → ${storeRange.to.split('-').reverse().join('/')}`)
+    : (records.length ? `${records.length} chiusur${records.length===1?'a':'e'} totali` : 'Nessuna chiusura');
+
+  document.getElementById('spu-brand').textContent=brand;
+  document.getElementById('spu-title').textContent=location;
+  document.getElementById('spu-sub').textContent=subLabel;
+
+  const metrics=[
+    {icon:'🏦',label:'Fondo cassa',       value:latestFondo},
+    {icon:'🧾',label:'Corrispettivo',      value:sumCorr},
+    {icon:'💳',label:'Incassato POS',      value:sumPOS},
+    {icon:'💵',label:'Incassato contanti', value:sumCash},
+  ];
+
+  document.getElementById('spu-btns').innerHTML=metrics.map(m=>{
+    const mBrand=brand.replace(/'/g,"\\'"), mLoc=location.replace(/'/g,"\\'");
+    const mLabel=m.label.replace(/'/g,"\\'");
+    const vHtml=noData||m.value===null
+      ?`<div class="spu-btn-v no-data">—</div>`
+      :`<div class="spu-btn-v">${fmt(m.value)}</div>`;
+    return `<button class="spu-btn" onclick="openStoreMetricSheet('${mBrand}','${mLoc}','${mLabel}')">
+      <div class="spu-btn-icon">${m.icon}</div>
+      <div class="spu-btn-l">${m.label}</div>
+      ${vHtml}
+    </button>`;
+  }).join('');
+
+  document.getElementById('store-popup-overlay').classList.add('show');
+}
+
+function closeStorePopup(){
+  document.getElementById('store-popup-overlay').classList.remove('show');
+}
+
+// Tap su un pulsante metrica → chiude popup e apre lo sheet storico
+function openStoreMetricSheet(brand, location, metric){
+  closeStorePopup();
+  openStoreSheet(brand, location);
+}
+
+// ── CALENDARIO DATE RANGE ────────────────────────────────────────────────
+
+function openCalendar(){
+  const now=new Date();
+  calState.year=now.getFullYear();
+  calState.month=now.getMonth();
+  calState.from=storeRange.from;
+  calState.to=storeRange.to;
+  _renderCal();
+  document.getElementById('cal-overlay').classList.add('show');
+}
+function closeCalendar(){
+  document.getElementById('cal-overlay').classList.remove('show');
+}
+function calNav(dir){
+  calState.month+=dir;
+  if(calState.month<0){calState.month=11;calState.year--;}
+  if(calState.month>11){calState.month=0;calState.year++;}
+  _renderCal();
+}
+function calReset(){
+  calState.from=null; calState.to=null;
+  _renderCal();
+}
+function _renderCal(){
+  const {year,month,from,to}=calState;
+  const MESI=['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+  document.getElementById('cal-month-title').textContent=`${MESI[month]} ${year}`;
+
+  const hint=document.getElementById('cal-hint');
+  if(!from) hint.textContent='Tocca un giorno per selezionare';
+  else if(!to) hint.textContent='Tocca un secondo giorno per il range, o lo stesso per un singolo giorno';
+  else{
+    const fd=from.split('-'), td=to.split('-');
+    hint.textContent=from===to
+      ?`Giorno: ${fd[2]}/${fd[1]}/${fd[0]}`
+      :`${fd[2]}/${fd[1]}/${fd[0]} → ${td[2]}/${td[1]}/${td[0]}`;
+  }
+
+  const applyBtn=document.getElementById('cal-btn-apply');
+  applyBtn.disabled=!from;
+
+  const tod=_isoToday();
+  const firstDow=new Date(year,month,1).getDay();
+  const startOffset=firstDow===0?6:firstDow-1;
+  const daysInMonth=new Date(year,month+1,0).getDate();
+
+  let html='';
+  for(let i=0;i<startOffset;i++) html+=`<button class="cal-day other-month" disabled></button>`;
+  for(let d=1;d<=daysInMonth;d++){
+    const iso=`${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    let cls='cal-day';
+    if(iso===tod) cls+=' today';
+    if(from&&to){
+      if(iso===from&&iso===to) cls+=' sel-start sel-end sel-single';
+      else if(iso===from)      cls+=' sel-start';
+      else if(iso===to)        cls+=' sel-end';
+      else if(iso>from&&iso<to) cls+=' in-range';
+    } else if(from&&iso===from){
+      cls+=' sel-start sel-single';
+    }
+    html+=`<button class="${cls}" onclick="calPickDay('${iso}')">${d}</button>`;
+  }
+  document.getElementById('cal-days').innerHTML=html;
+}
+
+function calPickDay(iso){
+  const {from,to}=calState;
+  if(!from||(from&&to)){
+    calState.from=iso; calState.to=null;
+  } else {
+    if(iso===from)       { calState.to=iso; }
+    else if(iso<from)    { calState.to=from; calState.from=iso; }
+    else                 { calState.to=iso; }
+  }
+  _renderCal();
+}
+
+function applyCalendar(){
+  if(!calState.from) return;
+  storeRange.from=calState.from;
+  storeRange.to=calState.to||calState.from;
+  _updateDatePill();
+  closeCalendar();
+  renderStores();
+}
+
+function resetStoreRange(){
+  storeRange={from:null,to:null};
+  _updateDatePill();
+  renderStores();
+}
+
+function _updateDatePill(){
+  const pill=document.getElementById('date-range-pill');
+  const txt=document.getElementById('drp-text');
+  const rst=document.getElementById('drp-reset');
+  if(!storeRange.from){
+    txt.textContent='Tutte le date';
+    pill.classList.remove('rng-active');
+    rst.classList.remove('show');
+  } else {
+    const f=storeRange.from.split('-'), t=storeRange.to.split('-');
+    txt.textContent=storeRange.from===storeRange.to
+      ?`${f[2]}/${f[1]}/${f[0]}`
+      :`${f[2]}/${f[1]} → ${t[2]}/${t[1]}`;
+    pill.classList.add('rng-active');
+    rst.classList.add('show');
+  }
+}
+
+function _isoToday(){
+  const n=new Date();
+  return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`;
 }
 
 // ── SHEET STORICO SALDO (cliccando una card della tab Negozi) ──
