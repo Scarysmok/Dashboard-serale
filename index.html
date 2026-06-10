@@ -2754,14 +2754,11 @@ function renderKPI(){
   const d=getFilteredData();
   const totCorr=d.reduce((a,r)=>a+r.corrispettivo,0);
   const totNet=totCorr/1.22;
-  // expectedCount è date-aware: per filterDate consideriamo i negozi attivi
-  // IN QUELLA DATA (rispettando active_from), altrimenti lo stato attuale.
-  // Senza questa distinzione, una data passata ottiene "X/23" col 23 di OGGI
-  // e non con i 21 di quella data — incoerente col chip Mancanti che invece
-  // usa già il filtro per data.
-  const expectedCount = filterDate
-    ? ALL_STORES.filter(s => isStoreMonitoredOn(s.brand, s.location, filterDate)).length
-    : EXPECTED_STORES.length;
+  // expectedCount riflette sempre lo stato ATTUALE dei negozi attivi (EXPECTED_STORES),
+  // indipendentemente da filterDate. Il chip "Mancanti" usa già la logica date-aware
+  // tramite getMissingStores(); qui vogliamo che l'utente veda subito l'effetto
+  // di ogni toggle attivo/non-attivo senza dover cambiare la data selezionata.
+  const expectedCount = EXPECTED_STORES.length;
   const negSub=filterDate
     ? `inviate · ${Math.max(0, expectedCount-d.length)} mancanti su ${expectedCount}`
     : 'PDF caricati';
