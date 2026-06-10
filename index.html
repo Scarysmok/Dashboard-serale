@@ -1906,6 +1906,7 @@ const TARGETS_HEADER_MAP = {
   'yamamay lecce city (sauro)':       ['Yamamay', 'Lecce'],
   'yamamay monopoli':                 ['Yamamay', 'Monopoli'],
   'yamamay monopoli city':            ['Yamamay', 'Monopoli'],
+  'yamamay monopoli city (magenta)':  ['Yamamay', 'Monopoli'],
   'yamamay polignano city (a. moro)': ['Yamamay', 'Polignano'],
   // 10 negozi NON-GoAudits (target c'erano nell'Excel ma non venivano letti
   // perché le colonne non sono verdi). Gli header del target hanno nomi più
@@ -1977,15 +1978,20 @@ async function uploadTargetsExcel(event){
       }
     }
     const matchedCount = Object.keys(colToStore).length;
-    const expectedCount = Object.keys(TARGETS_HEADER_MAP).length;
+    // expectedCount conta negozi unici (non chiavi — più alias puntano allo stesso negozio)
+    const expectedCount = new Set(Object.values(TARGETS_HEADER_MAP).map(v=>v.join('|'))).size;
     if(!matchedCount){
       throw new Error('Nessun negozio riconosciuto negli header Excel. Verifica che i nomi corrispondano a quelli attesi (es. "yamamay Polignano City (A. Moro)").');
     }
-    // Lista negozi attesi che mancano nell'Excel (per warning informativo)
-    const missing = [];
+    // Lista negozi attesi che mancano nell'Excel (per warning informativo).
+    // Usa un Set per evitare duplicati quando più alias puntano allo stesso negozio.
+    const missingSet = new Set();
     for(const k of Object.keys(TARGETS_HEADER_MAP)){
-      if(!seen.has(k)) missing.push(TARGETS_HEADER_MAP[k].join(' '));
+      if(!seen.has(k)) missingSet.add(TARGETS_HEADER_MAP[k].join(' '));
     }
+    // Rimuovi dal set i negozi che sono stati trovati tramite un altro alias
+    for(const [c, [b,l]] of Object.entries(colToStore)) missingSet.delete(`${b} ${l}`);
+    const missing = [...missingSet];
     // 3) Itera sulle righe dati (da headerRowIdx+1 in poi). Per ogni riga,
     // legge la data dalla colonna "Data" trovata sopra, poi i target dalle
     // colonne riconosciute. Righe senza data valida vengono saltate (gestisce
