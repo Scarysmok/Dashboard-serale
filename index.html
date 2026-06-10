@@ -688,7 +688,9 @@ body{display:flex;flex-direction:column}
 .spu-brand{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--t3);margin-bottom:4px}
 .spu-title{font-size:18px;font-weight:700;color:var(--t1);line-height:1.2}
 .spu-sub{font-size:12px;color:var(--t3);margin-top:4px}
-.spu-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.spu-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.spu-btn-versamenti{width:100%;padding:13px;border-radius:12px;border:1px solid var(--bd2);background:var(--s2);font-family:var(--font);font-size:14px;font-weight:600;color:var(--acc);cursor:pointer;-webkit-appearance:none;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:14px;transition:background .12s}
+.spu-btn-versamenti:active{background:var(--s3)}
 .spu-btn{padding:16px 12px 14px;border-radius:14px;border:1px solid var(--bd);background:var(--s2);cursor:pointer;font-family:var(--font);text-align:left;transition:all .12s;-webkit-appearance:none;display:flex;flex-direction:column;gap:6px}
 .spu-btn:active{transform:scale(.96);background:var(--s3)}
 .spu-btn-icon{font-size:22px;line-height:1}
@@ -730,6 +732,7 @@ body{display:flex;flex-direction:column}
       <div class="spu-sub" id="spu-sub"></div>
     </div>
     <div class="spu-btns" id="spu-btns"></div>
+    <button class="spu-btn-versamenti" id="spu-btn-versamenti" onclick="openStoreVersamenti()">🏦 Versamenti e saldo cassa</button>
     <button class="spu-close" onclick="closeStorePopup()">Chiudi</button>
   </div>
 </div>
@@ -3896,6 +3899,9 @@ function openStorePopup(brand, location){
   document.getElementById('spu-brand').textContent=brand;
   document.getElementById('spu-title').textContent=location;
   document.getElementById('spu-sub').textContent=subLabel;
+  // Salvo brand/location sul popup per usarli dai bottoni figli
+  document.getElementById('store-popup-overlay').dataset.brand=brand;
+  document.getElementById('store-popup-overlay').dataset.location=location;
 
   const metrics=[
     {icon:'🏦',label:'Fondo cassa',       value:latestFondo},
@@ -3924,8 +3930,81 @@ function closeStorePopup(){
   document.getElementById('store-popup-overlay').classList.remove('show');
 }
 
-// Tap su un pulsante metrica → chiude popup e apre lo sheet storico
+// Tap su un pulsante metrica → chiude popup e apre storico giornaliero
 function openStoreMetricSheet(brand, location, metric){
+  closeStorePopup();
+
+  const k=storeKey(brand,location);
+  let records=allData
+    .filter(r=>storeKey(r.brand,r.location)===k && r.dateISO)
+    .sort((a,b)=>b.dateISO.localeCompare(a.dateISO));
+
+  // Applica filtro range date se attivo
+  if(storeRange.from){
+    const f=storeRange.from, t=storeRange.to||storeRange.from;
+    records=records.filter(r=>r.dateISO>=f && r.dateISO<=t);
+  }
+
+  // Configurazione per ogni metrica
+  const METRICS={
+    'Fondo cassa':       {field:'fondo',       isSum:false, color:'',  label:'Fondo cassa',       note:'Valore nel cassetto a fine giornata'},
+    'Corrispettivo':     {field:'corrispettivo',isSum:true,  color:'g', label:'Corrispettivo',     note:'Lordo IVA 22%'},
+    'Incassato POS':     {field:'pos',          isSum:true,  color:'b', label:'Incassato POS',     note:''},
+    'Incassato contanti':{field:'contanti',     isSum:true,  color:'g', label:'Incassato contanti',note:''},
+  };
+  const cfg=METRICS[metric]||{field:metric,isSum:true,color:'',label:metric,note:''};
+
+  document.getElementById('sheet-title').textContent=`${cfg.label} · ${location}`;
+  document.getElementById('sheet-sub').textContent=brand
+    +(storeRange.from
+      ? ` · ${storeRange.from.split('-').reverse().join('/')}${storeRange.from!==storeRange.to?' → '+storeRange.to.split('-').reverse().join('/')':''}`
+      : '');
+
+  if(!records.length){
+    document.getElementById('sheet-rows').innerHTML=`<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-text">Nessun dato nel periodo selezionato</div></div>`;
+    document.getElementById('sheet').classList.add('show');
+    return;
+  }
+
+  // Totale o ultimo valore
+  const total = cfg.isSum
+    ? records.reduce((a,r)=>a+(r[cfg.field]||0),0)
+    : (records[0][cfg.field]||0); // primo = più recente
+  const totalLabel = cfg.isSum ? 'Totale periodo' : 'Ultimo valore';
+
+  const GIORNI=['Dom','Lun','Mar','Mer','Gio','Ven','Sab'];
+  let html=`
+    <div class="sheet-row" style="background:var(--s2);padding:10px 20px 8px">
+      <span style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.5px">${totalLabel}</span>
+      <span class="row-v ${cfg.color}" style="font-size:18px">${fmt(total)}</span>
+    </div>
+    ${cfg.note?`<div style="padding:6px 20px 2px;font-size:11px;color:var(--t3)">${cfg.note}</div>`:''}
+    <div class="sheet-row" style="background:var(--s2);padding:7px 20px">
+      <span style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.5px">Storico giornaliero</span>
+    </div>`;
+
+  for(const r of records){
+    const val=r[cfg.field]||0;
+    const d=new Date(r.dateISO+'T12:00:00');
+    const dow=GIORNI[d.getDay()];
+    html+=`<div class="sheet-row">
+      <div>
+        <div style="font-size:13px;font-weight:600">${r.dateDisplay}</div>
+        <div style="font-size:11px;color:var(--t3)">${dow}</div>
+      </div>
+      <span class="row-v ${cfg.color}">${fmt(val)}</span>
+    </div>`;
+  }
+
+  document.getElementById('sheet-rows').innerHTML=html;
+  document.getElementById('sheet').classList.add('show');
+}
+
+// Versamenti → apre lo sheet storico Da versare / Versato / Saldo
+function openStoreVersamenti(){
+  const overlay=document.getElementById('store-popup-overlay');
+  const brand=overlay.dataset.brand||'';
+  const location=overlay.dataset.location||'';
   closeStorePopup();
   openStoreSheet(brand, location);
 }
