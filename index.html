@@ -3647,7 +3647,7 @@ async function toggleStoreActive(brand, location){
 
   try{
     const r = await api('/stores/flags', {
-      method:'PATCH',
+      method:'POST',
       body: JSON.stringify({ brand, location, monitored: next }),
     });
     if(!r.ok){
