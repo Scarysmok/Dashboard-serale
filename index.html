@@ -3957,7 +3957,7 @@ function openStoreMetricSheet(brand, location, metric){
   document.getElementById('sheet-title').textContent=`${cfg.label} · ${location}`;
   document.getElementById('sheet-sub').textContent=brand
     +(storeRange.from
-      ? ` · ${storeRange.from.split('-').reverse().join('/')}${storeRange.from!==storeRange.to?' → '+storeRange.to.split('-').reverse().join('/')':''}`
+      ? ` · ${storeRange.from.split('-').reverse().join('/')}${storeRange.from!==storeRange.to?' → '+storeRange.to.split('-').reverse().join('/') : ''}`
       : '');
 
   if(!records.length){
