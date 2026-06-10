@@ -1890,6 +1890,8 @@ const TARGETS_HEADER_MAP = {
   'mango teramo gran sasso':          ['Mango',   'Teramo'],
   'mango treviso city (calmaggiore)': ['Mango',   'Treviso'],
   'yamamay lecce city (sauro)':       ['Yamamay', 'Lecce'],
+  'yamamay monopoli':                 ['Yamamay', 'Monopoli'],
+  'yamamay monopoli city':            ['Yamamay', 'Monopoli'],
   'yamamay polignano city (a. moro)': ['Yamamay', 'Polignano'],
   // 10 negozi NON-GoAudits (target c'erano nell'Excel ma non venivano letti
   // perché le colonne non sono verdi). Gli header del target hanno nomi più
@@ -2771,7 +2773,7 @@ function brandColor(name){
 }
 
 // ── ELENCO NEGOZI ──
-// ALL_STORES = lista completa dei punti vendita di Rino Petino (30 in totale).
+// ALL_STORES = lista completa dei punti vendita di Rino Petino (31 in totale).
 // Il flag `monitored` distingue:
 //   true  → invia chiusura giornaliera tramite GoAudits (20 negozi)
 //   false → non è ancora su GoAudits, esiste solo nei dati storici Excel
@@ -2800,8 +2802,9 @@ const ALL_STORES=[
   {brand:'Mango',   location:'Bariblu',          monitored:true},
   {brand:'Mango',   location:'Molfetta',         monitored:true},
   {brand:'Mango',   location:'Treviso',          monitored:true},
-  {brand:'Yamamay', location:'Polignano',        monitored:true},
   {brand:'Yamamay', location:'Lecce',            monitored:true},
+  {brand:'Yamamay', location:'Monopoli',         monitored:true},
+  {brand:'Yamamay', location:'Polignano',        monitored:true},
   // ── Non ancora su GoAudits (dati solo storici, gestione manuale) ──
   // Stato di default: attivabili dalla tab Negozi (admin) tramite toggle.
   // L'override vivo è in MongoDB (collection store_flags), il valore qui sotto
