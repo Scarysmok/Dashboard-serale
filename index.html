@@ -641,10 +641,9 @@ body{display:flex;flex-direction:column}
 .cal-nav-btn{width:28px;height:28px;border-radius:50%;border:none;background:transparent;font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#8c959f;-webkit-appearance:none;font-family:var(--font);transition:background .12s;line-height:1}
 .cal-nav-btn:active{background:#f0f0f0}
 .cal-hint{font-size:11px;color:#8c959f;text-align:center;min-height:20px;margin-bottom:8px;line-height:1.4}
-.cal-grid{margin-bottom:4px}
-.cal-dow{display:grid;grid-template-columns:repeat(7,1fr);margin-bottom:4px}
-.cal-dow span{text-align:center;font-size:11px;font-weight:600;color:#8c959f;padding:2px 0}
-.cal-days{display:grid;grid-template-columns:repeat(7,1fr);gap:0}
+/* Unica griglia 7 colonne: intestazioni + numeri nello stesso grid container */
+#cal-main-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:0;margin-bottom:4px}
+.cal-dow-cell{display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#8c959f;padding:4px 0 6px}
 /* Base: ogni cella è un cerchio */
 .cal-day{aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:50%;font-size:13px;font-weight:500;cursor:pointer;transition:background .1s;-webkit-appearance:none;border:none;background:transparent;font-family:var(--font);color:#1f2328;position:relative;margin:1px 0}
 .cal-day:active{opacity:.7}
@@ -735,10 +734,7 @@ body{display:flex;flex-direction:column}
       </div>
     </div>
     <div class="cal-hint" id="cal-hint">Tocca un giorno per selezionare</div>
-    <div class="cal-grid">
-      <div class="cal-dow"><span>L</span><span>M</span><span>M</span><span>G</span><span>V</span><span>S</span><span>D</span></div>
-      <div class="cal-days" id="cal-days"></div>
-    </div>
+    <div id="cal-main-grid"></div>
     <div class="cal-actions">
       <button class="cal-btn-reset" onclick="calReset()">Azzera</button>
       <button class="cal-btn-apply" id="cal-btn-apply" onclick="applyCalendar()" disabled>Applica</button>
@@ -3956,8 +3952,13 @@ function _renderCal(){
   const startOffset=firstDow===0?6:firstDow-1;
   const daysInMonth=new Date(year,month+1,0).getDate();
 
-  let html='';
+  // Intestazioni giorni (stessa griglia dei numeri = allineamento garantito)
+  const DOW=['L','M','M','G','V','S','D'];
+  let html=DOW.map(l=>`<div class="cal-dow-cell">${l}</div>`).join('');
+
+  // Celle vuote prima del primo giorno del mese
   for(let i=0;i<startOffset;i++) html+=`<button class="cal-day other-month" disabled></button>`;
+
   for(let d=1;d<=daysInMonth;d++){
     const iso=`${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     let cls='cal-day';
@@ -3972,7 +3973,7 @@ function _renderCal(){
     }
     html+=`<button class="${cls}" onclick="calPickDay('${iso}')">${d}</button>`;
   }
-  document.getElementById('cal-days').innerHTML=html;
+  document.getElementById('cal-main-grid').innerHTML=html;
 }
 
 function calPickDay(iso){
