@@ -3419,7 +3419,26 @@ function renderTempo(){
         const dlt = (y.netPast - y.tgtPast) / y.tgtPast * 100;
         yBadge += `<span class="am-badge ${badgeCls(dlt)}">${fmtPctSign(dlt)} vs TGT</span>`;
       }
-      if(comparePy) yBadge += pyBadge(y.netPast, pyNetForYear(yr));
+      if(comparePy){
+        // Stessa logica del mese: se l'anno "past" è l'anno corrente o successivo
+        // (nessun target caricato → 0 giorni futuri), confrontare parziale vs parziale.
+        const isCurrentOrLaterYr = +yr >= +todayISO.slice(0, 4);
+        if(isCurrentOrLaterYr){
+          const todayPyISOy = shiftYearBackISO(todayISO);
+          const prevY = years[String(+yr - 1)];
+          if(prevY){
+            let pyNetParzY = 0;
+            for(const pmk of Object.keys(prevY.months)){
+              for(const pd of prevY.months[pmk].days){
+                if(pd.dateISO <= todayPyISOy) pyNetParzY += pd.net;
+              }
+            }
+            yBadge += pyBadge(y.netPast, pyNetParzY, 'vs PY (parziale)');
+          }
+        } else {
+          yBadge += pyBadge(y.netPast, pyNetForYear(yr));
+        }
+      }
     } else if(yStatus === 'future'){
       yMain = `<div class="am-row-net future">target ${fmt(y.tgtAll)}</div>`;
     } else {
@@ -3482,7 +3501,28 @@ function renderTempo(){
           const dlt = (m.netPast - m.tgtPast) / m.tgtPast * 100;
           mBadge += `<span class="am-badge ${badgeCls(dlt)}">${fmtPctSign(dlt)} vs TGT</span>`;
         }
-        if(comparePy) mBadge += pyBadge(m.netPast, pyNetForMonth(mk));
+        if(comparePy){
+          // Se il mese "past" è comunque il mese corrente o successivo (le chiusure
+          // di oggi non sono ancora entrate → 0 giorni futuri nel dataset ma il mese
+          // non è finito), il confronto vs PY deve usare solo i giorni corrispondenti
+          // dell'anno scorso. Altrimenti confronteremmo 9 giorni di Giugno 2026 contro
+          // i 30 giorni di Giugno 2025, mostrando -61% anche se ogni singolo giorno è +%.
+          const isCurrentOrLaterMo = mk >= todayISO.slice(0, 7);
+          if(isCurrentOrLaterMo){
+            const [py2, pmm2] = mk.split('-');
+            const prevMo2 = years[String(+py2 - 1)] && years[String(+py2 - 1)].months[String(+py2 - 1) + '-' + pmm2];
+            if(prevMo2){
+              const todayPyISO2 = shiftYearBackISO(todayISO);
+              let pyNetParz2 = 0;
+              for(const pd of prevMo2.days){
+                if(pd.dateISO <= todayPyISO2) pyNetParz2 += pd.net;
+              }
+              mBadge += pyBadge(m.netPast, pyNetParz2, 'vs PY (parziale)');
+            }
+          } else {
+            mBadge += pyBadge(m.netPast, pyNetForMonth(mk));
+          }
+        }
       } else if(mStatus === 'future'){
         mMain = `<div class="am-row-net future">target ${fmt(m.tgtAll)}</div>`;
         mSub = `${m.days.length} giorni · solo previsionale`;
