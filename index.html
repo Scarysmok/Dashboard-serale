@@ -699,6 +699,126 @@ body{display:flex;flex-direction:column}
 .spu-btn-v.no-data{color:var(--t3);font-size:13px;font-weight:500}
 .spu-close{width:100%;padding:12px;border-radius:12px;border:1px solid var(--bd2);background:var(--s2);font-family:var(--font);font-size:14px;font-weight:600;color:var(--t2);cursor:pointer;-webkit-appearance:none;transition:background .12s}
 .spu-close:active{background:var(--s3)}
+
+/* ── FRECCE NAVIGAZIONE GIORNI (tab Chiusure) ── */
+.date-arrow{flex-shrink:0;width:34px;height:34px;border-radius:50%;border:1px solid var(--bd2);background:var(--s2);color:var(--acc);font-size:18px;font-weight:700;display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-appearance:none;font-family:var(--font);transition:background .12s,opacity .12s;line-height:1;padding:0}
+.date-arrow:active{background:var(--s3)}
+.date-arrow:disabled{opacity:.3;cursor:default}
+
+/* ── ORDINAMENTO CARD (tab Chiusure) ── */
+.search-row{display:flex;gap:8px;padding:0 16px 12px;align-items:center}
+.search-row .search-field{flex:1}
+.sort-select{flex-shrink:0;padding:11px 28px 11px 12px;background:var(--s1);border:1px solid var(--bd);border-radius:10px;color:var(--t2);font-family:var(--font);font-size:12px;font-weight:600;outline:none;-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%238c959f' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;max-width:140px}
+
+/* ── CARD CHIUSURA v2: gerarchia visiva + barra target ── */
+.card-main{padding:4px 16px 12px}
+.card-main-v{font-family:var(--mono);font-size:24px;font-weight:700;color:var(--t1);line-height:1.1}
+.card-main-l{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px}
+.tgt-bar-wrap{height:6px;border-radius:3px;background:var(--s3);margin-top:10px;overflow:hidden;position:relative}
+.tgt-bar{height:100%;border-radius:3px;transition:width .3s ease}
+.tgt-bar.green{background:var(--green)}
+.tgt-bar.yellow{background:#eab308}
+.tgt-bar.red{background:var(--red)}
+.tgt-bar-lbl{display:flex;justify-content:space-between;font-size:10px;color:var(--t3);margin-top:4px;font-family:var(--mono)}
+.card-sec{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--bd);border-top:1px solid var(--bd)}
+.card-sec .card-cell{padding:8px 12px}
+/* Gruppi brand collassabili */
+.brand-header.clickable{cursor:pointer;user-select:none}
+.brand-chev{display:inline-block;font-size:9px;color:inherit;opacity:.7;margin-right:6px;transition:transform .15s}
+.brand-header.collapsed .brand-chev{transform:rotate(-90deg)}
+
+/* ── TAB OGGI (home riepilogo giornata) ── */
+.oggi-wrap{padding:16px;display:flex;flex-direction:column;gap:12px;padding-bottom:32px}
+.oggi-date-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.oggi-date-title{font-size:18px;font-weight:700}
+.oggi-date-sub{font-size:12px;color:var(--t3);margin-top:2px}
+.oggi-banner{display:flex;align-items:center;gap:10px;padding:13px 14px;border-radius:12px;cursor:pointer;border:1px solid transparent;transition:background .12s}
+.oggi-banner.ok{background:#dcfce7;border-color:#bbf7d0;color:#166534}
+.oggi-banner.warn{background:#fef3c7;border-color:#fde68a;color:#92400e}
+.oggi-banner .ob-icon{font-size:20px;flex-shrink:0}
+.oggi-banner .ob-text{flex:1;font-size:13px;font-weight:600;line-height:1.4}
+.oggi-banner .ob-arrow{font-size:16px;opacity:.6}
+.oggi-hero{background:var(--s1);border:1px solid var(--bd);border-radius:16px;padding:16px}
+.oggi-hero-l{font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.6px}
+.oggi-hero-v{font-family:var(--mono);font-size:32px;font-weight:800;margin:4px 0 10px;line-height:1}
+.oggi-hero-badges{display:flex;gap:6px;flex-wrap:wrap}
+.oggi-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.oggi-mini{background:var(--s1);border:1px solid var(--bd);border-radius:12px;padding:11px 12px}
+.oggi-mini.alert{background:#fef2f2;border-color:#fecaca}
+.oggi-mini-l{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px}
+.oggi-mini-v{font-family:var(--mono);font-size:15px;font-weight:700}
+.oggi-mini.alert .oggi-mini-v{color:var(--red)}
+.oggi-sec-title{font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.6px;padding:6px 4px 0}
+.oggi-list{background:var(--s1);border:1px solid var(--bd);border-radius:14px;overflow:hidden}
+.oggi-row{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--bd);cursor:pointer;transition:background .1s}
+.oggi-row:last-child{border-bottom:none}
+.oggi-row:active{background:var(--s2)}
+.oggi-row-icon{font-size:16px;flex-shrink:0;width:22px;text-align:center}
+.oggi-row-name{flex:1;min-width:0;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.oggi-row-name .orn-brand{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--t3);display:block}
+.oggi-row-val{font-size:12px;font-family:var(--mono);font-weight:600;flex-shrink:0}
+.oggi-row-val.warn{color:var(--warn)}
+.oggi-row-val.bad{color:var(--red)}
+.oggi-empty-ok{display:flex;align-items:center;gap:10px;padding:14px;font-size:13px;color:var(--green);font-weight:600}
+.oggi-brandbar{display:flex;flex-direction:column;gap:6px}
+.oggi-bb-row{display:flex;align-items:center;gap:10px}
+.oggi-bb-name{flex:0 0 84px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.oggi-bb-track{flex:1;height:14px;border-radius:7px;background:var(--s3);overflow:hidden}
+.oggi-bb-fill{height:100%;border-radius:7px}
+.oggi-bb-val{flex:0 0 86px;text-align:right;font-family:var(--mono);font-size:11px;font-weight:600;color:var(--t2)}
+
+/* ── SEGMENTED CONTROL (tab Analisi: Vendite/KPI) ── */
+.seg-wrap{display:flex;gap:0;margin:0 16px;background:var(--s2);border:1px solid var(--bd2);border-radius:12px;padding:3px;flex-shrink:0}
+.seg-btn{flex:1;padding:9px 8px;border:none;border-radius:9px;background:transparent;font-family:var(--font);font-size:13px;font-weight:600;color:var(--t2);cursor:pointer;-webkit-appearance:none;transition:all .15s}
+.seg-btn.on{background:var(--s1);color:var(--acc);box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.tempo-wrap .seg-wrap{margin:0 0 4px}
+#tab-kpi .seg-wrap{margin:14px 16px 0}
+
+/* ── TOAST DI CONFERMA ── */
+#toast-wrap{position:fixed;left:16px;right:16px;bottom:calc(var(--safe-bot) + 86px);z-index:600;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.toast{display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:12px;background:#1f2328;color:#fff;font-size:13px;font-weight:500;box-shadow:0 8px 24px rgba(0,0,0,.25);animation:toastIn .25s cubic-bezier(.32,1,.57,1);max-width:480px;margin:0 auto;width:100%}
+.toast.ok{background:#14532d}
+.toast.err{background:#7f1d1d}
+.toast.out{animation:toastOut .25s ease forwards}
+@keyframes toastIn{from{transform:translateY(16px);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes toastOut{from{transform:translateY(0);opacity:1}to{transform:translateY(8px);opacity:0}}
+
+/* ── SKELETON LOADING (card grigie pulsanti) ── */
+.sk-card{background:var(--s1);border:1px solid var(--bd);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.sk-line{height:12px;border-radius:6px;background:linear-gradient(90deg,var(--s2) 25%,var(--s3) 50%,var(--s2) 75%);background-size:200% 100%;animation:skShimmer 1.4s infinite}
+.sk-line.w40{width:40%}.sk-line.w60{width:60%}.sk-line.w80{width:80%}
+.sk-line.tall{height:22px}
+@keyframes skShimmer{to{background-position:-200% 0}}
+
+/* ── BANNER COLD START SERVER ── */
+.coldstart-note{margin-top:6px;font-size:11px;color:var(--warn);max-width:260px;text-align:center;line-height:1.5;display:none}
+.coldstart-note.show{display:block}
+
+/* ── PULL TO REFRESH ── */
+.ptr-indicator{display:flex;align-items:center;justify-content:center;gap:8px;height:0;overflow:hidden;color:var(--t3);font-size:12px;transition:height .2s ease}
+.ptr-indicator.armed{color:var(--acc)}
+.ptr-indicator .spinner{width:16px;height:16px;border-width:2px}
+
+/* ── TAB ALTRO (sezioni) ── */
+.settings-head{font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.6px;padding:8px 4px 0}
+.settings-btn.nav-like{display:flex;align-items:center;justify-content:space-between;text-align:left}
+.settings-btn.nav-like .sbn-arrow{color:var(--t3);font-size:16px}
+
+/* ── SCHEDA NEGOZIO 360° ── */
+.s360-head{padding:4px 20px 14px}
+.s360-metrics{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px 16px}
+.s360-metric{background:var(--s2);border:1px solid var(--bd);border-radius:12px;padding:11px 12px;cursor:pointer;transition:background .12s;-webkit-appearance:none;font-family:var(--font);text-align:left}
+.s360-metric:active{background:var(--s3)}
+.s360-metric-l{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px}
+.s360-metric-v{font-family:var(--mono);font-size:16px;font-weight:700}
+.s360-metric-v.nodata{color:var(--t3);font-size:13px;font-weight:500}
+.s360-chart-wrap{margin:0 16px;background:var(--s2);border:1px solid var(--bd);border-radius:12px;padding:12px}
+.s360-chart-title{font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;display:flex;justify-content:space-between}
+.s360-chart-box{position:relative;height:130px}
+.s360-saldo{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--bd);border:1px solid var(--bd);border-radius:12px;overflow:hidden;margin:12px 16px}
+.s360-saldo-cell{background:var(--s1);padding:11px 10px;text-align:center}
+.s360-row-btn{display:flex;align-items:center;justify-content:space-between;margin:0 16px 12px;padding:13px 14px;background:var(--s2);border:1px solid var(--bd2);border-radius:12px;font-family:var(--font);font-size:13px;font-weight:600;color:var(--acc);cursor:pointer;-webkit-appearance:none;width:calc(100% - 32px)}
+.s360-row-btn:active{background:var(--s3)}
 </style>
 </head>
 <body>
@@ -706,7 +826,7 @@ body{display:flex;flex-direction:column}
 <div class="status-bar"></div>
 
 <!-- LOADING -->
-<div id="loading"><div class="spinner"></div><div class="loading-msg" id="loading-msg">Connessione…</div></div>
+<div id="loading"><div class="spinner"></div><div class="loading-msg" id="loading-msg">Connessione…</div><div class="coldstart-note" id="coldstart-note">⏳ Il server gratuito si sta riavviando dopo un periodo di inattività: può volerci fino a un minuto. Non chiudere la pagina.</div></div>
 
 <!-- DETAIL SHEET -->
 <div id="sheet" onclick="closeSheet(event)">
@@ -826,19 +946,37 @@ body{display:flex;flex-direction:column}
     </div>
   </div>
 
+  <!-- TAB OGGI (home: riepilogo della giornata) -->
+  <div class="scroll-area" id="tab-oggi">
+    <div class="ptr-indicator" id="ptr-oggi"><div class="spinner"></div><span>Aggiorno…</span></div>
+    <div class="oggi-wrap" id="oggi-content">
+      <div class="sk-card"><div class="sk-line w40"></div><div class="sk-line tall w60"></div><div class="sk-line w80"></div></div>
+      <div class="sk-card"><div class="sk-line w60"></div><div class="sk-line w40"></div></div>
+    </div>
+  </div>
+
   <!-- TAB NEGOZI -->
-  <div class="scroll-area" id="tab-negozi">
+  <div class="scroll-area" id="tab-negozi" style="display:none">
     <div class="kpi-scroll" id="kpi-scroll"></div>
     <div class="filter-bar">
+      <button class="date-arrow" id="date-prev" onclick="shiftFilterDate(-1)" aria-label="Giorno precedente">‹</button>
       <button class="chip" id="chip-date" onclick="openDateFilter()">📅 Tutte le date</button>
+      <button class="date-arrow" id="date-next" onclick="shiftFilterDate(1)" aria-label="Giorno successivo">›</button>
       <button class="chip on" onclick="setChip(this,'all')">Tutti</button>
       <button class="chip" onclick="setChip(this,'anomalie')">⚠ Anomalie</button>
       <button class="chip" onclick="setChip(this,'sconti')">Sconti</button>
       <button class="chip" onclick="setChip(this,'annull')">Annullamenti</button>
       <button class="chip" id="chip-mancanti" onclick="setChip(this,'mancanti')">📭 Mancanti</button>
     </div>
-    <div class="search-wrap">
+    <div class="search-row">
       <input class="search-field" type="search" placeholder="Cerca negozio o brand…" id="search" oninput="renderCards()" autocorrect="off"/>
+      <select class="sort-select" id="sort-select" onchange="setSortMode(this.value)" aria-label="Ordina negozi">
+        <option value="default">Ordina: Brand</option>
+        <option value="corr">Incasso ↓</option>
+        <option value="tgt">% Target ↓</option>
+        <option value="anom">Anomalie prima</option>
+        <option value="name">Nome A→Z</option>
+      </select>
     </div>
     <div class="cards-list" id="cards-list"></div>
   </div>
@@ -858,6 +996,10 @@ body{display:flex;flex-direction:column}
   <!-- TAB ANDAMENTO (v2: gerarchica anno → mesi → giorni) -->
   <div class="scroll-area" id="tab-tempo" style="display:none">
     <div class="tempo-wrap">
+      <div class="seg-wrap">
+        <button class="seg-btn on" onclick="switchTab('tempo')">📈 Vendite</button>
+        <button class="seg-btn" onclick="switchTab('kpi')">📊 KPI negozio</button>
+      </div>
       <!-- Filtri: Brand multi-select + Punto Vendita multi-select + toggle.
            Il pannello dei filtri viene popolato da renderAmFilterPanels()
            subito dopo il fetch dei dati, così riflette esattamente quello
@@ -905,6 +1047,11 @@ body{display:flex;flex-direction:column}
        Tap su una riga della classifica → bottom-sheet con i 3 mini-chart. -->
   <div class="scroll-area" id="tab-kpi" style="display:none">
     <div class="kpi-wrap">
+
+      <div class="seg-wrap">
+        <button class="seg-btn" onclick="switchTab('tempo')">📈 Vendite</button>
+        <button class="seg-btn on" onclick="switchTab('kpi')">📊 KPI negozio</button>
+      </div>
 
       <!-- Hero + selettore KPI -->
       <div class="kpi-tabs" id="kpi-tabs">
@@ -1007,9 +1154,10 @@ body{display:flex;flex-direction:column}
     </div>
   </div>
 
-  <!-- TAB SETTINGS -->
+  <!-- TAB ALTRO (impostazioni + dati + amministrazione) -->
   <div class="scroll-area" id="tab-settings" style="display:none">
     <div class="settings-inner">
+      <div class="settings-head">Stato</div>
       <div class="settings-section">
         <div class="settings-row"><span class="settings-label">Account</span><span class="settings-value" id="cfg-user-disp">—</span></div>
         <div class="settings-row"><span class="settings-label">Ultimo sync</span><span class="settings-value" id="last-sync-disp">—</span></div>
@@ -1017,9 +1165,13 @@ body{display:flex;flex-direction:column}
         <div class="settings-row"><span class="settings-label">Errori ultimo sync</span><span class="settings-value" id="err-count-disp">0</span></div>
         <div class="settings-row"><span class="settings-label">Auto-sync</span><span class="settings-value">ogni 5 minuti</span></div>
       </div>
+
+      <div class="settings-head">Sincronizzazione</div>
       <button class="settings-btn" onclick="syncNow()">↺ Sincronizza ora</button>
       <button class="settings-btn" onclick="forceResync()">⟳ Ricarica tutto (svuota cache)</button>
       <button class="settings-btn" onclick="showErrors()">🔍 Mostra errori sync</button>
+
+      <div class="settings-head">Dati</div>
       <button class="settings-btn" onclick="exportCSV()">↓ Esporta CSV</button>
       <!-- Upload Excel target: visibile solo agli admin via applyRoleVisibility() -->
       <input type="file" id="targets-upload-input" accept=".xlsx,.xls" style="display:none" onchange="uploadTargetsExcel(event)"/>
@@ -1036,26 +1188,35 @@ body{display:flex;flex-direction:column}
            non coperti dall'Excel). -->
       <input type="file" id="historical-cur-upload-input" accept=".xlsx,.xls" style="display:none" onchange="uploadHistoricalExcel(event, 'consuntivi')"/>
       <button class="settings-btn" id="btn-historical-cur-upload" style="display:none" onclick="document.getElementById('historical-cur-upload-input').click()">💰 Consuntivi nuovi</button>
+
+      <!-- Amministrazione: visibile solo agli admin via applyRoleVisibility() -->
+      <div class="settings-head" id="head-admin" style="display:none">Amministrazione</div>
+      <button class="settings-btn nav-like" id="btn-account-open" style="display:none" onclick="switchTab('account')"><span>👥 Gestione utenti</span><span class="sbn-arrow">›</span></button>
+
+      <div class="settings-head">Sessione</div>
       <button class="settings-btn danger" onclick="doLogout()">⎋ Disconnetti</button>
     </div>
   </div>
 
-  <!-- TAB ACCOUNT (admin only: gestione utenti) -->
+  <!-- TAB ACCOUNT (admin only: gestione utenti, raggiungibile da Altro) -->
   <div class="scroll-area" id="tab-account" style="display:none">
     <div class="settings-inner">
+      <button class="settings-btn nav-like" onclick="switchTab('settings')"><span>‹ Torna a Altro</span></button>
       <div id="account-list-wrap"><div class="empty-state"><div class="spinner" style="margin:0 auto 14px"></div><div class="empty-text">Carico utenti…</div></div></div>
     </div>
   </div>
 
-  <!-- BOTTOM NAV -->
+  <!-- BOTTOM NAV (5 voci: Oggi · Chiusure · Analisi · Negozi · Altro) -->
   <div class="bottom-nav">
-    <div class="nav-item active" id="nav-negozi" onclick="switchTab('negozi')"><div class="nav-icon">📋</div><span>Chiusure</span></div>
+    <div class="nav-item active" id="nav-oggi" onclick="switchTab('oggi')"><div class="nav-icon">🏠</div><span>Oggi</span></div>
+    <div class="nav-item" id="nav-negozi" onclick="switchTab('negozi')"><div class="nav-icon">📋</div><span>Chiusure</span></div>
+    <div class="nav-item" id="nav-analisi" onclick="switchTab('tempo')"><div class="nav-icon">📈</div><span>Analisi</span></div>
     <div class="nav-item" id="nav-stores" onclick="switchTab('stores')"><div class="nav-icon">🏪</div><span>Negozi</span></div>
-    <div class="nav-item" id="nav-tempo" onclick="switchTab('tempo')"><div class="nav-icon">📈</div><span>Andamento</span></div>
-    <div class="nav-item" id="nav-kpi" onclick="switchTab('kpi')"><div class="nav-icon">📊</div><span>KPI</span></div>
-    <div class="nav-item" id="nav-account" onclick="switchTab('account')" style="display:none"><div class="nav-icon">👥</div><span>Account</span></div>
-    <div class="nav-item" id="nav-settings" onclick="switchTab('settings')"><div class="nav-icon">⚙️</div><span>Config</span></div>
+    <div class="nav-item" id="nav-settings" onclick="switchTab('settings')"><div class="nav-icon">⚙️</div><span>Altro</span></div>
   </div>
+
+  <!-- TOAST DI CONFERMA -->
+  <div id="toast-wrap"></div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -1090,6 +1251,14 @@ const CONCURRENCY = IS_MOBILE ? 4 : 12;
 // anche dopo la compressione JPEG applicata dal generatore di PDF.
 const ATTACH_MIN_SIDE=200;
 let allData=[], filter='all', filterDate=null, syncTimer=null;
+// Ordinamento card tab Chiusure: 'default' (per brand) | 'corr' | 'tgt' | 'anom' | 'name'
+let sortMode='default';
+// Brand collassati nella tab Chiusure (persistono nella sessione, non oltre)
+let collapsedBrands=new Set();
+// Flag: il default "ultima giornata disponibile" è stato già applicato una volta.
+// Dopo il primo auto-set l'utente è libero di scegliere "Tutte le date" senza
+// che il sync successivo glielo re-imposti.
+let _dateAutoDone=false;
 // Stato range date per la tab Negozi (null = tutte le date)
 let storeRange={from:null,to:null};
 // Stato interno del calendario
@@ -1239,7 +1408,7 @@ document.addEventListener('click', _onAmDocClick);
   auth.accessToken=localStorage.getItem('access_token');
   auth.refreshToken=localStorage.getItem('refresh_token');
   if(auth.accessToken){
-    load(true,'Verifico sessione… (potrebbe richiedere qualche secondo se il server era inattivo)');
+    load(true,'Verifico sessione…',true);
     try{
       const r=await api('/auth/me');
       if(r.ok){
@@ -1287,14 +1456,22 @@ function showDash(){
     const cu=document.getElementById('cfg-user-disp');
     if(cu) cu.textContent=auth.user.username+' · '+auth.user.role;
   }
+  // Ripristina i filtri Analisi dell'ultima sessione (brand/punto vendita)
+  restoreAnalisiFilters();
+  // Pull-to-refresh sulle liste principali (registrato una sola volta)
+  initPullToRefresh();
+  // La home "Oggi" è la tab di partenza
+  switchTab('oggi');
   syncNow();
   syncTimer=setInterval(syncNow,5*60*1000);
 }
 function applyRoleVisibility(){
-  // Tab Account + bottoni upload visibili solo agli admin
+  // Gestione utenti + bottoni upload visibili solo agli admin
   const isAdmin = auth.user?.role==='admin';
-  const navAccount=document.getElementById('nav-account');
-  if(navAccount) navAccount.style.display = isAdmin ? '' : 'none';
+  const headAdmin=document.getElementById('head-admin');
+  if(headAdmin) headAdmin.style.display = isAdmin ? '' : 'none';
+  const btnAccount=document.getElementById('btn-account-open');
+  if(btnAccount) btnAccount.style.display = isAdmin ? 'flex' : 'none';
   const btnTargets=document.getElementById('btn-targets-upload');
   if(btnTargets) btnTargets.style.display = isAdmin ? '' : 'none';
   const btnHistoricalPY=document.getElementById('btn-historical-py-upload');
@@ -1313,7 +1490,7 @@ async function doLogin(){
   if(!email||!password){errEl.textContent='Inserisci email e password';errEl.style.display='block';return;}
   const btn=document.getElementById('login-btn');
   btn.disabled=true; btn.textContent='Accesso in corso…';
-  load(true,'Accesso… (se il server era inattivo, il primo login può richiedere 30-60 secondi)');
+  load(true,'Accesso in corso…',true);
   try{
     const r=await fetch(API_BASE+'/auth/login',{
       method:'POST',credentials:'include',
@@ -1346,7 +1523,7 @@ async function doRegister(){
   if(password.length<8){errEl.textContent='La password deve essere lunga almeno 8 caratteri';errEl.style.display='block';return;}
   const btn=document.getElementById('reg-btn');
   btn.disabled=true; btn.textContent='Registrazione…';
-  load(true,'Registrazione… (se il server era inattivo, può richiedere qualche secondo)');
+  load(true,'Registrazione in corso…',true);
   try{
     const r=await fetch(API_BASE+'/auth/register',{
       method:'POST',credentials:'include',
@@ -1383,6 +1560,7 @@ async function doLogout(){
 async function syncNow(){
   setPip('spin','Sincronizzazione…');
   load(true,'Lettura Google Drive…');
+  renderSkeletons();
   lastErrors=[];
   try{
     // Lista file da Drive + cache backend + overrides + target + storico in
@@ -2423,9 +2601,99 @@ function fmtDateTime(iso){
 }
 // Escape per attributi HTML/title (per i valori serializzati nel markup)
 function attrEsc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-function load(on,msg=''){
+// coldHint=true → dopo 5 secondi di attesa mostra la nota "il server si sta
+// riavviando". Usato solo per i flussi di autenticazione (login/registrazione/
+// verifica sessione), dove un'attesa lunga è quasi sempre il cold start di
+// Render free tier e non un problema dell'app.
+let _coldTimer=null;
+function load(on,msg='',coldHint=false){
   document.getElementById('loading').classList.toggle('show',on);
   if(msg)document.getElementById('loading-msg').textContent=msg;
+  const note=document.getElementById('coldstart-note');
+  if(_coldTimer){clearTimeout(_coldTimer);_coldTimer=null;}
+  if(note){
+    if(on && coldHint){
+      _coldTimer=setTimeout(()=>{note.classList.add('show');},5000);
+      note.classList.remove('show');
+    }else{
+      note.classList.remove('show');
+    }
+  }
+}
+
+// ── TOAST DI CONFERMA ──
+// Notifica leggera non bloccante in basso. type: '' | 'ok' | 'err'.
+// Sostituisce gli alert() per le conferme positive (gli errori che richiedono
+// attenzione restano alert).
+function showToast(msg, type=''){
+  const wrap=document.getElementById('toast-wrap');
+  if(!wrap) return;
+  const t=document.createElement('div');
+  t.className='toast'+(type?' '+type:'');
+  t.textContent=msg;
+  wrap.appendChild(t);
+  setTimeout(()=>{t.classList.add('out');setTimeout(()=>t.remove(),300);},2600);
+}
+
+// ── SKELETON (placeholder durante il primo caricamento) ──
+function renderSkeletons(){
+  const sk=`<div class="sk-card"><div class="sk-line w40"></div><div class="sk-line tall w60"></div><div class="sk-line w80"></div></div>`;
+  const cl=document.getElementById('cards-list');
+  if(cl && !cl.children.length) cl.innerHTML=sk.repeat(4);
+}
+
+// ── NAVIGAZIONE GIORNI (frecce ‹ › nella tab Chiusure) ──
+// Lista ordinata delle date disponibili nelle chiusure caricate.
+function availableDates(){
+  const s=new Set();
+  for(const r of allData) if(r.dateISO) s.add(r.dateISO);
+  return [...s].sort();
+}
+// dir = -1 (giorno precedente) | +1 (successivo). Se non c'è un filtro data
+// attivo, parte dall'ultima giornata disponibile.
+function shiftFilterDate(dir){
+  const dates=availableDates();
+  if(!dates.length) return;
+  if(!filterDate){
+    setDateFilter(dates[dates.length-1]);
+    return;
+  }
+  // Indice della data attuale (o della più vicina precedente se non esatta)
+  let i=dates.indexOf(filterDate);
+  if(i<0){
+    i=dates.findIndex(d=>d>filterDate);
+    i=(i<0?dates.length:i)-(dir>0?1:0);
+  }
+  const next=i+dir;
+  if(next<0 || next>=dates.length) return;
+  setDateFilter(dates[next]);
+}
+// Abilita/disabilita le frecce in base alla posizione nel range date.
+function updateDateNav(){
+  const prev=document.getElementById('date-prev');
+  const next=document.getElementById('date-next');
+  if(!prev||!next) return;
+  const dates=availableDates();
+  if(!dates.length){prev.disabled=true;next.disabled=true;return;}
+  if(!filterDate){
+    // "Tutte le date": ‹ porta all'ultima giornata, › non ha senso
+    prev.disabled=false;
+    next.disabled=true;
+    return;
+  }
+  prev.disabled = filterDate<=dates[0];
+  next.disabled = filterDate>=dates[dates.length-1];
+}
+// Cambia il criterio di ordinamento delle card e ridisegna.
+function setSortMode(v){
+  sortMode=v||'default';
+  renderCards();
+}
+// Espandi/collassa un gruppo brand nella tab Chiusure.
+function toggleBrandGroup(brand){
+  if(collapsedBrands.has(brand)) collapsedBrands.delete(brand);
+  else collapsedBrands.add(brand);
+  renderCards();
 }
 const setPip=(s,t)=>{
   const p=document.getElementById('pip');
@@ -2443,16 +2711,22 @@ function setChip(el,f){
   el.classList.add('on');renderCards();
 }
 function switchTab(t){
-  ['negozi','stores','tempo','kpi','settings','account'].forEach(n=>{
+  ['oggi','negozi','stores','tempo','kpi','settings','account'].forEach(n=>{
     const el=document.getElementById('tab-'+n);
     if(el)el.style.display=n===t?'block':'none';
-    const nav=document.getElementById('nav-'+n);
-    if(nav)nav.classList.toggle('active',n===t);
   });
-  // Titolo header dinamico in base alla tab
-  const titles={negozi:'Chiusure giornaliere',stores:'Negozi',tempo:'Andamento',kpi:'KPI',settings:'Impostazioni',account:'Gestione utenti'};
+  // Mappa tab → voce della bottom nav da evidenziare. Andamento (tempo) e KPI
+  // vivono entrambe sotto "Analisi"; la gestione utenti (account) sotto "Altro".
+  const navMap={oggi:'oggi',negozi:'negozi',stores:'stores',tempo:'analisi',kpi:'analisi',settings:'settings',account:'settings'};
+  const activeNav=navMap[t]||t;
+  ['oggi','negozi','analisi','stores','settings'].forEach(n=>{
+    const nav=document.getElementById('nav-'+n);
+    if(nav)nav.classList.toggle('active',n===activeNav);
+  });
+  const titles={oggi:'Riepilogo giornata',negozi:'Chiusure giornaliere',stores:'Negozi',tempo:'Analisi · Vendite',kpi:'Analisi · KPI negozio',settings:'Altro',account:'Gestione utenti'};
   const titleEl=document.getElementById('app-title');
   if(titleEl)titleEl.textContent=titles[t]||'Chiusure';
+  if(t==='oggi')renderOggi();
   if(t==='tempo')renderTempo();
   if(t==='stores')renderStores();
   if(t==='account')renderAccount();
@@ -2523,6 +2797,9 @@ function applyAmFilter(name){
   document.getElementById('am-btn-' + name).classList.remove('open');
   updAmCounter('brand');
   updAmCounter('store');
+  // Allinea la vista KPI (stessa tab Analisi) e salva per la prossima sessione
+  syncAnalisiFiltersFromTempo();
+  saveAnalisiFilters();
   renderTempo();
 }
 // Aggiorna il counter dentro il pulsante in base alle spunte attuali.
@@ -2614,7 +2891,28 @@ function toggleCompare(which, el){
 
 // ── RENDER ALL ──
 function renderAll(){
-  updateMissingChip();renderKPI();renderCards();
+  // Default intelligente: alla prima sincronizzazione con dati, la tab
+  // Chiusure parte dall'ultima giornata disponibile invece di "Tutte le date"
+  // (i totali cumulati di tutto lo storico non rispondono alla domanda
+  // quotidiana "com'è andata?"). Applicato una sola volta: dopo, l'utente
+  // può scegliere "Tutte le date" senza che il sync glielo re-imposti.
+  if(!_dateAutoDone && allData.length){
+    _dateAutoDone=true;
+    if(!filterDate){
+      const dates=availableDates();
+      filterDate=dates[dates.length-1]||null;
+      const chip=document.getElementById('chip-date');
+      if(chip && filterDate){
+        const [y,m,dd]=filterDate.split('-');
+        chip.textContent=`📅 ${dd}/${m}/${y}`;
+        chip.classList.add('on');
+      }
+    }
+  }
+  updateMissingChip();renderKPI();renderCards();updateDateNav();
+  // La home "Oggi" si aggiorna se visibile (è la tab di default)
+  const oggiTab=document.getElementById('tab-oggi');
+  if(oggiTab && oggiTab.style.display!=='none') renderOggi();
   // Se la tab "Negozi" (saldi) è attiva, ricalcola i totali con i nuovi dati
   const storesTab=document.getElementById('tab-stores');
   if(storesTab && storesTab.style.display==='block') renderStores();
@@ -2631,6 +2929,207 @@ function renderAll(){
 // Restituisce i record filtrati per la data selezionata (o tutti)
 function getFilteredData(){
   return filterDate ? allData.filter(r=>r.dateISO===filterDate) : allData;
+}
+
+// ── TAB OGGI (home: riepilogo della giornata) ───────────────────────────
+// Giornata di riferimento: oggi se ci sono già chiusure odierne, altrimenti
+// l'ultima giornata con dati (tipicamente ieri, finché le chiusure della sera
+// non arrivano). Tutte le informazioni rispondono alla domanda "com'è andata?"
+// senza dover toccare filtri.
+let _oggiRefDate=null;
+function renderOggi(){
+  const el=document.getElementById('oggi-content');
+  if(!el) return;
+  if(!allData.length) return; // skeleton iniziale finché il primo sync non arriva
+  const dates=availableDates();
+  const todayISO=_isoToday();
+  const refDate=dates.includes(todayISO)?todayISO:dates[dates.length-1];
+  _oggiRefDate=refDate;
+  const recs=allData.filter(r=>r.dateISO===refDate);
+  const missing=getMissingStores(refDate);
+  const expectedCount=recs.length+missing.length;
+  const totCorr=recs.reduce((a,r)=>a+r.corrispettivo,0);
+  const totNet=totCorr/1.22;
+  const totCash=recs.reduce((a,r)=>a+r.contanti,0);
+  const anomalie=recs.filter(r=>r.anomaly);
+
+  // Badge vs target / vs anno scorso (stessa logica e soglie delle altre tab)
+  const tgtD=periodTargetData(recs);
+  const pyD=periodPyData(recs);
+  const badge=(delta,label)=>{
+    const cls=delta>=-5?'green':(delta>=-30?'yellow':'red');
+    const sign=delta>=0?'+':'';
+    return `<span class="am-badge ${cls}">${sign}${delta.toLocaleString('it-IT',{minimumFractionDigits:1,maximumFractionDigits:1})}% ${label}</span>`;
+  };
+  let badges='';
+  if(tgtD) badges+=badge(tgtD.pct-100,'vs target');
+  if(pyD)  badges+=badge(pyD.pct-100,'vs anno scorso');
+  if(!badges) badges='<span class="am-badge muted">nessun confronto disponibile</span>';
+
+  const GG=['domenica','lunedì','martedì','mercoledì','giovedì','venerdì','sabato'];
+  const jd=new Date(refDate+'T12:00:00');
+  const dateLabel=`${GG[jd.getDay()]} ${jd.getDate()} ${MESI[jd.getMonth()].toLowerCase()}`;
+  const dateSub=refDate===todayISO?'chiusure di oggi':'ultima giornata disponibile';
+
+  const banner = missing.length
+    ? `<div class="oggi-banner warn" onclick="oggiGoChiusure(true)">
+        <span class="ob-icon">📭</span>
+        <span class="ob-text">${recs.length} su ${expectedCount} chiusure ricevute · ${missing.length} mancant${missing.length===1?'e':'i'}</span>
+        <span class="ob-arrow">›</span>
+      </div>`
+    : `<div class="oggi-banner ok" onclick="oggiGoChiusure(false)">
+        <span class="ob-icon">✅</span>
+        <span class="ob-text">Tutte le ${recs.length} chiusure ricevute</span>
+        <span class="ob-arrow">›</span>
+      </div>`;
+
+  // "Da controllare": anomalie di cassa + chiusure mancanti, cliccabili
+  let checkRows='';
+  for(const r of anomalie){
+    const idx=allData.indexOf(r);
+    checkRows+=`<div class="oggi-row" onclick="openSheet(${idx})">
+      <span class="oggi-row-icon">⚠️</span>
+      <span class="oggi-row-name"><span class="orn-brand">${r.brand}</span>${r.location}</span>
+      <span class="oggi-row-val bad">Δ ${fmt(r.diff)}</span>
+    </div>`;
+  }
+  for(const s of missing){
+    checkRows+=`<div class="oggi-row" onclick="oggiGoChiusure(true)">
+      <span class="oggi-row-icon">📭</span>
+      <span class="oggi-row-name"><span class="orn-brand">${s.brand}</span>${s.location}</span>
+      <span class="oggi-row-val warn">mancante</span>
+    </div>`;
+  }
+  const checkList = checkRows
+    ? `<div class="oggi-sec-title">Da controllare</div><div class="oggi-list">${checkRows}</div>`
+    : `<div class="oggi-list"><div class="oggi-empty-ok">✓ Tutto in ordine: nessuna anomalia, nessuna chiusura mancante</div></div>`;
+
+  // Composizione del corrispettivo per brand (barre proporzionali)
+  const byBrand={};
+  for(const r of recs){ byBrand[r.brand]=(byBrand[r.brand]||0)+r.corrispettivo; }
+  const brandEntries=Object.entries(byBrand).sort((a,b)=>b[1]-a[1]);
+  const maxBrand=brandEntries.length?brandEntries[0][1]:0;
+  let brandBars='';
+  for(const [b,v] of brandEntries){
+    const bc=brandColor(b);
+    const w=maxBrand?Math.max(4,v/maxBrand*100):0;
+    brandBars+=`<div class="oggi-bb-row">
+      <span class="oggi-bb-name" style="color:${bc.text}">${b}</span>
+      <div class="oggi-bb-track"><div class="oggi-bb-fill" style="width:${w}%;background:${bc.strong}"></div></div>
+      <span class="oggi-bb-val">${fmt(v)}</span>
+    </div>`;
+  }
+  const brandSection=brandEntries.length>1
+    ? `<div class="oggi-sec-title">Per brand</div><div class="oggi-hero oggi-brandbar" style="padding:14px 16px">${brandBars}</div>`
+    : '';
+
+  el.innerHTML=`
+    <div class="oggi-date-row">
+      <div>
+        <div class="oggi-date-title">${dateLabel}</div>
+        <div class="oggi-date-sub">${dateSub}</div>
+      </div>
+    </div>
+    ${banner}
+    <div class="oggi-hero">
+      <div class="oggi-hero-l">Corrispettivo della giornata</div>
+      <div class="oggi-hero-v">${fmt(totCorr)}</div>
+      <div class="oggi-hero-badges">${badges}</div>
+    </div>
+    <div class="oggi-grid">
+      <div class="oggi-mini"><div class="oggi-mini-l">Net sales</div><div class="oggi-mini-v">${fmt(totNet)}</div></div>
+      <div class="oggi-mini"><div class="oggi-mini-l">Contanti</div><div class="oggi-mini-v">${fmt(totCash)}</div></div>
+      <div class="oggi-mini${anomalie.length?' alert':''}"><div class="oggi-mini-l">Anomalie</div><div class="oggi-mini-v">${anomalie.length}</div></div>
+    </div>
+    ${checkList}
+    ${brandSection}
+  `;
+}
+// Dal riepilogo alla tab Chiusure, con la stessa giornata già filtrata.
+// showMissing=true → attiva anche il chip "Mancanti".
+function oggiGoChiusure(showMissing){
+  if(_oggiRefDate && filterDate!==_oggiRefDate) setDateFilter(_oggiRefDate);
+  switchTab('negozi');
+  if(showMissing && filterDate){
+    const chip=document.getElementById('chip-mancanti');
+    if(chip) setChip(chip,'mancanti');
+  }
+}
+
+// ── FILTRI ANALISI CONDIVISI E PERSISTENTI ──────────────────────────────
+// Andamento (tempo) e KPI vivono sotto la stessa tab "Analisi": quando
+// l'utente filtra Brand/Punto vendita in una vista, l'altra si allinea.
+// I filtri sopravvivono anche al riavvio dell'app (localStorage).
+function syncAnalisiFiltersFromTempo(){
+  kpiState.brands=new Set(tempoBrands);
+  const ks=new Set();
+  const locSet=new Set(tempoStores.map(s=>s.toLowerCase()));
+  if(locSet.size){
+    for(const s of ALL_STORES){
+      if(tempoBrands.length && !tempoBrands.includes(s.brand)) continue;
+      if(locSet.has(s.location.toLowerCase())) ks.add(`${s.brand}|${s.location}`);
+    }
+  }
+  kpiState.stores=ks;
+  kpiUpdateFilterUI();
+}
+function syncAnalisiFiltersFromKpi(){
+  tempoBrands=[...kpiState.brands];
+  tempoStores=[...new Set([...kpiState.stores].map(k=>k.split('|')[1]))];
+}
+function saveAnalisiFilters(){
+  try{
+    localStorage.setItem('rp_analisi_filters', JSON.stringify({brands:tempoBrands, stores:tempoStores}));
+  }catch(_){}
+}
+function restoreAnalisiFilters(){
+  try{
+    const d=JSON.parse(localStorage.getItem('rp_analisi_filters')||'null');
+    if(d && Array.isArray(d.brands) && Array.isArray(d.stores)){
+      tempoBrands=d.brands;
+      tempoStores=d.stores;
+      syncAnalisiFiltersFromTempo();
+    }
+  }catch(_){}
+}
+
+// ── PULL-TO-REFRESH (tab Oggi e Chiusure) ───────────────────────────────
+// Trascinando verso il basso dalla cima della lista parte una sincronizzazione.
+function initPullToRefresh(){
+  if(window._ptrBound) return;
+  window._ptrBound=true;
+  ['tab-oggi','tab-negozi'].forEach(id=>{
+    const area=document.getElementById(id);
+    if(!area) return;
+    let ind=area.querySelector('.ptr-indicator');
+    if(!ind){
+      ind=document.createElement('div');
+      ind.className='ptr-indicator';
+      ind.innerHTML='<div class="spinner"></div><span>Aggiorno…</span>';
+      area.insertBefore(ind, area.firstChild);
+    }
+    let startY=null, pulling=false;
+    area.addEventListener('touchstart',e=>{
+      if(area.scrollTop<=0){ startY=e.touches[0].clientY; pulling=true; }
+      else pulling=false;
+    },{passive:true});
+    area.addEventListener('touchmove',e=>{
+      if(!pulling||startY==null) return;
+      const dy=e.touches[0].clientY-startY;
+      if(dy<=0){ ind.style.height='0px'; ind.classList.remove('armed'); return; }
+      const h=Math.min(dy/2.2, 60);
+      ind.style.height=h+'px';
+      ind.classList.toggle('armed', h>=52);
+    },{passive:true});
+    area.addEventListener('touchend',()=>{
+      if(!pulling) return;
+      const armed=ind.classList.contains('armed');
+      ind.style.height='0px';
+      ind.classList.remove('armed');
+      pulling=false; startY=null;
+      if(armed) syncNow();
+    });
+  });
 }
 
 // Apre il filtro data come calendario interattivo. Mostra il mese di default
@@ -2993,7 +3492,71 @@ function periodTargetBadgeHTML(records){
   const pctStr = sign + delta.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2}) + '%';
   return `<div class="card-target ${cls}" title="Target NET ${fmt(d.totTgt)} · Net sales ${fmt(d.totNet)} · ${records.length} chiusur${records.length===1?'a':'e'}">${pctStr} vs TGT</div>`;
 }
-// ── CARDS (TAB NEGOZI) ──
+// ── CARDS (TAB CHIUSURE) ──
+// Card v2: corrispettivo come valore primario grande, barra di avanzamento
+// sul target, badge vs anno scorso, gruppi brand collassabili e ordinamento.
+// Costruisce l'HTML di una singola card chiusura.
+// flat=true → modalità ordinata senza raggruppamento brand: il nome include
+// anche il brand (piccolo, sopra la location).
+function _closureCardHTML(r, flat){
+  const bc=brandColor(r.brand);
+  const net=(+r.netSales)||((+r.corrispettivo||0)/1.22);
+  // Barra avanzamento target (target NET vs net sales del giorno)
+  const tKey=storeKey(r.brand,r.location)+'|'+(r.dateISO||'');
+  const tgt=+targetsByKey[tKey]||0;
+  let tgtBar='';
+  if(tgt>0){
+    const ratio=net/tgt*100;
+    const delta=ratio-100;
+    const cls=delta>=-5?'green':(delta>=-30?'yellow':'red');
+    const w=Math.max(2,Math.min(100,ratio));
+    tgtBar=`<div class="tgt-bar-wrap"><div class="tgt-bar ${cls}" style="width:${w}%"></div></div>
+      <div class="tgt-bar-lbl"><span>Target ${fmt(tgt)}</span><span>${ratio.toLocaleString('it-IT',{maximumFractionDigits:0})}% raggiunto</span></div>`;
+  }else{
+    tgtBar=`<div class="tgt-bar-lbl" style="margin-top:8px"><span>Nessun target per questa giornata</span></div>`;
+  }
+  // vs anno scorso: stesso negozio, stesso giorno dell'anno precedente (storico Excel)
+  const pyKey=storeKey(r.brand,r.location)+'|'+shiftYearBack(r.dateISO,1);
+  const py=+historicalByKey[pyKey]||0;
+  let pyCell='<div class="card-cell-v" style="color:var(--t3)">—</div>';
+  if(py>0){
+    const d=(net-py)/py*100;
+    const c=d>=-5?'g':(d>=-30?'':'r');
+    const sign=d>=0?'+':'';
+    pyCell=`<div class="card-cell-v ${c}" title="Anno scorso: ${fmt(py)} NET">${sign}${d.toLocaleString('it-IT',{maximumFractionDigits:1})}%</div>`;
+  }
+  const nameHtml=flat
+    ? `<div class="card-name"><span style="display:block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:${bc.text}">${r.brand}</span>${r.location}</div>`
+    : `<div class="card-name">${r.location}</div>`;
+  return `<div class="store-card${r.anomaly?' anomaly':''}" style="border-left:3px solid ${bc.strong}" onclick="openSheet(${allData.indexOf(r)})">
+    <div class="card-head" style="grid-template-columns:1fr auto">
+      ${nameHtml}
+      <div class="card-date">${r.dateDisplay}</div>
+    </div>
+    <div class="card-main">
+      <div class="card-main-l">Corrispettivo</div>
+      <div class="card-main-v">${fmt(r.corrispettivo)}</div>
+      ${tgtBar}
+    </div>
+    <div class="card-sec">
+      <div class="card-cell"><div class="card-cell-l">Net Sales</div><div class="card-cell-v b">${fmt(net)}</div></div>
+      <div class="card-cell"><div class="card-cell-l">Contanti</div><div class="card-cell-v">${fmt(r.contanti)}</div></div>
+      <div class="card-cell"><div class="card-cell-l">vs anno prec.</div>${pyCell}</div>
+    </div>
+    <div class="card-footer">
+      ${r.sconti?'<span class="tag tag-warn">Sconti</span>':''}
+      ${r.annull?'<span class="tag tag-warn">Annullamenti</span>':''}
+      ${r.anomaly?`<span class="verify-bad">⚠ Cassa Δ ${fmt(r.diff)}</span>`:'<span class="verify-ok">✓ cassa ok</span>'}
+    </div>
+  </div>`;
+}
+// Ratio % vs target di un record (per l'ordinamento "% Target"). -1 = senza target.
+function _tgtRatio(r){
+  const tgt=+targetsByKey[storeKey(r.brand,r.location)+'|'+(r.dateISO||'')]||0;
+  if(tgt<=0) return -1;
+  const net=(+r.netSales)||((+r.corrispettivo||0)/1.22);
+  return net/tgt*100;
+}
 function renderCards(){
   const q=document.getElementById('search').value.toLowerCase();
   // Applica prima il filtro data (se attivo), poi i filtri chip, poi la ricerca
@@ -3021,16 +3584,6 @@ function renderCards(){
     return;
   }
 
-  // Raggruppa per brand: real + missing nello stesso oggetto
-  const brands={};
-  for(const r of rows){
-    if(!brands[r.brand])brands[r.brand]={real:[],miss:[]};
-    brands[r.brand].real.push(r);
-  }
-  for(const s of missingRows){
-    if(!brands[s.brand])brands[s.brand]={real:[],miss:[]};
-    brands[s.brand].miss.push(s);
-  }
   const totCorr=rows.reduce((a,r)=>a+r.corrispettivo,0);
   const totNet=totCorr/1.22;
   const totCash=rows.reduce((a,r)=>a+r.contanti,0);
@@ -3040,54 +3593,19 @@ function renderCards(){
   if(filterDate){const [yy,mm,dd]=filterDate.split('-');missDateDisp=`${dd}/${mm}/${yy}`;}
   let html='';
 
-  for(const [brand,group] of Object.entries(brands)){
-    const stores=group.real;
-    const miss=group.miss;
-    const bCorr=stores.reduce((a,r)=>a+r.corrispettivo,0);
-    const bNet=bCorr/1.22;
-    const bCash=stores.reduce((a,r)=>a+r.contanti,0);
-    const bPOS=stores.reduce((a,r)=>a+r.pos,0);
-    const bc=brandColor(brand);
-    const totCount=stores.length+miss.length;
-    const missLabel=miss.length?` · <span style="color:var(--warn)">${miss.length} mancante${miss.length>1?'i':''}</span>`:'';
-    html+=`<div class="brand-header" style="background:${bc.tint};border-radius:8px;padding:8px 12px">
-      <span class="brand-label" style="color:${bc.text}">${brand}</span>
-      <span class="brand-count" style="color:${bc.text};opacity:.7">${totCount} negoz${totCount===1?'io':'i'}${missLabel}</span>
-    </div>`;
-    for(const r of stores){
-      html+=`<div class="store-card${r.anomaly?' anomaly':''}" style="border-left:3px solid ${bc.strong}" onclick="openSheet(${allData.indexOf(r)})">
-        <div class="card-head">
-          <div class="card-name">${r.location}</div>
-          ${targetBadgeHTML(r)}
-          <div class="card-date">${r.dateDisplay}</div>
-        </div>
-        <div class="card-body">
-          <div class="card-cell">
-            <div class="card-cell-l">Corrispettivo</div>
-            <div class="card-cell-v g">${fmt(r.corrispettivo)}</div>
-          </div>
-          <div class="card-cell">
-            <div class="card-cell-l">Net Sales</div>
-            <div class="card-cell-v b">${fmt(r.netSales)}</div>
-          </div>
-          <div class="card-cell">
-            <div class="card-cell-l">Contanti</div>
-            <div class="card-cell-v">${fmt(r.contanti)}</div>
-          </div>
-        </div>
-        <div class="card-footer">
-          ${r.sconti?'<span class="tag tag-warn">Sconti</span>':''}
-          ${r.annull?'<span class="tag tag-warn">Annullamenti</span>':''}
-          ${!r.sconti&&!r.annull?'<span class="tag tag-neutral">—</span>':''}
-          ${r.anomaly?`<span class="verify-bad">Δ ${fmt(r.diff)}</span>`:'<span class="verify-ok">✓ ok</span>'}
-        </div>
-      </div>`;
-    }
-    // Card grigie tratteggiate per i negozi che non hanno inviato la chiusura
-    for(const s of miss){
+  if(sortMode!=='default'){
+    // ── MODALITÀ ORDINATA: lista piatta senza raggruppamento brand ──
+    const sorted=[...rows];
+    if(sortMode==='corr')      sorted.sort((a,b)=>b.corrispettivo-a.corrispettivo);
+    else if(sortMode==='tgt')  sorted.sort((a,b)=>_tgtRatio(b)-_tgtRatio(a));
+    else if(sortMode==='anom') sorted.sort((a,b)=>(b.anomaly?1:0)-(a.anomaly?1:0)||b.corrispettivo-a.corrispettivo);
+    else if(sortMode==='name') sorted.sort((a,b)=>(a.location+a.brand).localeCompare(b.location+b.brand,'it'));
+    for(const r of sorted) html+=_closureCardHTML(r,true);
+    for(const s of missingRows){
+      const bc=brandColor(s.brand);
       html+=`<div class="store-card missing" style="border-left:3px dashed ${bc.strong}">
-        <div class="card-head">
-          <div class="card-name">${s.location}</div>
+        <div class="card-head" style="grid-template-columns:1fr auto">
+          <div class="card-name">${s.brand} · ${s.location}</div>
           <div class="card-date">${missDateDisp}</div>
         </div>
         <div class="missing-body">
@@ -3096,20 +3614,65 @@ function renderCards(){
         </div>
       </div>`;
     }
-    // Subtotale: solo se ci sono dati reali
-    if(stores.length){
-      html+=`<div class="subtotal-card" style="border-color:${bc.strong}40;background:${bc.tint}80">
-        <div>
-          <div class="sub-cell-l" style="color:${bc.text}">Sub-totale ${brand}</div>
-          <div class="sub-cell-v" style="color:var(--green)">${fmt(bCorr)}</div>
-          <div class="sub-cell-net">NET ${fmt(bNet)}</div>
-        </div>
-        <div>
-          <div class="sub-cell-l" style="color:${bc.text}">Contanti + POS</div>
-          <div class="sub-cell-v">${fmt(bCash)}</div>
-          <div class="sub-cell-net">POS ${fmt(bPOS)}</div>
-        </div>
+  }else{
+    // ── MODALITÀ DEFAULT: gruppi per brand, collassabili dal titolo ──
+    const brands={};
+    for(const r of rows){
+      if(!brands[r.brand])brands[r.brand]={real:[],miss:[]};
+      brands[r.brand].real.push(r);
+    }
+    for(const s of missingRows){
+      if(!brands[s.brand])brands[s.brand]={real:[],miss:[]};
+      brands[s.brand].miss.push(s);
+    }
+
+    for(const [brand,group] of Object.entries(brands)){
+      const stores=group.real;
+      const miss=group.miss;
+      const bCorr=stores.reduce((a,r)=>a+r.corrispettivo,0);
+      const bNet=bCorr/1.22;
+      const bCash=stores.reduce((a,r)=>a+r.contanti,0);
+      const bPOS=stores.reduce((a,r)=>a+r.pos,0);
+      const bc=brandColor(brand);
+      const totCount=stores.length+miss.length;
+      const collapsed=collapsedBrands.has(brand);
+      const missLabel=miss.length?` · <span style="color:var(--warn)">${miss.length} mancante${miss.length>1?'i':''}</span>`:'';
+      const tBrand=brand.replace(/'/g,"\\'");
+      html+=`<div class="brand-header clickable${collapsed?' collapsed':''}" style="background:${bc.tint};border-radius:8px;padding:8px 12px" onclick="toggleBrandGroup('${tBrand}')">
+        <span class="brand-label" style="color:${bc.text}"><span class="brand-chev">▼</span>${brand}</span>
+        <span class="brand-count" style="color:${bc.text};opacity:.7">${totCount} negoz${totCount===1?'io':'i'}${missLabel}${collapsed?` · ${fmt(bCorr)}`:''}</span>
       </div>`;
+      if(!collapsed){
+        for(const r of stores) html+=_closureCardHTML(r,false);
+        // Card grigie tratteggiate per i negozi che non hanno inviato la chiusura
+        for(const s of miss){
+          html+=`<div class="store-card missing" style="border-left:3px dashed ${bc.strong}">
+            <div class="card-head" style="grid-template-columns:1fr auto">
+              <div class="card-name">${s.location}</div>
+              <div class="card-date">${missDateDisp}</div>
+            </div>
+            <div class="missing-body">
+              <span class="missing-dot" style="background:${bc.strong}"></span>
+              <span class="missing-label">Nessuna chiusura ricevuta</span>
+            </div>
+          </div>`;
+        }
+      }
+      // Subtotale: sempre visibile (anche a gruppo collassato) se ci sono dati
+      if(stores.length){
+        html+=`<div class="subtotal-card" style="border-color:${bc.strong}40;background:${bc.tint}80">
+          <div>
+            <div class="sub-cell-l" style="color:${bc.text}">Sub-totale ${brand}</div>
+            <div class="sub-cell-v" style="color:var(--green)">${fmt(bCorr)}</div>
+            <div class="sub-cell-net">NET ${fmt(bNet)}</div>
+          </div>
+          <div>
+            <div class="sub-cell-l" style="color:${bc.text}">Contanti + POS</div>
+            <div class="sub-cell-v">${fmt(bCash)}</div>
+            <div class="sub-cell-net">POS ${fmt(bPOS)}</div>
+          </div>
+        </div>`;
+      }
     }
   }
 
@@ -3703,6 +4266,7 @@ async function toggleStoreActive(brand, location){
     };
     recomputeExpected();
     renderAll();
+    showToast(`✓ ${brand} ${location} ${data.monitored?'attivato':'disattivato'}`,'ok');
   }catch(e){
     console.error('toggleStoreActive', e);
     alert('Errore aggiornamento stato negozio: ' + (e.message||'sconosciuto'));
@@ -3914,7 +4478,10 @@ function _buildDayRow(r){
 
 // ── POPUP NEGOZIO + CALENDARIO DATE RANGE ──────────────────────────────
 
-// Apre il popup centrato con le 4 metriche per il range selezionato
+// ── SCHEDA NEGOZIO 360° ──
+// Sostituisce il vecchio popup a bottoni: un'unica vista scrollabile nel
+// bottom-sheet con metriche del range, trend NET 30 giorni, saldo versamenti
+// e ultime chiusure. Tap su una metrica → storico giornaliero di quel valore.
 function openStorePopup(brand, location){
   const k=storeKey(brand,location);
   let records=allData.filter(r=>storeKey(r.brand,r.location)===k && r.dateISO);
@@ -3939,34 +4506,102 @@ function openStorePopup(brand, location){
         : `${storeRange.from.split('-').reverse().join('/')} → ${storeRange.to.split('-').reverse().join('/')}`)
     : (records.length ? `${records.length} chiusur${records.length===1?'a':'e'} totali` : 'Nessuna chiusura');
 
-  document.getElementById('spu-brand').textContent=brand;
-  document.getElementById('spu-title').textContent=location;
-  document.getElementById('spu-sub').textContent=subLabel;
-  // Salvo brand/location sul popup per usarli dai bottoni figli
-  document.getElementById('store-popup-overlay').dataset.brand=brand;
-  document.getElementById('store-popup-overlay').dataset.location=location;
+  // Versamenti: sempre su tutto lo storico disponibile (come la vista saldo)
+  const allRecs=allData.filter(r=>storeKey(r.brand,r.location)===k && r.dateISO);
+  const sumDV=allRecs.reduce((s,r)=>s+(r.daVersare||0),0);
+  const sumV=allRecs.reduce((s,r)=>s+(r.versato||0),0);
+  const saldo=sumDV-sumV;
+  const saldoCls=saldo>0.01?'r':(saldo<-0.01?'g':'');
 
-  const metrics=[
-    {icon:'🏦',label:'Fondo cassa',       value:latestFondo},
-    {icon:'🧾',label:'Corrispettivo',      value:sumCorr},
-    {icon:'💳',label:'Incassato POS',      value:sumPOS},
-    {icon:'💵',label:'Incassato contanti', value:sumCash},
-  ];
+  document.getElementById('sheet-title').textContent=location;
+  document.getElementById('sheet-sub').textContent=brand+' · '+subLabel;
 
-  document.getElementById('spu-btns').innerHTML=metrics.map(m=>{
-    const mBrand=brand.replace(/'/g,"\\'"), mLoc=location.replace(/'/g,"\\'");
-    const mLabel=m.label.replace(/'/g,"\\'");
-    const vHtml=noData||m.value===null
-      ?`<div class="spu-btn-v no-data">—</div>`
-      :`<div class="spu-btn-v">${fmt(m.value)}</div>`;
-    return `<button class="spu-btn" onclick="openStoreMetricSheet('${mBrand}','${mLoc}','${mLabel}')">
-      <div class="spu-btn-icon">${m.icon}</div>
-      <div class="spu-btn-l">${m.label}</div>
-      ${vHtml}
+  const mB=brand.replace(/'/g,"\\'"), mL=location.replace(/'/g,"\\'");
+  const metric=(icon,label,value)=>{
+    const v=(value===null)
+      ?`<div class="s360-metric-v nodata">—</div>`
+      :`<div class="s360-metric-v">${fmt(value)}</div>`;
+    return `<button class="s360-metric" onclick="openStoreMetricSheet('${mB}','${mL}','${label}')">
+      <div class="s360-metric-l">${icon} ${label}</div>${v}
     </button>`;
-  }).join('');
+  };
 
-  document.getElementById('store-popup-overlay').classList.add('show');
+  // Ultime chiusure (max 7 nel range selezionato) → tap apre il dettaglio
+  let recent='';
+  for(const r of sorted.slice(0,7)){
+    const idx=allData.indexOf(r);
+    recent+=`<div class="saldo-row" onclick="openSheet(${idx})">
+      <div>
+        <div class="saldo-row-date">${r.dateDisplay}${r.anomaly?' <span style="color:var(--red)">⚠</span>':''}</div>
+        <div class="saldo-row-detail">Contanti ${fmt(r.contanti)} · POS ${fmt(r.pos)}</div>
+      </div>
+      <div class="saldo-row-delta n">${fmt(r.corrispettivo)}</div>
+    </div>`;
+  }
+
+  document.getElementById('sheet-rows').innerHTML=`
+    <div class="s360-metrics">
+      ${metric('🏦','Fondo cassa',latestFondo)}
+      ${metric('🧾','Corrispettivo',noData?null:sumCorr)}
+      ${metric('💳','Incassato POS',noData?null:sumPOS)}
+      ${metric('💵','Incassato contanti',noData?null:sumCash)}
+    </div>
+    <div class="s360-chart-wrap">
+      <div class="s360-chart-title"><span>Ultimi 30 giorni</span><span>NET giornaliero</span></div>
+      <div class="s360-chart-box"><canvas id="s360-canvas"></canvas></div>
+    </div>
+    <div class="s360-saldo">
+      <div class="s360-saldo-cell"><div class="saldo-summary-l">Da versare</div><div class="saldo-summary-v w">${fmt(sumDV)}</div></div>
+      <div class="s360-saldo-cell"><div class="saldo-summary-l">Versato</div><div class="saldo-summary-v b">${fmt(sumV)}</div></div>
+      <div class="s360-saldo-cell"><div class="saldo-summary-l">Saldo</div><div class="saldo-summary-v ${saldoCls}">${fmt(saldo)}</div></div>
+    </div>
+    <button class="s360-row-btn" onclick="openStoreSheet('${mB}','${mL}')"><span>🏦 Storico versamenti per settimana</span><span>›</span></button>
+    ${recent?`<div class="sheet-row divider"><span>Ultime chiusure</span></div>${recent}`:''}
+  `;
+  document.getElementById('sheet').classList.add('show');
+  _renderS360Chart(k);
+}
+
+// Trend NET ultimi 30 giorni del negozio: unione storico Excel + PDF GoAudits
+// (l'Excel vince sul giorno in overlap, stessa regola della tab Analisi).
+let _s360Chart=null;
+function _renderS360Chart(k){
+  const cv=document.getElementById('s360-canvas');
+  if(!cv) return;
+  if(_s360Chart){ try{_s360Chart.destroy();}catch(_){} _s360Chart=null; }
+  const noChartMsg=(msg)=>{ cv.parentElement.innerHTML=`<div style="padding:20px;font-size:12px;color:var(--t3);text-align:center">${msg}</div>`; };
+  if(typeof Chart==='undefined'){ noChartMsg('Grafico non disponibile'); return; }
+  const days=[];
+  for(let i=29;i>=0;i--){
+    const d=new Date(); d.setDate(d.getDate()-i);
+    days.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+  }
+  const byDay={};
+  for(const day of days){
+    const hv=+historicalByKey[k+'|'+day]||0;
+    if(hv>0) byDay[day]=hv;
+  }
+  for(const r of allData){
+    if(!r.dateISO || storeKey(r.brand,r.location)!==k) continue;
+    if(byDay[r.dateISO]!=null) continue;
+    if(r.dateISO<days[0] || r.dateISO>days[days.length-1]) continue;
+    byDay[r.dateISO]=(+r.netSales)||((+r.corrispettivo||0)/1.22);
+  }
+  const labels=days.map(d=>d.slice(8,10)+'/'+d.slice(5,7));
+  const data=days.map(d=>byDay[d]!=null?+byDay[d].toFixed(2):null);
+  if(!data.some(v=>v!=null)){ noChartMsg('Nessun dato negli ultimi 30 giorni'); return; }
+  _s360Chart=new Chart(cv.getContext('2d'),{
+    type:'bar',
+    data:{labels,datasets:[{data,backgroundColor:'#2563eb',borderRadius:3}]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>fmt(c.parsed.y)}}},
+      scales:{
+        x:{ticks:{font:{family:'Nunito',size:8},maxTicksLimit:8},grid:{display:false}},
+        y:{ticks:{font:{family:'Nunito',size:9},callback:v=>v>=1000?'€'+(v/1000).toFixed(0)+'k':'€'+v},grid:{color:'#eaecef'}}
+      }
+    }
+  });
 }
 
 function closeStorePopup(){
@@ -4038,6 +4673,9 @@ function openStoreMetricSheet(brand, location, metric){
       <span class="row-v ${cfg.color}">${fmt(val)}</span>
     </div>`;
   }
+
+  const bB=brand.replace(/'/g,"\\'"), bL=location.replace(/'/g,"\\'");
+  html+=`<div style="padding:16px"><button class="settings-btn" onclick="openStorePopup('${bB}','${bL}')">← Torna alla scheda negozio</button></div>`;
 
   document.getElementById('sheet-rows').innerHTML=html;
   document.getElementById('sheet').classList.add('show');
@@ -4307,6 +4945,9 @@ function openStoreSheet(brand, location){
     }
   }
 
+  const vB=brand.replace(/'/g,"\\'"), vL=location.replace(/'/g,"\\'");
+  html+=`<div style="padding:16px"><button class="settings-btn" onclick="openStorePopup('${vB}','${vL}')">← Torna alla scheda negozio</button></div>`;
+
   document.getElementById('sheet-rows').innerHTML=html;
   document.getElementById('sheet').classList.add('show');
 }
@@ -4479,6 +5120,7 @@ async function applyEditToRecord(r, field, newVal, idx){
       r._overridden[field]={by:me, at:new Date().toISOString()};
     }
     recomputeCash(r);
+    showToast(newVal==null?'✓ Valore originale ripristinato':'✓ Correzione salvata','ok');
     // Ridisegna lo sheet (semplifica la coerenza badge/colori) ma riapri
     // mantenendo lo stato corrente.
     openSheet(idx);
@@ -5566,6 +6208,9 @@ function kpiApplyPanel(type){
   }
   panel.classList.remove('open');
   kpiUpdateFilterUI();
+  // Allinea la vista Vendite (stessa tab Analisi) e salva per la prossima sessione
+  syncAnalisiFiltersFromKpi();
+  saveAnalisiFilters();
   renderKpiAll();
 }
 function kpiUpdateFilterUI(){
@@ -5711,6 +6356,7 @@ function exportCSV(){
   a.href=URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8'}));
   a.download=`chiusure_${new Date().toISOString().slice(0,10)}.csv`;
   a.click();
+  showToast('✓ CSV esportato','ok');
 }
 </script>
 </body>
