@@ -3518,15 +3518,17 @@ function _closureCardHTML(r, flat){
   }else{
     tgtBar=`<div class="tgt-bar-lbl" style="margin-top:8px"><span>Nessun target per questa giornata</span></div>`;
   }
-  // vs anno scorso: stesso negozio, stesso giorno dell'anno precedente (storico Excel)
-  const pyKey=storeKey(r.brand,r.location)+'|'+shiftYearBack(r.dateISO,1);
-  const py=+historicalByKey[pyKey]||0;
+  // vs anno scorso: stesso negozio, STESSO GIORNO DELLA SETTIMANA dell'anno
+  // precedente (shift 364gg, vedi pyDateISO). Sorgente: storico Excel.
+  const pyIso=pyDateISO(r.dateISO);
+  const py=+historicalByKey[storeKey(r.brand,r.location)+'|'+pyIso]||0;
   let pyCell='<div class="card-cell-v" style="color:var(--t3)">—</div>';
   if(py>0){
     const d=(net-py)/py*100;
     const c=d>=-5?'g':(d>=-30?'':'r');
     const sign=d>=0?'+':'';
-    pyCell=`<div class="card-cell-v ${c}" title="Anno scorso: ${fmt(py)} NET">${sign}${d.toLocaleString('it-IT',{maximumFractionDigits:1})}%</div>`;
+    const pyDisp=pyIso?pyIso.split('-').reverse().join('/'):'';
+    pyCell=`<div class="card-cell-v ${c}" title="Stesso giorno della settimana 1 anno fa (${pyDisp}): ${fmt(py)} NET">${sign}${d.toLocaleString('it-IT',{maximumFractionDigits:1})}%</div>`;
   }
   const nameHtml=flat
     ? `<div class="card-name"><span style="display:block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:${bc.text}">${r.brand}</span>${r.location}</div>`
@@ -3756,6 +3758,24 @@ function shiftYearBack(dateISO, years){
   }
   return `${py}-${String(pm).padStart(2,'0')}-${String(pd).padStart(2,'0')}`;
 }
+// Shift di una data ISO di N giorni (N può essere negativo). TZ-safe: ancoro a
+// mezzogiorno locale così l'ora legale non fa mai slittare il giorno, e formatto
+// dai componenti locali invece di toISOString() (che userebbe UTC).
+function shiftDaysISO(iso, days){
+  if(!iso) return null;
+  const x = new Date(iso + 'T12:00:00');
+  x.setDate(x.getDate() + days);
+  return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`;
+}
+// ── CONFRONTO ANNO-SU-ANNO ALLINEATO AL GIORNO DELLA SETTIMANA ──────────
+// Nel retail confrontare il 1° giugno col 1° giugno è fuorviante quando cadono
+// in giorni diversi della settimana (un sabato di punta non è paragonabile a un
+// mercoledì fiacco). Lo standard è lo shift di 52 settimane ESATTE = 364 giorni
+// (364 = 52×7): preserva SEMPRE il giorno della settimana. Esempio richiesto
+// dall'utente: domenica 01/06/2025 + 364gg = domenica 31/05/2026; quindi per una
+// data di quest'anno il "pari" dell'anno scorso è la stessa data − 364 giorni,
+// che cade nello stesso giorno della settimana. Lunedì↔Lunedì, Martedì↔Martedì.
+function pyDateISO(iso){ return shiftDaysISO(iso, -364); }
 // Aggregato anno-su-anno per un gruppo di record.
 // Restituisce {pct, totCur, totPy} oppure null se nessun record ha un PY
 // disponibile. pct è il RAPPORTO percentuale (totCur/totPy*100): 100% = stesso
@@ -3765,7 +3785,8 @@ function periodPyData(records){
   let totCur=0, totPy=0;
   for(const r of records){
     if(!r.dateISO) continue;
-    const pyKey = storeKey(r.brand, r.location) + '|' + shiftYearBack(r.dateISO);
+    // Pari anno-scorso allineato al giorno della settimana (vedi pyDateISO).
+    const pyKey = storeKey(r.brand, r.location) + '|' + pyDateISO(r.dateISO);
     const py = +historicalByKey[pyKey] || 0;
     if(py > 0){
       totCur += (+r.netSales) || ((+r.corrispettivo||0)/1.22);
@@ -3932,40 +3953,28 @@ function renderTempo(){
   };
   const DAYS_IT = ['Dom','Lun','Mar','Mer','Gio','Ven','Sab'];
 
-  // 6b) Helper PY: shifta una data indietro di 1 anno gestendo il 29 feb.
-  //     Restituisce 'YYYY-MM-DD' o null se non c'è dato per la data shiftata.
-  const shiftYearBackISO = (iso) => {
-    const [y, m, d] = iso.split('-').map(Number);
-    let py = y - 1, pd = d;
-    if(m === 2 && d === 29){
-      const leap = (py % 4 === 0 && py % 100 !== 0) || py % 400 === 0;
-      if(!leap) pd = 28;
+  // 6b) Badge PY ALLINEATO AL GIORNO DELLA SETTIMANA.
+  // Per ogni giorno del periodo (non futuro) prende il valore dell'anno scorso
+  // allo STESSO giorno della settimana (data − 364 giorni, vedi pyDateISO),
+  // leggendolo da dailySums (aggregato dei negozi filtrati). Confronta solo i
+  // giorni che hanno un pari valido (>0): numeratore e denominatore coprono lo
+  // stesso insieme di giorni → confronto equo, parziale-vs-parziale automatico.
+  // `days` = array di dayObj {dateISO, isFuture, net}. `partial` → suffisso label.
+  const pyAlignedBadge = (days, partial) => {
+    let cur = 0, py = 0, n = 0;
+    for(const d of days){
+      if(d.isFuture) continue;            // i giorni futuri non hanno consuntivo
+      const pv = dailySums[pyDateISO(d.dateISO)];
+      const pyNet = pv ? pv.net : 0;
+      if(pyNet > 0){ cur += d.net; py += pyNet; n++; }
     }
-    return `${py}-${String(m).padStart(2,'0')}-${String(pd).padStart(2,'0')}`;
+    if(py <= 0) return '';
+    const dlt = (cur - py) / py * 100;
+    const label = partial ? 'vs PY (parziale)' : 'vs PY';
+    return `<span class="am-badge ${badgeCls(dlt)}" title="${n} giorni confrontati con lo stesso giorno della settimana di un anno fa · ${fmt(cur)} vs ${fmt(py)}">${fmtPctSign(dlt)} ${label}</span>`;
   };
-  // Net dell'anno precedente per un dato anno/mese/giorno. Ritorna null se
-  // non ci sono dati per il periodo shiftato (es. dati 2024 non caricati).
-  const pyNetForYear  = (yr) => {
-    const prev = years[String(+yr - 1)];
-    return prev ? prev.netPast : null;
-  };
-  const pyNetForMonth = (mo) => {
-    const [y, m] = mo.split('-');
-    const prev = years[String(+y - 1)];
-    if(!prev || !prev.months[String(+y - 1) + '-' + m]) return null;
-    return prev.months[String(+y - 1) + '-' + m].netPast;
-  };
-  const pyNetForDay = (iso) => {
-    const k = shiftYearBackISO(iso);
-    return dailySums[k] ? dailySums[k].net : null;
-  };
-  // Costruisce il badge "vs PY" data una coppia net corrente / net anno scorso.
-  // Restituisce stringa HTML (può essere vuota se non c'è dato di confronto).
-  const pyBadge = (curNet, pyNet, label = 'vs PY') => {
-    if(pyNet == null || pyNet <= 0) return '';
-    const dlt = (curNet - pyNet) / pyNet * 100;
-    return `<span class="am-badge ${badgeCls(dlt)}">${fmtPctSign(dlt)} ${label}</span>`;
-  };
+  const curYearISO = todayISO.slice(0,4);
+  const curMonthISO = todayISO.slice(0,7);
 
   // 7) Render
   let html = '';
@@ -3986,24 +3995,8 @@ function renderTempo(){
         yBadge += `<span class="am-badge ${badgeCls(dlt)}">${fmtPctSign(dlt)} vs TGT</span>`;
       }
       if(comparePy){
-        // Stessa logica del mese: se l'anno "past" è l'anno corrente o successivo
-        // (nessun target caricato → 0 giorni futuri), confrontare parziale vs parziale.
-        const isCurrentOrLaterYr = +yr >= +todayISO.slice(0, 4);
-        if(isCurrentOrLaterYr){
-          const todayPyISOy = shiftYearBackISO(todayISO);
-          const prevY = years[String(+yr - 1)];
-          if(prevY){
-            let pyNetParzY = 0;
-            for(const pmk of Object.keys(prevY.months)){
-              for(const pd of prevY.months[pmk].days){
-                if(pd.dateISO <= todayPyISOy) pyNetParzY += pd.net;
-              }
-            }
-            yBadge += pyBadge(y.netPast, pyNetParzY, 'vs PY (parziale)');
-          }
-        } else {
-          yBadge += pyBadge(y.netPast, pyNetForYear(yr));
-        }
+        const yDays = Object.values(y.months).flatMap(mo => mo.days);
+        yBadge += pyAlignedBadge(yDays, yr >= curYearISO);
       }
     } else if(yStatus === 'future'){
       yMain = `<div class="am-row-net future">target ${fmt(y.tgtAll)}</div>`;
@@ -4014,25 +4007,12 @@ function renderTempo(){
         const dlt = (y.netPast - y.tgtPast) / y.tgtPast * 100;
         yBadge += `<span class="am-badge ${badgeCls(dlt)}">${fmtPctSign(dlt)} vs TGT (parziale)</span>`;
       }
-      // PY a livello anno-in-corso: confronto i giorni passati di quest'anno
-      // con gli stessi giorni dell'anno scorso. Per semplicità uso il netPast
-      // dell'anno precedente nel mese corrispondente e prima.
+      // PY anno-in-corso: ogni giorno passato di quest'anno confrontato con lo
+      // stesso giorno della settimana di un anno fa (pyAlignedBadge gestisce
+      // l'allineamento e il parziale-vs-parziale).
       if(comparePy){
-        // Calcola il PY come somma dei giorni passati dell'anno precedente fino
-        // alla data odierna (perché altrimenti confronterei un parziale vs un
-        // totale annuale). Lo storico 2025 ha tutti i 365 giorni, quindi devo
-        // sommare solo i giorni <= todayISO_pyShifted.
-        const todayPyISO = shiftYearBackISO(todayISO);
-        const prev = years[String(+yr - 1)];
-        if(prev){
-          let pyNetParziale = 0;
-          for(const pmKey of Object.keys(prev.months)){
-            for(const pd of prev.months[pmKey].days){
-              if(pd.dateISO <= todayPyISO) pyNetParziale += pd.net;
-            }
-          }
-          yBadge += pyBadge(y.netPast, pyNetParziale, 'vs PY (parziale)');
-        }
+        const yDays = Object.values(y.months).flatMap(mo => mo.days);
+        yBadge += pyAlignedBadge(yDays, true);
       }
     }
     // Marker "IN CORSO": fuori dal titolo, su riga propria allineato a sinistra
@@ -4068,26 +4048,10 @@ function renderTempo(){
           mBadge += `<span class="am-badge ${badgeCls(dlt)}">${fmtPctSign(dlt)} vs TGT</span>`;
         }
         if(comparePy){
-          // Se il mese "past" è comunque il mese corrente o successivo (le chiusure
-          // di oggi non sono ancora entrate → 0 giorni futuri nel dataset ma il mese
-          // non è finito), il confronto vs PY deve usare solo i giorni corrispondenti
-          // dell'anno scorso. Altrimenti confronteremmo 9 giorni di Giugno 2026 contro
-          // i 30 giorni di Giugno 2025, mostrando -61% anche se ogni singolo giorno è +%.
-          const isCurrentOrLaterMo = mk >= todayISO.slice(0, 7);
-          if(isCurrentOrLaterMo){
-            const [py2, pmm2] = mk.split('-');
-            const prevMo2 = years[String(+py2 - 1)] && years[String(+py2 - 1)].months[String(+py2 - 1) + '-' + pmm2];
-            if(prevMo2){
-              const todayPyISO2 = shiftYearBackISO(todayISO);
-              let pyNetParz2 = 0;
-              for(const pd of prevMo2.days){
-                if(pd.dateISO <= todayPyISO2) pyNetParz2 += pd.net;
-              }
-              mBadge += pyBadge(m.netPast, pyNetParz2, 'vs PY (parziale)');
-            }
-          } else {
-            mBadge += pyBadge(m.netPast, pyNetForMonth(mk));
-          }
+          // Ogni giorno del mese confrontato con lo stesso giorno della settimana
+          // di un anno fa. Se il mese è quello in corso (o successivo, con dati
+          // ancora parziali), la label diventa "(parziale)".
+          mBadge += pyAlignedBadge(m.days, mk >= curMonthISO);
         }
       } else if(mStatus === 'future'){
         mMain = `<div class="am-row-net future">target ${fmt(m.tgtAll)}</div>`;
@@ -4099,19 +4063,10 @@ function renderTempo(){
           const dlt = (m.netPast - m.tgtPast) / m.tgtPast * 100;
           mBadge += `<span class="am-badge ${badgeCls(dlt)}">${fmtPctSign(dlt)} vs TGT (parziale)</span>`;
         }
-        // PY mese-in-corso: somma i giorni passati di questo mese e confronta
-        // con la stessa porzione del mese dell'anno scorso.
+        // PY mese-in-corso: ogni giorno passato del mese confrontato con lo
+        // stesso giorno della settimana di un anno fa (allineamento in pyAlignedBadge).
         if(comparePy){
-          const [py, pmm] = mk.split('-');
-          const prevMo = years[String(+py - 1)] && years[String(+py - 1)].months[String(+py - 1) + '-' + pmm];
-          if(prevMo){
-            const todayPyISO = shiftYearBackISO(todayISO);
-            let pyNetParziale = 0;
-            for(const pd of prevMo.days){
-              if(pd.dateISO <= todayPyISO) pyNetParziale += pd.net;
-            }
-            mBadge += pyBadge(m.netPast, pyNetParziale, 'vs PY (parziale)');
-          }
+          mBadge += pyAlignedBadge(m.days, true);
         }
       }
       const mMarker = mStatus === 'current' ? '<div class="am-today-marker block">in corso</div>' : '';
@@ -4149,7 +4104,7 @@ function renderTempo(){
               const dlt = (d.net - d.tgt) / d.tgt * 100;
               dBadge += `<span class="am-badge ${badgeCls(dlt)}">${fmtPctSign(dlt)} vs TGT</span>`;
             }
-            if(comparePy) dBadge += pyBadge(d.net, pyNetForDay(d.dateISO));
+            if(comparePy) dBadge += pyAlignedBadge([d], false);
           }
           const dMarker = d.isToday ? ' <span class="am-today-marker">oggi</span>' : '';
           html += `<div class="am-day-row ${d.isFuture ? 'future' : ''}">
@@ -5583,7 +5538,9 @@ function kpiSyntheticFromHistorical(sIso, eIso, brandF, storeF, shiftYears){
     };
     if(shiftYears){
       rec._origDateISO = date;
-      rec.dateISO = kpiFmtDateISO(kpiShiftYear(new Date(date + 'T00:00:00'), shiftYears));
+      // Shift weekday-aligned: 52 settimane esatte per "anno" (364gg), così il
+      // dato dell'anno scorso finisce nel bucket dello stesso giorno settimana.
+      rec.dateISO = shiftDaysISO(date, shiftYears * 364);
     }
     out.push(rec);
   }
@@ -5762,8 +5719,11 @@ function kpiRenderHero(){
 // (perché nel 2025 non c'era GoAudits). Dedup gestito da kpiSyntheticFromHistorical.
 function kpiPyShiftedFiltered(){
   const [s,e] = kpiDateRange(kpiState.range);
-  const sPy = kpiShiftYear(s,-1), ePy = kpiShiftYear(e,-1);
-  const sIso = kpiFmtDateISO(sPy), eIso = kpiFmtDateISO(ePy);
+  // Finestra PY = finestra corrente spostata indietro di 52 settimane esatte
+  // (364gg), così copre gli STESSI giorni della settimana di un anno fa.
+  // Derivo i limiti dagli ISO correnti (coerenti con kpiFiltered) e poi
+  // ri-allineo in avanti dello stesso 364gg → bucket combaciano lun↔lun.
+  const sIso = shiftDaysISO(kpiFmtDateISO(s), -364), eIso = shiftDaysISO(kpiFmtDateISO(e), -364);
   const brandF = kpiState.brands.size ? kpiState.brands : null;
   const storeF = kpiState.stores.size ? kpiState.stores : null;
   const shifted = allData.filter(r => {
@@ -5774,9 +5734,9 @@ function kpiPyShiftedFiltered(){
     return true;
   }).map(r => ({
     ...r,
-    // Sposta la data avanti di 1 anno per allineare i bucket
+    // Avanti di 364gg per allineare i bucket allo stesso giorno della settimana
     _origDateISO: r.dateISO,
-    dateISO: kpiFmtDateISO(kpiShiftYear(new Date(r.dateISO + 'T00:00:00'), 1))
+    dateISO: shiftDaysISO(r.dateISO, 364)
   }));
   // Sintetici dall'Excel storico per i giorni del PY range che non hanno
   // GoAudits. shiftYears=1 → dateISO traslato a 2026, _origDateISO=2025 così
@@ -6108,8 +6068,8 @@ function openKpiDrill(payload){
     </div>`;
   ['ingressi','cr','upt'].forEach((kpi, idx) => {
     const tot = kpiAggregateTotal(recs, kpi);
-    const sPy = kpiShiftYear(s,-1), ePy = kpiShiftYear(e,-1);
-    const sPyI = kpiFmtDateISO(sPy), ePyI = kpiFmtDateISO(ePy);
+    // Finestra PY allineata al giorno della settimana: −364gg (52 settimane).
+    const sPyI = shiftDaysISO(sIso, -364), ePyI = shiftDaysISO(eIso, -364);
     const pyRecs = allData.filter(r => r.brand === o.brand && r.location === o.location && r.dateISO >= sPyI && r.dateISO <= ePyI);
     const totPy = kpiAggregateTotal(pyRecs, kpi);
     const d = kpiDelta(tot, totPy);
