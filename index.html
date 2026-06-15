@@ -774,6 +774,11 @@ body{display:flex;flex-direction:column}
 .tempo-wrap .seg-wrap{margin:0 0 4px}
 #tab-kpi .seg-wrap{margin:14px 16px 0}
 
+/* Riga "consuntivi aggiornati al…" in cima alla sezione Analisi */
+.analisi-asof{display:flex;align-items:center;justify-content:center;gap:6px;font-size:11.5px;color:var(--t3);padding:8px 16px 2px;font-weight:600}
+.analisi-asof .aa-dot{width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0}
+.tempo-wrap .analisi-asof{padding:8px 0 2px}
+
 /* ── TOAST DI CONFERMA ── */
 #toast-wrap{position:fixed;left:16px;right:16px;bottom:calc(var(--safe-bot) + 86px);z-index:600;display:flex;flex-direction:column;gap:8px;pointer-events:none}
 .toast{display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:12px;background:#1f2328;color:#fff;font-size:13px;font-weight:500;box-shadow:0 8px 24px rgba(0,0,0,.25);animation:toastIn .25s cubic-bezier(.32,1,.57,1);max-width:480px;margin:0 auto;width:100%}
@@ -1000,6 +1005,7 @@ body{display:flex;flex-direction:column}
         <button class="seg-btn on" onclick="switchTab('tempo')">📈 Vendite</button>
         <button class="seg-btn" onclick="switchTab('kpi')">📊 KPI negozio</button>
       </div>
+      <div class="analisi-asof" id="asof-tempo"></div>
       <!-- Filtri: Brand multi-select + Punto Vendita multi-select + toggle.
            Il pannello dei filtri viene popolato da renderAmFilterPanels()
            subito dopo il fetch dei dati, così riflette esattamente quello
@@ -1052,6 +1058,7 @@ body{display:flex;flex-direction:column}
         <button class="seg-btn" onclick="switchTab('tempo')">📈 Vendite</button>
         <button class="seg-btn on" onclick="switchTab('kpi')">📊 KPI negozio</button>
       </div>
+      <div class="analisi-asof" id="asof-kpi"></div>
 
       <!-- Hero + selettore KPI -->
       <div class="kpi-tabs" id="kpi-tabs">
@@ -3776,6 +3783,31 @@ function shiftDaysISO(iso, days){
 // data di quest'anno il "pari" dell'anno scorso è la stessa data − 364 giorni,
 // che cade nello stesso giorno della settimana. Lunedì↔Lunedì, Martedì↔Martedì.
 function pyDateISO(iso){ return shiftDaysISO(iso, -364); }
+// Data del consuntivo più recente caricato = data massima presente nello
+// storico incassi (historicalByKey, dove finiscono i "Consuntivi nuovi"
+// caricati da Excel). Dice "fino a che giorno i numeri sono aggiornati".
+// Ritorna 'YYYY-MM-DD' o null se non c'è alcun consuntivo.
+function lastConsuntivoISO(){
+  let max=null;
+  for(const k in historicalByKey){
+    const iso=k.slice(k.lastIndexOf('|')+1);
+    if(/^\d{4}-\d{2}-\d{2}$/.test(iso) && (max===null || iso>max)) max=iso;
+  }
+  return max;
+}
+// Aggiorna la riga "Consuntivi aggiornati al…" in cima alla sezione Analisi
+// (presente sia nella vista Vendite sia in KPI).
+function updateConsuntivoLabel(){
+  const iso=lastConsuntivoISO();
+  const txt=iso
+    ? `Consuntivi aggiornati al ${iso.split('-').reverse().join('/')}`
+    : 'Nessun consuntivo caricato';
+  const dot=iso?'<span class="aa-dot"></span>':'';
+  ['asof-tempo','asof-kpi'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.innerHTML=dot+txt;
+  });
+}
 // Aggregato anno-su-anno per un gruppo di record.
 // Restituisce {pct, totCur, totPy} oppure null se nessun record ha un PY
 // disponibile. pct è il RAPPORTO percentuale (totCur/totPy*100): 100% = stesso
@@ -3827,6 +3859,7 @@ function periodPyBadgeHTML(records){
 function renderTempo(){
   const targetEl = document.getElementById('tempo-content');
   if(!targetEl) return;
+  updateConsuntivoLabel();
 
   // 0) Aggiorna i pannelli filtri (in caso siano cambiate le brand/store mappate
   //    o sia il primo render dopo il login). Il render è idempotente.
@@ -6189,6 +6222,7 @@ function kpiUpdateFilterUI(){
 
 // Master render — chiamato sia entrando in tab, sia al cambio di filtri/state
 function renderKpiAll(){
+  updateConsuntivoLabel();
   kpiRenderHero();
   if(kpiState.view === 'chart'){
     kpiRenderChart();
