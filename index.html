@@ -774,10 +774,13 @@ body{display:flex;flex-direction:column}
 .tempo-wrap .seg-wrap{margin:0 0 4px}
 #tab-kpi .seg-wrap{margin:14px 16px 0}
 
-/* Riga "consuntivi aggiornati al…" in cima alla sezione Analisi */
-.analisi-asof{display:flex;align-items:center;justify-content:center;gap:6px;font-size:11.5px;color:var(--t3);padding:8px 16px 2px;font-weight:600}
-.analisi-asof .aa-dot{width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0}
-.tempo-wrap .analisi-asof{padding:8px 0 2px}
+/* Fascia "consuntivi aggiornati al…" in cima alla sezione Analisi */
+.analisi-asof{display:flex;align-items:center;justify-content:center;gap:8px;margin:12px 16px 6px;padding:12px 14px;border-radius:12px;font-size:14px;font-weight:600;border:1px solid transparent}
+.analisi-asof b{font-weight:800}
+.analisi-asof.ok{background:#dcfce7;border-color:#86efac;color:#166534}
+.analisi-asof.none{background:#fef3c7;border-color:#fde68a;color:#92400e}
+.tempo-wrap .analisi-asof{margin:12px 0 6px}
+#tab-kpi .analisi-asof{margin:14px 16px 6px}
 
 /* ── TOAST DI CONFERMA ── */
 #toast-wrap{position:fixed;left:16px;right:16px;bottom:calc(var(--safe-bot) + 86px);z-index:600;display:flex;flex-direction:column;gap:8px;pointer-events:none}
@@ -1001,11 +1004,11 @@ body{display:flex;flex-direction:column}
   <!-- TAB ANDAMENTO (v2: gerarchica anno → mesi → giorni) -->
   <div class="scroll-area" id="tab-tempo" style="display:none">
     <div class="tempo-wrap">
+      <div class="analisi-asof" id="asof-tempo"></div>
       <div class="seg-wrap">
         <button class="seg-btn on" onclick="switchTab('tempo')">📈 Vendite</button>
         <button class="seg-btn" onclick="switchTab('kpi')">📊 KPI negozio</button>
       </div>
-      <div class="analisi-asof" id="asof-tempo"></div>
       <!-- Filtri: Brand multi-select + Punto Vendita multi-select + toggle.
            Il pannello dei filtri viene popolato da renderAmFilterPanels()
            subito dopo il fetch dei dati, così riflette esattamente quello
@@ -1054,11 +1057,11 @@ body{display:flex;flex-direction:column}
   <div class="scroll-area" id="tab-kpi" style="display:none">
     <div class="kpi-wrap">
 
+      <div class="analisi-asof" id="asof-kpi"></div>
       <div class="seg-wrap">
         <button class="seg-btn" onclick="switchTab('tempo')">📈 Vendite</button>
         <button class="seg-btn on" onclick="switchTab('kpi')">📊 KPI negozio</button>
       </div>
-      <div class="analisi-asof" id="asof-kpi"></div>
 
       <!-- Hero + selettore KPI -->
       <div class="kpi-tabs" id="kpi-tabs">
@@ -2108,6 +2111,40 @@ const TARGETS_HEADER_MAP = {
   'yamamay molfetta puglia village':            ['Yamamay', 'Molfetta'],
   'yamamay putignano city (umberto)':           ['Yamamay', 'Putignano'],
 };
+// ── LETTORE ROBUSTO DI CELLE "DATA" EXCEL ──
+// In passato l'upload accettava SOLO date in formato data "vero" (cellDates:true
+// le converte in oggetti Date). Ma un Excel rigenerato/esportato spesso salva le
+// date come TESTO ("01/06/2026") o come numero seriale: in quei casi venivano
+// scartate tutte → "Nessun dato valido estratto dal file".
+// Questa funzione interpreta i 3 casi e ritorna un oggetto Date (mezzogiorno
+// locale, niente drift di fuso) oppure null se davvero non è una data.
+//   1) Date vera        → ritorna così com'è
+//   2) numero seriale   → giorni dal 30/12/1899 (epoca Excel)
+//   3) testo            → "gg/mm/aaaa", "gg-mm-aaaa", "gg.mm.aaaa" o "aaaa-mm-gg"
+function parseExcelDateCell(v){
+  if(v == null || v === '') return null;
+  if(v instanceof Date) return isNaN(v.getTime()) ? null : v;
+  if(typeof v === 'number' && isFinite(v)){
+    // 25569 = giorni tra l'epoca Excel (1899-12-30) e l'epoca Unix (1970-01-01)
+    const d = new Date(Math.round((v - 25569) * 86400 * 1000));
+    return isNaN(d.getTime()) ? null : new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 12);
+  }
+  const s = String(v).trim();
+  if(!s) return null;
+  let m;
+  // ISO: aaaa-mm-gg (anche con / o .)
+  if((m = s.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})$/))){
+    const d = new Date(+m[1], +m[2]-1, +m[3], 12);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  // Italiano: gg/mm/aaaa (anche con - o .); anno a 2 cifre → 20xx
+  if((m = s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2,4})$/))){
+    let y = +m[3]; if(y < 100) y += 2000;
+    const d = new Date(y, +m[2]-1, +m[1], 12);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  return null;
+}
 // Parsa l'Excel selezionato dall'utente e POSTa i target a /targets/bulk con
 // replace_all=true (sostituisce tutto il dataset esistente in MongoDB).
 // Il parsing avviene 100% client-side via SheetJS, niente backend coinvolto
@@ -2185,13 +2222,11 @@ async function uploadTargetsExcel(event){
     for(let r = headerRowIdx + 1; r <= range.e.r; r++){
       const dateCell = ws[XLSX.utils.encode_cell({r, c: dateColIdx})];
       if(!dateCell || dateCell.v == null) continue;
-      let dateStr;
-      if(dateCell.v instanceof Date){
-        const d = dateCell.v;
-        // Costruisco l'ISO dai componenti locali per evitare drift di timezone
-        // (toISOString() su mezzanotte locale di Roma può tornare il giorno prima).
-        dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-      }else continue;
+      // Lettore robusto: accetta date vere, numeri seriali Excel e date-testo.
+      const d = parseExcelDateCell(dateCell.v);
+      if(!d) continue;
+      // ISO dai componenti locali per evitare drift di timezone.
+      const dateStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
       for(const colStr of Object.keys(colToStore)){
         const c = +colStr;
         const [brand, location] = colToStore[c];
@@ -2413,11 +2448,9 @@ async function uploadHistoricalExcel(event, mode){
         unrecognized.add(String(nameV));
         continue;
       }
-      const dateV = ws[XLSX.utils.encode_cell({r,c:dateCol})]?.v;
-      // Date non valide: la cella deve essere una data Excel vera, non testo.
-      // Conto esplicitamente per avvisare nell'alert (problema frequente con
-      // export da altri sistemi che mettono le date come stringhe).
-      if(!(dateV instanceof Date)){ invalidDateSkipped++; continue; }
+      // Lettore robusto: accetta date vere, numeri seriali Excel e date-testo.
+      const dateV = parseExcelDateCell(ws[XLSX.utils.encode_cell({r,c:dateCol})]?.v);
+      if(!dateV){ invalidDateSkipped++; continue; }
       const dateStr = `${dateV.getFullYear()}-${String(dateV.getMonth()+1).padStart(2,'0')}-${String(dateV.getDate()).padStart(2,'0')}`;
       // Validazione anno: se la riga è di un anno diverso da quello target del
       // pulsante, NON la includo. Tengo conto per fail-safe (vedi sotto).
@@ -2473,7 +2506,13 @@ async function uploadHistoricalExcel(event, mode){
           `Verifica di aver scelto il pulsante giusto, oppure controlla che le celle Data siano in formato Data (non testo).`
         );
       }
-      throw new Error('Nessun dato valido estratto dal file. Controlla che le celle Data siano formato data e Net Sales numeri.');
+      // Messaggio diagnostico: dice ESATTAMENTE perché nessuna riga è passata.
+      const diag = [];
+      if(invalidDateSkipped) diag.push(`${invalidDateSkipped} righe con data non leggibile`);
+      if(unrecognized.size)  diag.push(`${unrecognized.size} negozi non riconosciuti (es. "${[...unrecognized][0]}")`);
+      if(nullSkipped)        diag.push(`${nullSkipped} righe senza valore Net Sales`);
+      const why = diag.length ? `\n\nDettaglio: ${diag.join(' · ')}.` : '';
+      throw new Error('Nessun dato valido estratto dal file.'+why+'\n\nControlla che la colonna Data contenga date e la colonna Net Sales numeri.');
     }
     btn.textContent = `📤 Carico ${entries.length} record…`;
     // replace_years=[targetYear]: il backend cancella TUTTI i record di
@@ -3799,13 +3838,13 @@ function lastConsuntivoISO(){
 // (presente sia nella vista Vendite sia in KPI).
 function updateConsuntivoLabel(){
   const iso=lastConsuntivoISO();
-  const txt=iso
-    ? `Consuntivi aggiornati al ${iso.split('-').reverse().join('/')}`
-    : 'Nessun consuntivo caricato';
-  const dot=iso?'<span class="aa-dot"></span>':'';
+  const cls=iso?'analisi-asof ok':'analisi-asof none';
+  const html=iso
+    ? `📅 Consuntivi aggiornati al <b>${iso.split('-').reverse().join('/')}</b>`
+    : `⚠️ Nessun consuntivo caricato`;
   ['asof-tempo','asof-kpi'].forEach(id=>{
     const el=document.getElementById(id);
-    if(el) el.innerHTML=dot+txt;
+    if(el){ el.className=cls; el.innerHTML=html; }
   });
 }
 // Aggregato anno-su-anno per un gruppo di record.
