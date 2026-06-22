@@ -2091,6 +2091,11 @@ const TARGETS_HEADER_MAP = {
   'mango taranto porte dello jonio':  ['Mango',   'Taranto'],
   'mango teramo gran sasso':          ['Mango',   'Teramo'],
   'mango treviso city (calmaggiore)': ['Mango',   'Treviso'],
+  // Nuovo negozio aperto 20/06/2026. Più varianti d'intestazione per tolleranza:
+  // se l'Excel target usa un nome diverso, aggiungere qui la chiave esatta (minuscola).
+  'mango ascoli piceno':              ['Mango',   'Ascoli Piceno'],
+  'mango ascoli piceno city':         ['Mango',   'Ascoli Piceno'],
+  'mango ascoli':                     ['Mango',   'Ascoli Piceno'],
   'yamamay lecce city (sauro)':       ['Yamamay', 'Lecce'],
   'yamamay monopoli':                 ['Yamamay', 'Monopoli'],
   'yamamay monopoli city':            ['Yamamay', 'Monopoli'],
@@ -3367,6 +3372,9 @@ const ALL_STORES=[
   {brand:'Mango',   location:'Bariblu',          monitored:true},
   {brand:'Mango',   location:'Molfetta',         monitored:true},
   {brand:'Mango',   location:'Treviso',          monitored:true},
+  // Aperto il 20/06/2026 (prime chiusure GoAudits 20 e 21/06). `activeFrom`
+  // evita che compaia come "mancante" per le date precedenti all'apertura.
+  {brand:'Mango',   location:'Ascoli Piceno',    monitored:true, activeFrom:'2026-06-20'},
   {brand:'Yamamay', location:'Lecce',            monitored:true},
   {brand:'Yamamay', location:'Monopoli',         monitored:false},
   {brand:'Yamamay', location:'Polignano',        monitored:true},
@@ -3419,10 +3427,13 @@ function isStoreMonitoredOn(brand, location, dateISO){
   // Backcompat: vecchio shape boolean diretto. Non dovrebbe più esistere dopo
   // fetchStoreFlags ma copro il caso per robustezza.
   if(typeof flag === 'boolean') return flag;
-  // Nessun override: default da ALL_STORES. Non c'è una data di attivazione
-  // hardcoded per i 20 default-monitorati; valgono come "sempre attivi".
+  // Nessun override: default da ALL_STORES. I monitorati valgono "sempre attivi",
+  // TRANNE quelli con un `activeFrom` hardcoded (negozi aperti in una data nota):
+  // per le date precedenti all'apertura non sono attivi (niente "mancante" finto).
   const def = ALL_STORES.find(s => storeKey(s.brand, s.location) === k);
-  return def ? !!def.monitored : false;
+  if(!def || !def.monitored) return false;
+  if(dateISO && def.activeFrom && def.activeFrom > dateISO) return false;
+  return true;
 }
 // Wrapper "stato attuale" — usato ovunque ci si chieda "oggi è attivo?". È solo
 // `isStoreMonitoredOn` senza data, mantenuto come API distinta per chiarezza.
