@@ -3307,16 +3307,24 @@ function renderKPI(){
   const d=getFilteredData();
   const totCorr=d.reduce((a,r)=>a+r.corrispettivo,0);
   const totNet=totCorr/1.22;
-  // expectedCount riflette sempre lo stato ATTUALE dei negozi attivi (EXPECTED_STORES),
-  // indipendentemente da filterDate. Il chip "Mancanti" usa già la logica date-aware
-  // tramite getMissingStores(); qui vogliamo che l'utente veda subito l'effetto
-  // di ogni toggle attivo/non-attivo senza dover cambiare la data selezionata.
-  const expectedCount = EXPECTED_STORES.length;
+  // expectedCount:
+  //  - SENZA data filtrata → stato attuale dei negozi attivi (EXPECTED_STORES),
+  //    così ogni toggle attivo/non-attivo si riflette subito.
+  //  - CON data filtrata → negozi attivi IN QUELLA DATA (date-aware), coerente
+  //    con il chip "Mancanti" (getMissingStores). Necessario per i negozi con
+  //    data di apertura (activeFrom): es. Ascoli Piceno aperto il 20/06 non deve
+  //    risultare "mancante" il 18/06.
+  const expectedCount = filterDate
+    ? ALL_STORES.filter(s => isStoreMonitoredOn(s.brand, s.location, filterDate)).length
+    : EXPECTED_STORES.length;
+  // Il numero di mancanti viene dalla STESSA fonte del chip, così card e chip
+  // non possono mai discordare.
+  const missCount = filterDate ? getMissingStores(filterDate).length : 0;
   const negSub=filterDate
-    ? `inviate · ${Math.max(0, expectedCount-d.length)} mancanti su ${expectedCount}`
+    ? `inviate · ${missCount} mancanti su ${expectedCount}`
     : 'PDF caricati';
   document.getElementById('kpi-scroll').innerHTML=[
-    {l:'Negozi',v:filterDate?`${d.length}/${expectedCount}`:d.length,cls:'y',s:negSub},
+    {l:'Negozi',v:filterDate?`${Math.max(0,expectedCount-missCount)}/${expectedCount}`:d.length,cls:'y',s:negSub},
     {l:'Corrispettivo',v:fmt(totCorr),cls:'g',s:'lordo IVA 22%'},
     {l:'Net Sales',v:fmt(totNet),cls:'b',s:'al netto IVA'},
     {l:'Contanti',v:fmt(d.reduce((a,r)=>a+r.contanti,0)),cls:'',s:'incassato'},
