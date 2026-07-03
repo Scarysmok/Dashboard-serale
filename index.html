@@ -2067,8 +2067,10 @@ async function syncConsuntiviFromDrive({silent=true, force=false}={}){
     throw e;
   }
 }
-// Pulsante "📥 Importa" nel banner consuntivi della tab Analisi (admin): forza
-// l'import anche se il file non è cambiato, poi ricarica gli indici e ridisegna.
+// Pulsante "📥 Importa" nel banner consuntivi della tab Analisi (admin).
+// NON forza: se l'ultimo .xlsx su Drive è lo stesso già importato (stessa firma
+// id+modifiedTime sul backend), non riscrive nulla e mostra solo un avviso —
+// richiesta utente 03/07: niente re-import né date che cambiano a vuoto.
 // I bottoni sono 2 (banner Vendite + banner KPI, stessa classe): li disabilito
 // tutti durante l'import. Al termine renderAll() rigenera i banner via
 // updateConsuntivoLabel, quindi non serve ripristinare il testo a mano.
@@ -2076,7 +2078,7 @@ async function importConsuntiviFromDriveManual(){
   const btns=[...document.querySelectorAll('.asof-import-btn')];
   btns.forEach(b=>{b.disabled=true;b.textContent='⏳ Importo…';});
   try{
-    const res=await syncConsuntiviFromDrive({silent:false, force:true});
+    const res=await syncConsuntiviFromDrive({silent:false});
     if(res && res.imported){
       historicalByKey=await fetchHistorical();
       historicalKpiByKey=await fetchHistoricalKpi();
@@ -2085,7 +2087,12 @@ async function importConsuntiviFromDriveManual(){
       if(res.unrecognized && res.unrecognized.length) msg+=`\n\nNegozi non riconosciuti ignorati: ${res.unrecognized.slice(0,5).join(', ')}`;
       alert(msg);
     }else if(res && res.imported===false){
-      alert('Nessun aggiornamento: '+(res.reason||'file già importato')+(res.file?`\n\nUltimo file: ${res.file}`:''));
+      // Due esiti "niente da fare": cartella vuota vs file già importato.
+      if(res.reason && res.reason.startsWith('Nessun file')){
+        alert('⚠️ '+res.reason);
+      }else{
+        alert('ℹ️ Il file più recente su Drive è già stato caricato.\n\nNessuna modifica ai dati.'+(res.file?`\nFile: ${res.file}`:''));
+      }
     }else{
       alert('Import non riuscito: la cartella Drive dei consuntivi non è configurata sul backend (DRIVE_CONSUNTIVI_FOLDER_ID).');
     }
