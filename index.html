@@ -779,6 +779,10 @@ body{display:flex;flex-direction:column}
 .analisi-asof b{font-weight:800}
 .analisi-asof.ok{background:#dcfce7;border-color:#86efac;color:#166534}
 .analisi-asof.none{background:#fef3c7;border-color:#fde68a;color:#92400e}
+/* Bottone "Importa da Drive" dentro il banner consuntivi (solo admin) */
+.asof-import-btn{margin-left:6px;padding:5px 11px;border-radius:8px;border:1px solid #86efac;background:#fff;color:#166534;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap}
+.analisi-asof.none .asof-import-btn{border-color:#fde68a;color:#92400e}
+.asof-import-btn:disabled{opacity:.55;cursor:default}
 .tempo-wrap .analisi-asof{margin:12px 0 6px}
 #tab-kpi .analisi-asof{margin:14px 16px 6px}
 
@@ -1198,10 +1202,8 @@ body{display:flex;flex-direction:column}
            non coperti dall'Excel). -->
       <input type="file" id="historical-cur-upload-input" accept=".xlsx,.xls" style="display:none" onchange="uploadHistoricalExcel(event, 'consuntivi')"/>
       <button class="settings-btn" id="btn-historical-cur-upload" style="display:none" onclick="document.getElementById('historical-cur-upload-input').click()">💰 Consuntivi nuovi</button>
-      <!-- Import automatico consuntivi da Google Drive: pesca l'ultimo .xlsx dalla cartella
-           dedicata (riempita da Power Automate con l'allegato email) e lo importa. Parte anche
-           da solo a ogni sincronizzazione; questo bottone lo forza (force=true). Admin only. -->
-      <button class="settings-btn" id="btn-consuntivi-drive" style="display:none" onclick="importConsuntiviFromDriveManual()">📥 Importa consuntivi da Drive</button>
+      <!-- Il bottone "Importa consuntivi da Drive" vive nel banner verde della tab
+           Analisi (vedi updateConsuntivoLabel), non qui: richiesta utente 03/07. -->
 
       <!-- Amministrazione: visibile solo agli admin via applyRoleVisibility() -->
       <div class="settings-head" id="head-admin" style="display:none">Amministrazione</div>
@@ -1492,8 +1494,9 @@ function applyRoleVisibility(){
   if(btnHistoricalPY) btnHistoricalPY.style.display = isAdmin ? '' : 'none';
   const btnHistoricalCur=document.getElementById('btn-historical-cur-upload');
   if(btnHistoricalCur) btnHistoricalCur.style.display = isAdmin ? '' : 'none';
-  const btnConsDrive=document.getElementById('btn-consuntivi-drive');
-  if(btnConsDrive) btnConsDrive.style.display = isAdmin ? '' : 'none';
+  // Il bottone import-da-Drive è nel banner Analisi: la visibilità admin è
+  // gestita direttamente da updateConsuntivoLabel a ogni render.
+  updateConsuntivoLabel();
 }
 
 // ── LOGIN / REGISTER / LOGOUT ──
@@ -2064,12 +2067,14 @@ async function syncConsuntiviFromDrive({silent=true, force=false}={}){
     throw e;
   }
 }
-// Pulsante "📥 Importa consuntivi da Drive" (Altro, admin): forza l'import anche
-// se il file non è cambiato, poi ricarica gli indici storici e ridisegna.
+// Pulsante "📥 Importa" nel banner consuntivi della tab Analisi (admin): forza
+// l'import anche se il file non è cambiato, poi ricarica gli indici e ridisegna.
+// I bottoni sono 2 (banner Vendite + banner KPI, stessa classe): li disabilito
+// tutti durante l'import. Al termine renderAll() rigenera i banner via
+// updateConsuntivoLabel, quindi non serve ripristinare il testo a mano.
 async function importConsuntiviFromDriveManual(){
-  const btn=document.getElementById('btn-consuntivi-drive');
-  const orig=btn?btn.textContent:'';
-  if(btn){btn.disabled=true;btn.textContent='⏳ Importo da Drive…';}
+  const btns=[...document.querySelectorAll('.asof-import-btn')];
+  btns.forEach(b=>{b.disabled=true;b.textContent='⏳ Importo…';});
   try{
     const res=await syncConsuntiviFromDrive({silent:false, force:true});
     if(res && res.imported){
@@ -2088,7 +2093,9 @@ async function importConsuntiviFromDriveManual(){
     console.error('importConsuntiviFromDriveManual',e);
     alert('Errore import consuntivi da Drive:\n'+(e.message||e));
   }finally{
-    if(btn){btn.disabled=false;btn.textContent=orig;}
+    // Rigenera i banner (e quindi i bottoni, ri-abilitati) in ogni caso,
+    // anche negli esiti di errore dove renderAll() non è stato chiamato.
+    updateConsuntivoLabel();
   }
 }
 // Override del flag monitored per i 30 negozi (vedi commento globale storeFlagsByKey).
@@ -3947,9 +3954,13 @@ function lastConsuntivoISO(){
 function updateConsuntivoLabel(){
   const iso=lastConsuntivoISO();
   const cls=iso?'analisi-asof ok':'analisi-asof none';
-  const html=iso
+  // Bottone import da Drive DENTRO il banner (solo admin): pesca l'ultimo .xlsx
+  // dalla cartella Drive dei consuntivi (riempita da Power Automate) e aggiorna.
+  const isAdmin=auth&&auth.user&&auth.user.role==='admin';
+  const btn=isAdmin?` <button class="asof-import-btn" onclick="importConsuntiviFromDriveManual()" title="Importa l'ultimo file consuntivi dalla cartella Google Drive">📥 Importa</button>`:'';
+  const html=(iso
     ? `📅 Consuntivi aggiornati al <b>${iso.split('-').reverse().join('/')}</b>`
-    : `⚠️ Nessun consuntivo caricato`;
+    : `⚠️ Nessun consuntivo caricato`)+btn;
   ['asof-tempo','asof-kpi'].forEach(id=>{
     const el=document.getElementById(id);
     if(el){ el.className=cls; el.innerHTML=html; }
