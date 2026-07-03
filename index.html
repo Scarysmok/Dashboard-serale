@@ -1198,6 +1198,10 @@ body{display:flex;flex-direction:column}
            non coperti dall'Excel). -->
       <input type="file" id="historical-cur-upload-input" accept=".xlsx,.xls" style="display:none" onchange="uploadHistoricalExcel(event, 'consuntivi')"/>
       <button class="settings-btn" id="btn-historical-cur-upload" style="display:none" onclick="document.getElementById('historical-cur-upload-input').click()">💰 Consuntivi nuovi</button>
+      <!-- Import automatico consuntivi da Google Drive: pesca l'ultimo .xlsx dalla cartella
+           dedicata (riempita da Power Automate con l'allegato email) e lo importa. Parte anche
+           da solo a ogni sincronizzazione; questo bottone lo forza (force=true). Admin only. -->
+      <button class="settings-btn" id="btn-consuntivi-drive" style="display:none" onclick="importConsuntiviFromDriveManual()">📥 Importa consuntivi da Drive</button>
 
       <!-- Amministrazione: visibile solo agli admin via applyRoleVisibility() -->
       <div class="settings-head" id="head-admin" style="display:none">Amministrazione</div>
@@ -1488,6 +1492,8 @@ function applyRoleVisibility(){
   if(btnHistoricalPY) btnHistoricalPY.style.display = isAdmin ? '' : 'none';
   const btnHistoricalCur=document.getElementById('btn-historical-cur-upload');
   if(btnHistoricalCur) btnHistoricalCur.style.display = isAdmin ? '' : 'none';
+  const btnConsDrive=document.getElementById('btn-consuntivi-drive');
+  if(btnConsDrive) btnConsDrive.style.display = isAdmin ? '' : 'none';
 }
 
 // ── LOGIN / REGISTER / LOGOUT ──
@@ -1573,6 +1579,11 @@ async function syncNow(){
   renderSkeletons();
   lastErrors=[];
   try{
+    // Import automatico dei consuntivi da Drive PRIMA di leggere lo storico, così
+    // fetchHistorical() qui sotto vede subito i dati aggiornati. È idempotente
+    // (se il file su Drive non è cambiato non fa nulla) e non-bloccante: eventuali
+    // errori sono silenziati e non fermano la sincronizzazione della dashboard.
+    await syncConsuntiviFromDrive({silent:true});
     // Lista file da Drive + cache backend + overrides + target + storico in
     // parallelo (latenza coperta dal request più lento). Tutti questi dati
     // servono per le viste della dashboard: pdf cache per le chiusure,
@@ -2028,6 +2039,57 @@ async function fetchHistoricalKpi(){
     const data=await r.json();
     return (data && typeof data==='object') ? data : {};
   }catch(e){console.warn('fetchHistoricalKpi',e);return {};}
+}
+// ── IMPORT AUTOMATICO CONSUNTIVI DA GOOGLE DRIVE ──
+// Chiede al backend di pescare l'ultimo .xlsx dalla cartella Drive dedicata
+// (riempita da Power Automate con l'allegato email) e importarlo. È idempotente
+// lato backend: se il file non è cambiato dall'ultima volta non fa nulla.
+//   silent=true  → usato nella sync automatica: non deve MAI bloccare o disturbare.
+//                  Il 503 "cartella non configurata" è normale finché non imposti
+//                  l'env var DRIVE_CONSUNTIVI_FOLDER_ID → lo ignoro in silenzio.
+//   silent=false → usato dal pulsante manuale: propago gli errori al chiamante.
+// Ritorna l'oggetto risposta (o null se silent e qualcosa è andato storto).
+async function syncConsuntiviFromDrive({silent=true, force=false}={}){
+  try{
+    const r=await api('/historical/sync-drive'+(force?'?force=true':''),{method:'POST'});
+    if(!r.ok){
+      if(r.status===503) return null; // cartella non configurata: normale, silenzio
+      let detail='Errore '+r.status;
+      try{const e=await r.json(); if(e.detail) detail=typeof e.detail==='string'?e.detail:JSON.stringify(e.detail);}catch(_){}
+      throw new Error(detail);
+    }
+    return await r.json();
+  }catch(e){
+    if(silent){console.warn('syncConsuntiviFromDrive',e);return null;}
+    throw e;
+  }
+}
+// Pulsante "📥 Importa consuntivi da Drive" (Altro, admin): forza l'import anche
+// se il file non è cambiato, poi ricarica gli indici storici e ridisegna.
+async function importConsuntiviFromDriveManual(){
+  const btn=document.getElementById('btn-consuntivi-drive');
+  const orig=btn?btn.textContent:'';
+  if(btn){btn.disabled=true;btn.textContent='⏳ Importo da Drive…';}
+  try{
+    const res=await syncConsuntiviFromDrive({silent:false, force:true});
+    if(res && res.imported){
+      historicalByKey=await fetchHistorical();
+      historicalKpiByKey=await fetchHistoricalKpi();
+      renderAll();
+      let msg=`✓ Consuntivi importati da Drive.\n\nFile: ${res.file}\nAnno ${res.year} · ${res.records} record (nuovi ${res.upserted}, aggiornati ${res.modified})`;
+      if(res.unrecognized && res.unrecognized.length) msg+=`\n\nNegozi non riconosciuti ignorati: ${res.unrecognized.slice(0,5).join(', ')}`;
+      alert(msg);
+    }else if(res && res.imported===false){
+      alert('Nessun aggiornamento: '+(res.reason||'file già importato')+(res.file?`\n\nUltimo file: ${res.file}`:''));
+    }else{
+      alert('Import non riuscito: la cartella Drive dei consuntivi non è configurata sul backend (DRIVE_CONSUNTIVI_FOLDER_ID).');
+    }
+  }catch(e){
+    console.error('importConsuntiviFromDriveManual',e);
+    alert('Errore import consuntivi da Drive:\n'+(e.message||e));
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent=orig;}
+  }
 }
 // Override del flag monitored per i 30 negozi (vedi commento globale storeFlagsByKey).
 // Non-fatale: se la GET fallisce torno {} e i default di ALL_STORES restano
