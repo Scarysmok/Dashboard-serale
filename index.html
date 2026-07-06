@@ -1956,6 +1956,12 @@ function recomputeCash(r){
   const c=computeCash(r);
   r.diff=c.diff;
   r.anomaly=c.anomaly;
+  // netSales è un campo DERIVATO dal corrispettivo (÷1.22, vedi parse): va
+  // riallineato qui, perché quando una correzione manuale cambia il
+  // corrispettivo tutte le viste aggregate (Analisi, Oggi, KPI, card) leggono
+  // r.netSales — senza questo ricalcolo continuerebbero a mostrare il valore
+  // originale del PDF anche dopo l'override (bug segnalato il 06/07).
+  r.netSales=(+r.corrispettivo||0)/1.22;
   return c;
 }
 
