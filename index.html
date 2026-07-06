@@ -1254,7 +1254,7 @@ body{display:flex;flex-direction:column}
 
   <!-- BOTTOM NAV (5 voci: Oggi · Chiusure · Analisi · Negozi · Altro) -->
   <div class="bottom-nav">
-    <div class="nav-item active" id="nav-oggi" onclick="switchTab('oggi')"><div class="nav-icon">🏠</div><span>Oggi</span></div>
+    <div class="nav-item active" id="nav-oggi" onclick="switchTab('oggi')"><div class="nav-icon">🏠</div><span>Dashboard</span></div>
     <div class="nav-item" id="nav-negozi" onclick="switchTab('negozi')"><div class="nav-icon">📋</div><span>Chiusure</span></div>
     <div class="nav-item" id="nav-analisi" onclick="switchTab('tempo')"><div class="nav-icon">📈</div><span>Analisi</span></div>
     <div class="nav-item" id="nav-stores" onclick="switchTab('stores')"><div class="nav-icon">🏪</div><span>Negozi</span></div>
@@ -3218,7 +3218,7 @@ function switchTab(t){
     const nav=document.getElementById('nav-'+n);
     if(nav)nav.classList.toggle('active',n===activeNav);
   });
-  const titles={oggi:'Riepilogo giornata',negozi:'Chiusure giornaliere',stores:'Negozi',tempo:'Analisi · Vendite',kpi:'Analisi · KPI negozio',settings:'Altro',account:'Gestione utenti'};
+  const titles={oggi:'Dashboard',negozi:'Chiusure giornaliere',stores:'Negozi',tempo:'Analisi · Vendite',kpi:'Analisi · KPI negozio',settings:'Altro',account:'Gestione utenti'};
   const titleEl=document.getElementById('app-title');
   if(titleEl)titleEl.textContent=titles[t]||'Chiusure';
   if(t==='oggi')renderOggi();
@@ -3466,7 +3466,11 @@ function renderOggi(){
   const GG=['domenica','lunedì','martedì','mercoledì','giovedì','venerdì','sabato'];
   const jd=new Date(refDate+'T12:00:00');
   const dateLabel=`${GG[jd.getDay()]} ${jd.getDate()} ${MESI[jd.getMonth()].toLowerCase()}`;
-  const dateSub=refDate===todayISO?'chiusure di oggi':'ultima giornata disponibile';
+  // Titolo dinamico del riepilogo chiusure: di norma la giornata mostrata è
+  // ieri (le chiusure arrivano la sera), ma può essere oggi o più indietro.
+  const yestISO=shiftDaysISO(todayISO,-1);
+  const riepTitle=refDate===todayISO?'Riepilogo di oggi'
+    :(refDate===yestISO?'Riepilogo di ieri':'Riepilogo ultima giornata');
 
   const banner = missing.length
     ? `<div class="oggi-banner warn" onclick="oggiGoChiusure(true)">
@@ -3523,10 +3527,11 @@ function renderOggi(){
   const aperturaSection=_aperturaSectionHTML();
 
   el.innerHTML=`
+    ${aperturaSection}
     <div class="oggi-date-row">
       <div>
-        <div class="oggi-date-title">${dateLabel}</div>
-        <div class="oggi-date-sub">${dateSub}</div>
+        <div class="oggi-date-title">${riepTitle}</div>
+        <div class="oggi-date-sub">🌙 ${dateLabel}</div>
       </div>
     </div>
     ${banner}
@@ -3541,17 +3546,33 @@ function renderOggi(){
       <div class="oggi-mini${anomalie.length?' alert':''}"><div class="oggi-mini-l">Anomalie</div><div class="oggi-mini-v">${anomalie.length}</div></div>
     </div>
     ${checkList}
-    ${aperturaSection}
     ${brandSection}
   `;
 }
-// Sezione "Aperture" della home Oggi. Mostra l'ULTIMO giorno di aperture
-// disponibile (di norma stamattina): ricevute/mancanti + anomalie.
+// Sezione "Aperture" della Dashboard: SEMPRE compatta. Banner ricevute/mancanti
+// + CONTATORI di anomalia (fondo cassa / pulizia / guasti) visibili solo se >0.
+// Click sul contatore → espande l'elenco dei negozi coinvolti; click sul
+// negozio → salta alla vista Aperture con la scheda di dettaglio già aperta.
 // Il controllo principe è il FONDO CASSA: quello dichiarato all'apertura deve
 // coincidere col "Fondo cassa" dell'ultima chiusura precedente del negozio
-// (non necessariamente ieri: regge giorni di chiusura settimanale). Lookback
-// massimo 14 giorni per non confrontare valori troppo vecchi.
-// In più: pulizia non ok e guasti insegna/luci/apparecchiature.
+// (lookback 14 giorni, vedi _prevClosureFor).
+let _apIssuesOpen=new Set();   // contatori espansi (persiste tra i re-render)
+function toggleApIssue(key){
+  if(_apIssuesOpen.has(key)) _apIssuesOpen.delete(key);
+  else _apIssuesOpen.add(key);
+  renderOggi();
+}
+// Naviga alla vista Aperture (tab Chiusure → ☀️). Con i (indice in allAperture)
+// apre anche la scheda di dettaglio di quel negozio, sul giorno giusto.
+function oggiGoAperture(i){
+  switchTab('negozi');
+  setVistaNegozi('aperture');
+  if(i!=null && allAperture[i]){
+    aperturaDate=allAperture[i].dateISO;
+    renderAperture();
+    openAperturaSheet(i);
+  }
+}
 function _aperturaSectionHTML(){
   if(!allAperture.length) return '';
   const days=[...new Set(allAperture.map(a=>a.dateISO).filter(Boolean))].sort();
@@ -3561,51 +3582,56 @@ function _aperturaSectionHTML(){
   const expected=ALL_STORES.filter(s=>isStoreMonitoredOn(s.brand,s.location,day));
   const gotKeys=new Set(recs.map(a=>storeKey(a.brand,a.location)));
   const missing=expected.filter(s=>!gotKeys.has(storeKey(s.brand,s.location)));
-  const minPrevISO=shiftDaysISO(day,-14);
 
-  let rows='';
-  let issueCount=0;
+  // Tre liste di anomalie, con l'indice in allAperture per il salto alla scheda
+  const fondi=[],puliti=[],guasti=[];
   for(const a of recs){
-    const k=storeKey(a.brand,a.location);
-    // ultima chiusura del negozio PRIMA del giorno di apertura
-    let prev=null;
-    for(const r of allData){
-      if(!r.dateISO || r.dateISO>=day || r.dateISO<minPrevISO) continue;
-      if(storeKey(r.brand,r.location)!==k) continue;
-      if(!prev || r.dateISO>prev.dateISO) prev=r;
+    const i=allAperture.indexOf(a);
+    if(a.fondoCassa!=null){
+      const prev=_prevClosureFor(storeKey(a.brand,a.location),a.dateISO);
+      if(prev && isFinite(+prev.fondo) && +prev.fondo!==0){
+        const diff=a.fondoCassa-(+prev.fondo);
+        if(Math.abs(diff)>0.005) fondi.push({a,i,diff});
+      }
     }
-    if(a.fondoCassa!=null && prev && isFinite(+prev.fondo) && Math.abs(a.fondoCassa-(+prev.fondo))>0.005){
-      issueCount++;
-      const pd=`${prev.dateISO.slice(8,10)}/${prev.dateISO.slice(5,7)}`;
-      rows+=`<div class="oggi-row">
-        <span class="oggi-row-icon">💶</span>
-        <span class="oggi-row-name"><span class="orn-brand">${a.brand} · ${a.location}</span>ANOMALIA FONDO CASSA — apertura ${fmt(a.fondoCassa)} · chiusura ${pd} ${fmt(+prev.fondo)}</span>
-        <span class="oggi-row-val bad">Δ ${fmt(a.fondoCassa-(+prev.fondo))}</span>
-      </div>`;
-    }
-    if(a.puliziaOk===false){
-      issueCount++;
-      rows+=`<div class="oggi-row">
-        <span class="oggi-row-icon">🧹</span>
-        <span class="oggi-row-name"><span class="orn-brand">${a.brand}</span>${a.location}</span>
-        <span class="oggi-row-val warn">negozio non pulito</span>
-      </div>`;
-    }
-    if(a.insegnaOk===false){
-      issueCount++;
-      rows+=`<div class="oggi-row">
-        <span class="oggi-row-icon">💡</span>
-        <span class="oggi-row-name"><span class="orn-brand">${a.brand}</span>${a.location}</span>
-        <span class="oggi-row-val warn">guasto insegna/luci/apparecch.</span>
-      </div>`;
-    }
+    if(a.puliziaOk===false) puliti.push({a,i});
+    if(a.insegnaOk===false) guasti.push({a,i});
   }
+
+  const storeRow=(a,i,extra)=>`<div class="oggi-row" onclick="oggiGoAperture(${i})" style="padding-left:34px">
+      <span class="oggi-row-icon">›</span>
+      <span class="oggi-row-name"><span class="orn-brand">${a.brand}</span>${a.location}</span>
+      ${extra||''}
+    </div>`;
+  const counter=(key,icon,label,arr,rowFn)=>{
+    if(!arr.length) return '';
+    const open=_apIssuesOpen.has(key);
+    let h=`<div class="oggi-row" onclick="toggleApIssue('${key}')">
+      <span class="oggi-row-icon">${icon}</span>
+      <span class="oggi-row-name"><b>${arr.length}</b>&nbsp;${label}</span>
+      <span class="oggi-row-val warn">${open?'▴':'▾'}</span>
+    </div>`;
+    if(open) h+=arr.map(rowFn).join('');
+    return h;
+  };
+
+  let counters='';
+  counters+=counter('fondo','💶',
+    fondi.length===1?'fondo cassa non allineato':'fondi cassa non allineati',
+    fondi,({a,i,diff})=>storeRow(a,i,`<span class="oggi-row-val bad">Δ ${fmt(diff)}</span>`));
+  counters+=counter('pulizia','🧹',
+    puliti.length===1?'segnalazione pulizia':'segnalazioni pulizia',
+    puliti,({a,i})=>storeRow(a,i,`<span class="oggi-row-val warn">non pulito</span>`));
+  counters+=counter('guasti','💡',
+    guasti.length===1?'guasto apparecchiature':'guasti apparecchiature',
+    guasti,({a,i})=>storeRow(a,i,`<span class="oggi-row-val warn">guasto</span>`));
+
   const dayLabel=`${day.slice(8,10)}/${day.slice(5,7)}`;
   const banner = missing.length
-    ? `<div class="oggi-banner warn"><span class="ob-icon">☀️</span><span class="ob-text">${recs.length} su ${expected.length} aperture ricevute · ${missing.length} mancant${missing.length===1?'e':'i'}</span></div>`
-    : `<div class="oggi-banner ok"><span class="ob-icon">☀️</span><span class="ob-text">Tutte le ${recs.length} aperture ricevute</span></div>`;
-  const list = rows
-    ? `<div class="oggi-list">${rows}</div>`
+    ? `<div class="oggi-banner warn" onclick="oggiGoAperture()"><span class="ob-icon">☀️</span><span class="ob-text">${recs.length} su ${expected.length} aperture ricevute · ${missing.length} mancant${missing.length===1?'e':'i'}</span><span class="ob-arrow">›</span></div>`
+    : `<div class="oggi-banner ok" onclick="oggiGoAperture()"><span class="ob-icon">☀️</span><span class="ob-text">Tutte le ${recs.length} aperture ricevute</span><span class="ob-arrow">›</span></div>`;
+  const list = counters
+    ? `<div class="oggi-list">${counters}</div>`
     : `<div class="oggi-list"><div class="oggi-empty-ok">✓ Fondi cassa allineati, nessuna segnalazione pulizia o guasti</div></div>`;
   return `<div class="oggi-sec-title">Aperture · ${dayLabel}</div>${banner}${list}`;
 }
