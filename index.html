@@ -1288,6 +1288,9 @@ let calState={year:null,month:null,from:null,to:null};
 //                    non perde lo stato quando cambia filtro.
 // Default: tutto collassato. L'utente decide cosa aprire.
 let tempoBrands=[], tempoStores=[];
+// Checklist di APERTURA (GoAudits, dal 07/2026): record parsati dai PDF della
+// cartella Drive dedicata. Popolato da syncAperture(), mostrato nella home Oggi.
+let allAperture=[];
 let amExpanded = new Set();
 // Toggle confronti nella tab Andamento. Default: target ON (preserva il
 // comportamento già esistente dopo l'introduzione del badge target),
@@ -1609,6 +1612,9 @@ async function syncNow(){
     // tutta la pipeline di rendering parte con la lista negozi attesi corretta.
     storeFlagsByKey = storeFlags;
     recomputeExpected();
+    // Aperture: sync in parallelo SENZA await (non deve rallentare le chiusure).
+    // Al termine ridisegna solo la home Oggi, unica vista che le mostra.
+    syncAperture(backendCache).then(()=>{ try{ renderOggi(); }catch(_){} });
     if(!files.length){setPip('','Nessun PDF');load(false);allData=[];renderAll();return;}
 
     const localCache=loadCache();
@@ -1902,6 +1908,131 @@ async function parsePDF(ab,fname,modifiedTime,fileId){
   return{fileId,store,brand,location,dateISO,dateDisplay,
     corrispettivo,netSales,contanti,pos,fondo,versato,daVersare,
     cambi,giftcard,buonoE,buonoR,sconti,annull,anomaly,diff,qa};
+}
+
+// ── CHECKLIST APERTURA (GoAudits, dal 07/2026) ──
+// PDF con 4 domande: Fondo cassa (importo), Check pulizia (SI/NO), Stato
+// negozio (foto), Controllo insegna/luci/apparecchiature (SI/NO). Una quinta
+// domanda "Inventario a campione" esiste solo nei primissimi PDF: opzionale.
+// ATTENZIONE data: l'intestazione GoAudits può riportare il giorno SBAGLIATO
+// (visto un PDF compilato lunedì 06/07 con header "SUNDAY 5TH JULY"), quindi
+// la data di apertura si prende dal timestamp di generazione del report
+// ("Ref:NNN : 06,July 2026 09:06:36") e in fallback dal modifiedTime del file.
+async function parseAperturaPDF(ab,fname,modifiedTime,fileId){
+  const loadingTask=pdfjsLib.getDocument({data:ab});
+  const pdf=await loadingTask.promise;
+  let txt='';
+  try{
+    for(let i=1;i<=pdf.numPages;i++){
+      const pg=await pdf.getPage(i);
+      const items=(await pg.getTextContent()).items;
+      const lineMap={};
+      for(const it of items){
+        if(!it.str.trim())continue;
+        const y=Math.round(it.transform[5]/2)*2;
+        if(!lineMap[y])lineMap[y]=[];
+        lineMap[y].push({x:it.transform[4],str:it.str});
+      }
+      const ys=Object.keys(lineMap).map(Number).sort((a,b)=>b-a);
+      for(const y of ys){
+        const line=lineMap[y].sort((a,b)=>a.x-b.x).map(i=>i.str).join(' ').trim();
+        if(line) txt+=line+'\n';
+      }
+      try{ pg.cleanup(); }catch(_){}
+    }
+  } finally {
+    try{ await pdf.cleanup(); }catch(_){}
+    try{ await pdf.destroy(); }catch(_){}
+    try{ await loadingTask.destroy(); }catch(_){}
+  }
+  ab=null;
+  txt=txt.replace(/(\d)\n\.(\d)/g,'$1.$2').replace(/(\d)\n,(\d)/g,'$1,$2');
+
+  // Brand/location: stesso header delle chiusure ("Carpisa - Casamassima | Via …")
+  const sm=txt.match(/([A-Za-z0-9 &']+?)\s*[-–]\s*([^\|]+)\|/);
+  const brand=sm?sm[1].trim():'Sconosciuto';
+  const location=sm?sm[2].trim().replace(/\s+/g,' '):'—';
+
+  // Data apertura: timestamp del report, NON l'header (inaffidabile, vedi sopra)
+  const monthMapEn={january:1,february:2,march:3,april:4,may:5,june:6,
+    july:7,august:8,september:9,october:10,november:11,december:12};
+  let dateISO='';
+  const rm=txt.match(/Ref:\s*\d+\s*:\s*(\d{1,2})\s*,\s*([A-Za-z]+)\s+(\d{4})/i);
+  if(rm && monthMapEn[rm[2].toLowerCase()]){
+    dateISO=`${rm[3]}-${String(monthMapEn[rm[2].toLowerCase()]).padStart(2,'0')}-${rm[1].padStart(2,'0')}`;
+  }
+  if(!dateISO && modifiedTime) dateISO=String(modifiedTime).slice(0,10);
+
+  // Risposte: cerco la riga della domanda per parola chiave e il valore nelle
+  // righe subito successive. Tollerante all'ordine "1. Domanda" / "Domanda 1."
+  // e alla presenza di timestamp foto tra domanda e risposta.
+  const lines=txt.split('\n');
+  const answerNear=(kwRe,valRe,maxLook=6)=>{
+    for(let i=0;i<lines.length;i++){
+      if(!kwRe.test(lines[i])) continue;
+      for(let j=i+1;j<=Math.min(i+maxLook,lines.length-1);j++){
+        const m=lines[j].match(valRe);
+        if(m) return m[1]!==undefined?m[1]:m[0];
+      }
+      return null;
+    }
+    return null;
+  };
+  const NUMLINE=/^\s*(?:€\s*)?(\d+(?:\.\d{3})*(?:,\d{1,2})?)\s*$/;   // riga solo-numero
+  const SINO=/^\s*(SI|SÌ|NO)\s*$/i;
+  const toNumIt=s=>{
+    if(s==null)return null;
+    const n=parseFloat(String(s).replace(/\./g,'').replace(',','.'));
+    return isFinite(n)?n:null;
+  };
+  const siNo=s=>s==null?null:!/^no$/i.test(String(s).trim());
+  const fondoCassa  = toNumIt(answerNear(/fondo\s+cassa/i, NUMLINE));
+  const puliziaOk   = siNo(answerNear(/check\s+pulizia/i, SINO));
+  const insegnaOk   = siNo(answerNear(/controllo\s+insegna/i, SINO, 8));
+  const inventarioOk= siNo(answerNear(/inventario.*campione/i, SINO)); // opzionale, sparirà
+
+  return {type:'apertura',fileId,fname,modifiedTime,brand,location,dateISO,
+          fondoCassa,puliziaOk,insegnaOk,inventarioOk};
+}
+
+// Lista PDF aperture dal backend. [] se la cartella non è configurata (503/404)
+// o in caso d'errore: la sezione Aperture semplicemente non compare.
+async function fetchApertureList(){
+  try{
+    const r=await api('/drive/list-aperture');
+    if(!r.ok) return [];
+    const d=await r.json();
+    return Array.isArray(d)?d:[];
+  }catch(e){return [];}
+}
+
+// Sync aperture: NON bloccante rispetto alla pipeline chiusure (chiamata senza
+// await da syncNow). Riusa la stessa cache dei PDF (chiave fileId_modifiedTime,
+// locale + backend condivisa): ogni PDF si scarica e parsa una volta sola.
+async function syncAperture(backendCache){
+  try{
+    const files=await fetchApertureList();
+    if(!files.length){ allAperture=[]; return; }
+    const localCache=loadCache();
+    const out=[];
+    let dirty=false;
+    for(const f of files){
+      const key=f.id+'_'+f.modifiedTime;
+      let rec=(backendCache&&backendCache[key])||localCache[key];
+      if(!rec){
+        try{
+          const r=await api(`/drive/file/${encodeURIComponent(f.id)}`);
+          if(!r.ok) continue;
+          rec=await parseAperturaPDF(await r.arrayBuffer(), f.name, f.modifiedTime, f.id);
+          localCache[key]=rec; dirty=true;
+          pushPdfCache(key, rec); // best-effort, condivisa con gli altri utenti
+        }catch(e){ console.warn('parseAperturaPDF', f.name, e); continue; }
+      }
+      if(rec && rec.type==='apertura') out.push(rec);
+    }
+    if(dirty) saveCache(localCache);
+    allAperture=out;
+  }catch(e){ console.warn('syncAperture', e); }
 }
 
 // ── VERIFICA CASSA ──
@@ -3186,6 +3317,8 @@ function renderOggi(){
     ? `<div class="oggi-sec-title">Per brand</div><div class="oggi-hero oggi-brandbar" style="padding:14px 16px">${brandBars}</div>`
     : '';
 
+  const aperturaSection=_aperturaSectionHTML();
+
   el.innerHTML=`
     <div class="oggi-date-row">
       <div>
@@ -3205,8 +3338,73 @@ function renderOggi(){
       <div class="oggi-mini${anomalie.length?' alert':''}"><div class="oggi-mini-l">Anomalie</div><div class="oggi-mini-v">${anomalie.length}</div></div>
     </div>
     ${checkList}
+    ${aperturaSection}
     ${brandSection}
   `;
+}
+// Sezione "Aperture" della home Oggi. Mostra l'ULTIMO giorno di aperture
+// disponibile (di norma stamattina): ricevute/mancanti + anomalie.
+// Il controllo principe è il FONDO CASSA: quello dichiarato all'apertura deve
+// coincidere col "Fondo cassa" dell'ultima chiusura precedente del negozio
+// (non necessariamente ieri: regge giorni di chiusura settimanale). Lookback
+// massimo 14 giorni per non confrontare valori troppo vecchi.
+// In più: pulizia non ok e guasti insegna/luci/apparecchiature.
+function _aperturaSectionHTML(){
+  if(!allAperture.length) return '';
+  const days=[...new Set(allAperture.map(a=>a.dateISO).filter(Boolean))].sort();
+  if(!days.length) return '';
+  const day=days[days.length-1];
+  const recs=allAperture.filter(a=>a.dateISO===day);
+  const expected=ALL_STORES.filter(s=>isStoreMonitoredOn(s.brand,s.location,day));
+  const gotKeys=new Set(recs.map(a=>storeKey(a.brand,a.location)));
+  const missing=expected.filter(s=>!gotKeys.has(storeKey(s.brand,s.location)));
+  const minPrevISO=shiftDaysISO(day,-14);
+
+  let rows='';
+  let issueCount=0;
+  for(const a of recs){
+    const k=storeKey(a.brand,a.location);
+    // ultima chiusura del negozio PRIMA del giorno di apertura
+    let prev=null;
+    for(const r of allData){
+      if(!r.dateISO || r.dateISO>=day || r.dateISO<minPrevISO) continue;
+      if(storeKey(r.brand,r.location)!==k) continue;
+      if(!prev || r.dateISO>prev.dateISO) prev=r;
+    }
+    if(a.fondoCassa!=null && prev && isFinite(+prev.fondo) && Math.abs(a.fondoCassa-(+prev.fondo))>0.005){
+      issueCount++;
+      const pd=`${prev.dateISO.slice(8,10)}/${prev.dateISO.slice(5,7)}`;
+      rows+=`<div class="oggi-row">
+        <span class="oggi-row-icon">💶</span>
+        <span class="oggi-row-name"><span class="orn-brand">${a.brand} · ${a.location}</span>ANOMALIA FONDO CASSA — apertura ${fmt(a.fondoCassa)} · chiusura ${pd} ${fmt(+prev.fondo)}</span>
+        <span class="oggi-row-val bad">Δ ${fmt(a.fondoCassa-(+prev.fondo))}</span>
+      </div>`;
+    }
+    if(a.puliziaOk===false){
+      issueCount++;
+      rows+=`<div class="oggi-row">
+        <span class="oggi-row-icon">🧹</span>
+        <span class="oggi-row-name"><span class="orn-brand">${a.brand}</span>${a.location}</span>
+        <span class="oggi-row-val warn">negozio non pulito</span>
+      </div>`;
+    }
+    if(a.insegnaOk===false){
+      issueCount++;
+      rows+=`<div class="oggi-row">
+        <span class="oggi-row-icon">💡</span>
+        <span class="oggi-row-name"><span class="orn-brand">${a.brand}</span>${a.location}</span>
+        <span class="oggi-row-val warn">guasto insegna/luci/apparecch.</span>
+      </div>`;
+    }
+  }
+  const dayLabel=`${day.slice(8,10)}/${day.slice(5,7)}`;
+  const banner = missing.length
+    ? `<div class="oggi-banner warn"><span class="ob-icon">☀️</span><span class="ob-text">${recs.length} su ${expected.length} aperture ricevute · ${missing.length} mancant${missing.length===1?'e':'i'}</span></div>`
+    : `<div class="oggi-banner ok"><span class="ob-icon">☀️</span><span class="ob-text">Tutte le ${recs.length} aperture ricevute</span></div>`;
+  const list = rows
+    ? `<div class="oggi-list">${rows}</div>`
+    : `<div class="oggi-list"><div class="oggi-empty-ok">✓ Fondi cassa allineati, nessuna segnalazione pulizia o guasti</div></div>`;
+  return `<div class="oggi-sec-title">Aperture · ${dayLabel}</div>${banner}${list}`;
 }
 // Dal riepilogo alla tab Chiusure, con la stessa giornata già filtrata.
 // showMissing=true → attiva anche il chip "Mancanti".
