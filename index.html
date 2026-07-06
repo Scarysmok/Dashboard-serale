@@ -783,6 +783,21 @@ body{display:flex;flex-direction:column}
 .asof-import-btn{margin-left:6px;padding:5px 11px;border-radius:8px;border:1px solid #86efac;background:#fff;color:#166534;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap}
 .analisi-asof.none .asof-import-btn{border-color:#fde68a;color:#92400e}
 .asof-import-btn:disabled{opacity:.55;cursor:default}
+/* Card checklist APERTURA (vista Aperture nella tab Chiusure) */
+.ap-card{background:var(--s1);border:1px solid var(--bd2);border-radius:14px;padding:12px 14px;margin:0 16px 10px;cursor:pointer;transition:box-shadow .15s}
+.ap-card:active{box-shadow:0 2px 10px rgba(0,0,0,.12)}
+.ap-card.ap-missing{opacity:.55;cursor:default}
+.ap-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:8px}
+.ap-brand{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--t3);display:block}
+.ap-store{font-weight:700;font-size:14.5px}
+.ap-fondo{font-size:17px;font-weight:800;white-space:nowrap}
+.ap-time{font-size:11px;color:var(--t3);white-space:nowrap}
+.ap-badges{display:flex;flex-wrap:wrap;gap:6px}
+.ap-badge{font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;border:1px solid transparent}
+.ap-badge.ok{background:#dcfce7;border-color:#86efac;color:#166534}
+.ap-badge.ko{background:#fee2e2;border-color:#fca5a5;color:#b91c1c}
+.ap-badge.warn{background:#fef3c7;border-color:#fde68a;color:#92400e}
+.ap-badge.muted{background:var(--s2);border-color:var(--bd2);color:var(--t3)}
 .tempo-wrap .analisi-asof{margin:12px 0 6px}
 #tab-kpi .analisi-asof{margin:14px 16px 6px}
 
@@ -967,10 +982,15 @@ body{display:flex;flex-direction:column}
     </div>
   </div>
 
-  <!-- TAB NEGOZI -->
+  <!-- TAB NEGOZI (Chiusure + vista Aperture) -->
   <div class="scroll-area" id="tab-negozi" style="display:none">
+    <!-- Toggle Chiusure/Aperture: stesso pattern segmented della tab Analisi -->
+    <div class="seg-wrap" style="margin:10px 16px 2px">
+      <button class="seg-btn on" id="segn-chiusure" onclick="setVistaNegozi('chiusure')">🌙 Chiusure</button>
+      <button class="seg-btn" id="segn-aperture" onclick="setVistaNegozi('aperture')">☀️ Aperture</button>
+    </div>
     <div class="kpi-scroll" id="kpi-scroll"></div>
-    <div class="filter-bar">
+    <div class="filter-bar" id="chiusure-filterbar">
       <button class="date-arrow" id="date-prev" onclick="shiftFilterDate(-1)" aria-label="Giorno precedente">‹</button>
       <button class="chip" id="chip-date" onclick="openDateFilter()">📅 Tutte le date</button>
       <button class="date-arrow" id="date-next" onclick="shiftFilterDate(1)" aria-label="Giorno successivo">›</button>
@@ -980,7 +1000,7 @@ body{display:flex;flex-direction:column}
       <button class="chip" onclick="setChip(this,'annull')">Annullamenti</button>
       <button class="chip" id="chip-mancanti" onclick="setChip(this,'mancanti')">📭 Mancanti</button>
     </div>
-    <div class="search-row">
+    <div class="search-row" id="chiusure-searchrow">
       <input class="search-field" type="search" placeholder="Cerca negozio o brand…" id="search" oninput="renderCards()" autocorrect="off"/>
       <select class="sort-select" id="sort-select" onchange="setSortMode(this.value)" aria-label="Ordina negozi">
         <option value="default">Ordina: Brand</option>
@@ -991,6 +1011,16 @@ body{display:flex;flex-direction:column}
       </select>
     </div>
     <div class="cards-list" id="cards-list"></div>
+    <!-- Vista APERTURE: una card per negozio con fondo cassa (confrontato con la
+         chiusura precedente), esiti pulizia/apparecchiature e accesso alle foto. -->
+    <div id="aperture-view" style="display:none">
+      <div class="filter-bar">
+        <button class="date-arrow" onclick="shiftAperturaDate(-1)" aria-label="Giorno precedente">‹</button>
+        <button class="chip on" id="apertura-date-chip">📅 —</button>
+        <button class="date-arrow" onclick="shiftAperturaDate(1)" aria-label="Giorno successivo">›</button>
+      </div>
+      <div class="cards-list" id="aperture-list"></div>
+    </div>
   </div>
 
   <!-- TAB NEGOZI (lista negozi + popup metriche + calendario range) -->
@@ -1614,7 +1644,7 @@ async function syncNow(){
     recomputeExpected();
     // Aperture: sync in parallelo SENZA await (non deve rallentare le chiusure).
     // Al termine ridisegna solo la home Oggi, unica vista che le mostra.
-    syncAperture(backendCache).then(()=>{ try{ renderOggi(); }catch(_){} });
+    syncAperture(backendCache).then(()=>{ try{ renderOggi(); if(vistaNegozi==='aperture') renderAperture(); }catch(_){} });
     if(!files.length){setPip('','Nessun PDF');load(false);allData=[];renderAll();return;}
 
     const localCache=loadCache();
@@ -2040,6 +2070,170 @@ async function syncAperture(backendCache){
     if(dirty) saveCache(localCache);
     allAperture=out;
   }catch(e){ console.warn('syncAperture', e); }
+}
+
+// ── VISTA APERTURE (dentro la tab Chiusure, toggle segmented) ──────────
+let vistaNegozi='chiusure';   // 'chiusure' | 'aperture'
+let aperturaDate=null;        // giorno mostrato nella vista Aperture (ISO)
+
+function setVistaNegozi(v){
+  vistaNegozi=v;
+  const ap=v==='aperture';
+  const bC=document.getElementById('segn-chiusure');
+  const bA=document.getElementById('segn-aperture');
+  if(bC) bC.classList.toggle('on',!ap);
+  if(bA) bA.classList.toggle('on',ap);
+  for(const id of ['kpi-scroll','chiusure-filterbar','chiusure-searchrow','cards-list']){
+    const el=document.getElementById(id);
+    if(el) el.style.display=ap?'none':'';
+  }
+  const av=document.getElementById('aperture-view');
+  if(av) av.style.display=ap?'':'none';
+  if(ap) renderAperture();
+}
+
+function _aperturaDays(){
+  return [...new Set(allAperture.map(a=>a.dateISO).filter(Boolean))].sort();
+}
+function shiftAperturaDate(delta){
+  const days=_aperturaDays();
+  if(!days.length) return;
+  let i=days.indexOf(aperturaDate);
+  if(i<0) i=days.length-1;
+  i=Math.max(0,Math.min(days.length-1,i+delta));
+  aperturaDate=days[i];
+  renderAperture();
+}
+// Ultima chiusura del negozio PRIMA del giorno dato (lookback 14gg): è il
+// termine di confronto del fondo cassa. Non per forza ieri: regge i giorni
+// di chiusura settimanale.
+function _prevClosureFor(k, dayISO){
+  const minISO=shiftDaysISO(dayISO,-14);
+  let prev=null;
+  for(const r of allData){
+    if(!r.dateISO || r.dateISO>=dayISO || r.dateISO<minISO) continue;
+    if(storeKey(r.brand,r.location)!==k) continue;
+    if(!prev || r.dateISO>prev.dateISO) prev=r;
+  }
+  return prev;
+}
+// Ora di invio dall'ISO nel nome file GoAudits ("...2026-07-06T13:12:04+00:00.pdf")
+function _aperturaTimeHHMM(a){
+  const m=String(a.fname||'').match(/(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:[+-]\d{2}:\d{2}|Z)?)/);
+  if(!m) return '';
+  const d=new Date(m[1]);
+  if(isNaN(d)) return '';
+  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+// Badge di stato fondo cassa per un record apertura. Ritorna {html, anomaly}.
+function _fondoBadge(a){
+  if(a.fondoCassa==null)
+    return {html:'<span class="ap-badge muted">💶 fondo non indicato</span>', anomaly:false};
+  const prev=_prevClosureFor(storeKey(a.brand,a.location), a.dateISO);
+  if(!prev || !isFinite(+prev.fondo) || +prev.fondo===0)
+    return {html:'<span class="ap-badge muted">💶 nessuna chiusura di confronto</span>', anomaly:false};
+  const diff=a.fondoCassa-(+prev.fondo);
+  const pd=`${prev.dateISO.slice(8,10)}/${prev.dateISO.slice(5,7)}`;
+  if(Math.abs(diff)>0.005)
+    return {html:`<span class="ap-badge ko">💶 ANOMALIA FONDO CASSA · chiusura ${pd} ${fmt(+prev.fondo)} · Δ ${fmt(diff)}</span>`, anomaly:true};
+  return {html:`<span class="ap-badge ok">💶 fondo allineato alla chiusura ${pd}</span>`, anomaly:false};
+}
+
+function renderAperture(){
+  const list=document.getElementById('aperture-list');
+  const chip=document.getElementById('apertura-date-chip');
+  if(!list) return;
+  const days=_aperturaDays();
+  if(!days.length){
+    if(chip) chip.textContent='📅 —';
+    list.innerHTML='<div style="padding:40px 24px;text-align:center;color:var(--t3)"><div style="font-size:32px;margin-bottom:10px">☀️</div><div style="font-size:13px">Nessuna checklist di apertura ancora ricevuta.</div></div>';
+    return;
+  }
+  if(!aperturaDate || !days.includes(aperturaDate)) aperturaDate=days[days.length-1];
+  if(chip) chip.textContent='📅 '+aperturaDate.split('-').reverse().join('/');
+
+  const recs=allAperture.filter(a=>a.dateISO===aperturaDate);
+  const got=new Map(recs.map(a=>[storeKey(a.brand,a.location),a]));
+  // Unione: negozi attesi quel giorno + eventuali aperture da negozi non attesi
+  // (es. punti vendita non monitorati che comunque inviano la checklist).
+  const items=[];
+  const seen=new Set();
+  for(const s of ALL_STORES){
+    if(!isStoreMonitoredOn(s.brand,s.location,aperturaDate)) continue;
+    const k=storeKey(s.brand,s.location);
+    seen.add(k);
+    items.push({brand:s.brand,location:s.location,rec:got.get(k)||null});
+  }
+  for(const a of recs){
+    const k=storeKey(a.brand,a.location);
+    if(!seen.has(k)) items.push({brand:a.brand,location:a.location,rec:a});
+  }
+  items.sort((x,y)=>(x.brand+x.location).localeCompare(y.brand+y.location));
+
+  const received=items.filter(i=>i.rec).length;
+  let html=`<div style="margin:2px 16px 10px;font-size:12.5px;color:var(--t2);font-weight:600">${received} su ${items.length} aperture ricevute</div>`;
+  for(const it of items){
+    const bc=brandColor(it.brand);
+    if(!it.rec){
+      html+=`<div class="ap-card ap-missing">
+        <div class="ap-head">
+          <div><span class="ap-brand" style="color:${bc.text}">${it.brand}</span><span class="ap-store">${it.location}</span></div>
+          <span class="ap-time">📭 mancante</span>
+        </div>
+      </div>`;
+      continue;
+    }
+    const a=it.rec;
+    const i=allAperture.indexOf(a);
+    const fondo=_fondoBadge(a);
+    const time=_aperturaTimeHHMM(a);
+    const badges=[fondo.html];
+    if(a.puliziaOk===false)      badges.push('<span class="ap-badge warn">🧹 non pulito</span>');
+    else if(a.puliziaOk===true)  badges.push('<span class="ap-badge ok">🧹 pulito</span>');
+    if(a.insegnaOk===false)      badges.push('<span class="ap-badge warn">💡 guasto segnalato</span>');
+    else if(a.insegnaOk===true)  badges.push('<span class="ap-badge ok">💡 tutto funziona</span>');
+    html+=`<div class="ap-card" onclick="openAperturaSheet(${i})">
+      <div class="ap-head">
+        <div><span class="ap-brand" style="color:${bc.text}">${it.brand}</span><span class="ap-store">${it.location}</span></div>
+        <div style="text-align:right"><div class="ap-fondo">${a.fondoCassa!=null?fmt(a.fondoCassa):'—'}</div>${time?`<div class="ap-time">inviata ${time}</div>`:''}</div>
+      </div>
+      <div class="ap-badges">${badges.join('')}</div>
+    </div>`;
+  }
+  list.innerHTML=html;
+}
+
+// Scheda dettaglio apertura nel bottom sheet (stesso contenitore delle chiusure)
+function openAperturaSheet(i){
+  const a=allAperture[i];
+  if(!a) return;
+  document.getElementById('sheet-title').textContent=a.location;
+  document.getElementById('sheet-sub').textContent=`${a.brand} · Apertura · ${a.dateISO?a.dateISO.split('-').reverse().join('/'):'—'}`;
+  const siNoTxt=v=>v==null?'—':(v?'✓ SI':'✗ NO');
+  const siNoCls=v=>v===false?'r':(v===true?'g':'');
+  const prev=a.fondoCassa!=null?_prevClosureFor(storeKey(a.brand,a.location),a.dateISO):null;
+  const parts=[
+    dividerRow('Apertura'),
+    staticRow('Data', a.dateISO?a.dateISO.split('-').reverse().join('/'):'—',''),
+    staticRow('Fondo cassa dichiarato', a.fondoCassa!=null?fmt(a.fondoCassa):'—','b'),
+  ];
+  if(prev && isFinite(+prev.fondo) && +prev.fondo!==0){
+    const diff=a.fondoCassa-(+prev.fondo);
+    const pd=prev.dateISO.split('-').reverse().join('/');
+    parts.push(staticRow(`Fondo alla chiusura del ${pd}`, fmt(+prev.fondo),''));
+    parts.push(`<div class="row-cash-result ${Math.abs(diff)>0.005?'ko':'ok'}"><span>Verifica fondo cassa</span><span class="delta">${Math.abs(diff)>0.005?`⚠ Δ ${fmt(diff)}`:'✓ Allineato'}</span></div>`);
+  }else{
+    parts.push(staticRow('Confronto con chiusura precedente','nessuna chiusura nei 14 giorni precedenti',''));
+  }
+  parts.push(dividerRow('Controlli'));
+  parts.push(staticRow('Check pulizia', siNoTxt(a.puliziaOk), siNoCls(a.puliziaOk)));
+  parts.push(staticRow('Insegna, luci e apparecchiature', siNoTxt(a.insegnaOk), siNoCls(a.insegnaOk)));
+  if(a.inventarioOk!=null) parts.push(staticRow('Inventario a campione', siNoTxt(a.inventarioOk), siNoCls(a.inventarioOk)));
+  const attachBtn=a.fileId
+    ? `<div style="padding:16px"><button class="settings-btn" onclick="openAttachments(${i},'ap')">📎 Vedi foto allegate</button></div>`
+    : '';
+  document.getElementById('sheet-rows').innerHTML=parts.join('')+attachBtn;
+  document.getElementById('sheet').classList.add('show');
 }
 
 // ── VERIFICA CASSA ──
@@ -3211,6 +3405,8 @@ function renderAll(){
     }
   }
   updateMissingChip();renderKPI();renderCards();updateDateNav();
+  // Vista Aperture: se attiva, ridisegna (i dati possono cambiare a ogni sync)
+  if(vistaNegozi==='aperture'){ try{ renderAperture(); }catch(_){} }
   // La home "Oggi" si aggiorna se visibile (è la tab di default)
   const oggiTab=document.getElementById('tab-oggi');
   if(oggiTab && oggiTab.style.display!=='none') renderOggi();
@@ -5509,11 +5705,15 @@ async function applyEditToRecord(r, field, newVal, idx){
 //     Se troviamo link → li serviamo via backend /drive/image (CORS-safe + auth).
 //  2) Fallback: se non ci sono link annotations (PDF non-GoAudits), estrae
 //     le immagini embedded dal PDF direttamente.
-async function openAttachments(idx){
-  const r=allData[idx];
+// src: undefined → chiusura (allData); 'ap' → apertura (allAperture). Il flusso
+// (link annotations GoAudits → galleria originali, fallback immagini embedded)
+// è IDENTICO per entrambe: cambia solo il record sorgente e il bottone "torna".
+async function openAttachments(idx, src){
+  const r=src==='ap'?allAperture[idx]:allData[idx];
+  const backCall=src==='ap'?`openAperturaSheet(${idx})`:`openSheet(${idx})`;
   if(!r||!r.fileId){alert('File ID non disponibile per questo record.');return;}
   document.getElementById('sheet-title').textContent=r.location+' · Allegati';
-  document.getElementById('sheet-sub').textContent=r.brand+' · '+r.dateDisplay;
+  document.getElementById('sheet-sub').textContent=r.brand+' · '+(r.dateDisplay||(r.dateISO?r.dateISO.split('-').reverse().join('/'):''));
   const rowsEl=document.getElementById('sheet-rows');
   const setStatus=(msg)=>{
     rowsEl.innerHTML=`<div style="padding:40px 20px;text-align:center;color:var(--t2)">
@@ -5550,7 +5750,7 @@ async function openAttachments(idx){
     }
 
     if(linkUrls.length>0){
-      renderLinkGallery(linkUrls,idx,r);
+      renderLinkGallery(linkUrls,idx,r,src);
       return;
     }
 
@@ -5624,7 +5824,7 @@ async function openAttachments(idx){
       rowsEl.innerHTML=`<div style="padding:40px 24px;text-align:center;color:var(--t3)">
         <div style="font-size:32px;margin-bottom:10px">📭</div>
         <div style="font-size:13px">Nessun allegato immagine trovato in questo PDF</div>
-        <button class="settings-btn" style="margin-top:16px" onclick="openSheet(${idx})">← Torna ai dati</button>
+        <button class="settings-btn" style="margin-top:16px" onclick="${backCall}">← Torna ai dati</button>
       </div>`;
       return;
     }
@@ -5666,7 +5866,7 @@ async function openAttachments(idx){
     backBtn.className='settings-btn';
     backBtn.style.marginTop='14px';
     backBtn.textContent='← Torna ai dati';
-    backBtn.onclick=()=>openSheet(idx);
+    backBtn.onclick=()=>src==='ap'?openAperturaSheet(idx):openSheet(idx);
     container.appendChild(backBtn);
     rowsEl.innerHTML='';
     rowsEl.appendChild(container);
@@ -5675,13 +5875,14 @@ async function openAttachments(idx){
     rowsEl.innerHTML=`<div style="padding:40px 24px;text-align:center;color:var(--red)">
       <div style="font-size:32px;margin-bottom:10px">⚠</div>
       <div style="font-size:13px">Errore nel caricamento delle foto<br/><span style="color:var(--t3)">${e.message}</span></div>
-      <button class="settings-btn" style="margin-top:16px" onclick="openSheet(${idx})">← Torna ai dati</button>
+      <button class="settings-btn" style="margin-top:16px" onclick="${backCall}">← Torna ai dati</button>
     </div>`;
   }
 }
 
 // Galleria con le foto originali dal CDN GoAudits (via backend autenticato).
-function renderLinkGallery(links,idx,r){
+// src='ap' → il bottone "torna" riapre la scheda apertura invece della chiusura.
+function renderLinkGallery(links,idx,r,src){
   const rowsEl=document.getElementById('sheet-rows');
   const safe=s=>String(s||'').replace(/[^\w\-]+/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'');
   const fileBase=`${safe(r.brand)}_${safe(r.location)}_${r.dateISO||'senza-data'}`;
@@ -5754,7 +5955,7 @@ function renderLinkGallery(links,idx,r){
   backBtn.className='settings-btn';
   backBtn.style.marginTop='14px';
   backBtn.textContent='← Torna ai dati';
-  backBtn.onclick=()=>openSheet(idx);
+  backBtn.onclick=()=>src==='ap'?openAperturaSheet(idx):openSheet(idx);
   container.appendChild(backBtn);
 
   rowsEl.innerHTML='';
