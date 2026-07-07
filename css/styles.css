@@ -1,0 +1,816 @@
+:root{
+  /* Tema chiaro: bianco pulito con grigi delicati per la gerarchia visiva */
+  --bg:#fafbfc;
+  --s1:#ffffff;
+  --s2:#f4f5f7;
+  --s3:#eaecef;
+  --bd:#e1e4e8;
+  --bd2:#d1d5da;
+  /* Accenti: blu brand-neutrale + colori di stato ben visibili su bianco */
+  --acc:#2563eb;
+  --blue:#0969da;
+  --green:#16a34a;
+  --red:#dc2626;
+  --warn:#ea580c;
+  /* Testo: gerarchia t1 > t2 > t3 con contrasti AA */
+  --t1:#1f2328;
+  --t2:#57606a;
+  --t3:#8c959f;
+  /* Nunito ovunque — testo e numeri. Look "Apple-style rounded": cifre
+     tonde, "0" pieno senza slash, x-height ampio. Mono e font puntano allo
+     stesso family — la separazione delle variabili rimane per non rompere
+     i selettori CSS che leggono `var(--mono)` su date/valori. */
+  --font:'Nunito',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+  --mono:'Nunito',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+  --safe-top:env(safe-area-inset-top,0px);
+  --safe-bot:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--t1);font-family:var(--font)}
+body{display:flex;flex-direction:column}
+.status-bar{height:var(--safe-top);background:var(--bg);flex-shrink:0}
+.scroll-area{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch}
+
+/* ── SETUP / LOGIN / REGISTER / PENDING ── */
+#login-wrap .setup-inner,#register-wrap .setup-inner,#pending-wrap .setup-inner,#setup-wrap .setup-inner{padding:24px 16px;display:flex;flex-direction:column;gap:16px}
+.setup-hero{text-align:center;padding:24px 0 8px}
+.setup-icon{font-size:48px;margin-bottom:12px}
+.setup-h{font-size:22px;font-weight:600;margin-bottom:6px}
+.setup-sub{font-size:14px;color:var(--t2);line-height:1.6}
+.setup-card{background:var(--s1);border:1px solid var(--bd);border-radius:16px;padding:16px}
+.setup-card-title{font-size:13px;font-weight:600;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.step-badge{width:20px;height:20px;border-radius:50%;background:var(--acc);color:#0f0f11;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.setup-card p{font-size:13px;color:var(--t2);line-height:1.6;margin-bottom:8px}
+.setup-card code{font-family:var(--mono);background:var(--s3);color:var(--blue);padding:1px 6px;border-radius:4px;font-size:12px}
+.field-label{font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.field{width:100%;padding:12px 14px;background:var(--s2);border:1px solid var(--bd2);border-radius:10px;color:var(--t1);font-family:var(--font);font-size:14px;outline:none;-webkit-appearance:none;transition:border-color .15s}
+.field:focus{border-color:#555}
+.field::placeholder{color:var(--t3)}
+.cta{width:100%;padding:15px;background:var(--acc);color:#ffffff;border:none;border-radius:12px;font-family:var(--font);font-size:15px;font-weight:600;cursor:pointer;-webkit-appearance:none;transition:transform .1s,background .15s}
+.cta:active{transform:scale(.98);background:#1d4ed8}
+.setup-note{font-size:11px;color:var(--t3);text-align:center;line-height:1.5;padding:0 8px}
+
+/* ── HEADER ── */
+.app-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;flex-shrink:0;border-bottom:1px solid var(--bd);background:rgba(255,255,255,.92);backdrop-filter:blur(20px)}
+.app-title{font-size:16px;font-weight:600}
+.app-badge{font-family:var(--mono);font-size:10px;color:var(--acc);background:#2563eb14;padding:2px 7px;border-radius:4px;border:1px solid #2563eb28;margin-left:8px}
+.header-actions{display:flex;align-items:center;gap:8px}
+.sync-pill{display:flex;align-items:center;gap:5px;padding:6px 10px;border-radius:20px;background:var(--s2);border:1px solid var(--bd2);font-size:11px;color:var(--t2)}
+.pip{width:6px;height:6px;border-radius:50%;background:var(--t3)}
+.pip.live{background:var(--green);box-shadow:0 0 6px var(--green)}
+.pip.spin{background:var(--warn);animation:blink .8s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.icon-btn{width:36px;height:36px;border-radius:10px;border:1px solid var(--bd2);background:var(--s2);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;transition:background .15s;flex-shrink:0}
+.icon-btn:active{background:var(--s3)}
+
+/* ── KPI ── */
+.kpi-scroll{display:flex;gap:10px;padding:16px;overflow-x:auto;-webkit-overflow-scrolling:touch;flex-shrink:0;scrollbar-width:none}
+.kpi-scroll::-webkit-scrollbar{display:none}
+.kpi-card{flex-shrink:0;background:var(--s1);border:1px solid var(--bd);border-radius:14px;padding:14px 16px;min-width:130px}
+.kpi-card.acc{border-color:#2563eb40;background:#2563eb0a}
+.kpi-l{font-size:10px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px}
+.kpi-v{font-family:var(--mono);font-size:22px;font-weight:500;line-height:1}
+.kpi-v.y{color:var(--acc)}.kpi-v.g{color:var(--green)}.kpi-v.b{color:var(--blue)}.kpi-v.r{color:var(--red)}
+.kpi-s{font-size:11px;color:var(--t3);margin-top:4px}
+
+/* ── ALERTS ── */
+.alerts-wrap{padding:0 16px 8px;display:flex;flex-direction:column;gap:6px}
+.alert-pill{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;background:#ff5a5a0a;border:1px solid #ff5a5a20;border-radius:10px}
+.a-dot{width:6px;height:6px;border-radius:50%;background:var(--red);flex-shrink:0;margin-top:4px}
+.a-text{font-size:12px;line-height:1.5;color:var(--t1)}
+
+/* ── FILTER BAR ── */
+.filter-bar{display:flex;gap:8px;padding:0 16px 12px;overflow-x:auto;-webkit-overflow-scrolling:touch;flex-shrink:0;scrollbar-width:none}
+.filter-bar::-webkit-scrollbar{display:none}
+.chip{flex-shrink:0;padding:7px 14px;border-radius:20px;font-size:12px;font-weight:500;border:1px solid var(--bd2);background:var(--s2);color:var(--t2);cursor:pointer;-webkit-appearance:none;font-family:var(--font);transition:all .15s}
+.chip.on{border-color:var(--acc);color:var(--acc);background:#2563eb10}
+.chip:active{opacity:.7}
+.chip.disabled{opacity:.45;cursor:not-allowed;pointer-events:none}
+.chip#chip-mancanti.on{border-color:var(--warn);color:var(--warn);background:#ea580c14}
+
+/* ── SEARCH ── */
+.search-wrap{padding:0 16px 12px}
+.search-field{width:100%;padding:11px 14px 11px 38px;background:var(--s1);border:1px solid var(--bd);border-radius:10px;color:var(--t1);font-family:var(--font);font-size:14px;outline:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238c959f' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:12px center}
+.search-field::placeholder{color:var(--t3)}
+.search-field:focus{border-color:#444}
+
+/* ── CARDS ── */
+.cards-list{padding:0 16px;display:flex;flex-direction:column;gap:10px;padding-bottom:32px}
+.store-card{background:var(--s1);border:1px solid var(--bd);border-radius:14px;overflow:hidden;transition:background .1s}
+.store-card:active{background:var(--s2)}
+.store-card.anomaly{border-color:#dc262640;background:#fef2f2}
+/* Header card a 3 colonne: nome a sinistra, badge TGT al CENTRO esatto della card,
+   data a destra. La griglia 1fr auto 1fr garantisce che il badge sia sempre centrato
+   indipendentemente dalla lunghezza del nome o della data. */
+.card-head{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;padding:14px 16px 10px}
+.card-name{font-size:14px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card-date{font-family:var(--mono);font-size:11px;color:var(--t3);text-align:right;min-width:0}
+/* Badge percentuale realizzazione target. Posizionato fra nome negozio e data,
+   colorato in base alle soglie: rosso < 70%, giallo 70-95%, verde >= 95%.
+   Casi speciali: TGT=0 (festività/chiusura programmata) → grigio neutro;
+   TGT mancante (nessun dato) → niente badge. */
+.card-target{display:inline-flex;align-items:center;font-family:var(--mono);font-size:11px;font-weight:600;padding:2px 8px;border-radius:6px;line-height:1.4;flex-shrink:0;white-space:nowrap}
+.card-target.green{background:#dcfce7;color:#166534;border:1px solid #86efac}
+.card-target.yellow{background:#fef9c3;color:#854d0e;border:1px solid #fde047}
+.card-target.red{background:#fee2e2;color:#991b1b;border:1px solid #fecaca}
+.card-target.zero{background:var(--s2);color:var(--t3);border:1px solid var(--bd)}
+.card-body{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--bd);border-top:1px solid var(--bd)}
+.card-cell{background:var(--s1);padding:10px 12px}
+.card-cell-l{font-size:10px;color:var(--t3);margin-bottom:3px;text-transform:uppercase;letter-spacing:.4px}
+.card-cell-v{font-family:var(--mono);font-size:13px;font-weight:500}
+.card-cell-v.g{color:var(--green)}.card-cell-v.b{color:var(--blue)}.card-cell-v.r{color:var(--red)}
+.card-footer{display:flex;align-items:center;gap:8px;padding:10px 16px;border-top:1px solid var(--bd);flex-wrap:wrap}
+.tag{display:inline-flex;align-items:center;font-size:11px;font-weight:500;padding:3px 9px;border-radius:6px}
+.tag-warn{background:#fef2f2;color:var(--red);border:1px solid #fecaca}
+.tag-neutral{background:var(--s2);color:var(--t2);border:1px solid var(--bd)}
+.verify-ok{font-size:11px;color:var(--green);margin-left:auto;font-family:var(--mono)}
+.verify-bad{font-size:11px;color:var(--red);margin-left:auto;font-family:var(--mono)}
+
+/* ── MISSING CARDS (negozi senza chiusura per la data filtrata) ── */
+.store-card.missing{background:var(--s2);border:1px dashed var(--bd2);cursor:default}
+.store-card.missing:active{background:var(--s2)}
+.store-card.missing .card-name{color:var(--t2);font-weight:500}
+.store-card.missing .card-date{color:var(--t3)}
+.missing-body{display:flex;align-items:center;gap:8px;padding:10px 16px 14px;border-top:1px dashed var(--bd2);font-size:12px;color:var(--t2)}
+.missing-dot{display:inline-block;width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.missing-label{font-weight:500}
+
+/* ── BRAND SECTION ── */
+.brand-header{display:flex;align-items:center;justify-content:space-between;padding:10px 16px 6px;margin-top:8px}
+.brand-label{font-size:11px;font-weight:700;color:var(--acc);text-transform:uppercase;letter-spacing:1px}
+.brand-count{font-size:11px;color:var(--t3)}
+.subtotal-card{background:var(--s1);border:1px solid var(--bd);border-radius:12px;margin:4px 0 12px;padding:12px 16px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.sub-cell-l{font-size:10px;color:var(--acc);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;font-weight:600}
+.sub-cell-v{font-family:var(--mono);font-size:13px;font-weight:500}
+.sub-cell-net{font-family:var(--mono);font-size:11px;color:var(--blue);margin-top:2px}
+
+/* ── GRAND TOTAL ── */
+.grand-total{background:var(--s1);border:2px solid var(--bd2);border-radius:14px;padding:16px;margin:8px 0 4px}
+.grand-label{font-size:10px;font-weight:700;color:var(--acc);text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px}
+.grand-row{display:flex;justify-content:space-between;align-items:baseline;padding:7px 0;border-bottom:1px solid var(--bd)}
+.grand-row:last-child{border-bottom:none}
+.grand-row-l{font-size:13px;color:var(--t2)}
+.grand-row-v{font-family:var(--mono);font-size:14px;font-weight:500}
+.grand-row-v.g{color:var(--green)}.grand-row-v.b{color:var(--blue)}.grand-row-v.y{color:var(--acc)}
+
+/* ── STORES TAB (saldo per negozio: fondocassa + da-versare cumulato) ── */
+.stores-wrap{padding:16px;display:flex;flex-direction:column;gap:10px;padding-bottom:32px}
+.stores-summary{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px}
+.stores-summary .ssum-card{background:var(--s1);border:1px solid var(--bd);border-radius:14px;padding:14px 16px}
+.stores-summary .ssum-l{font-size:10px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px}
+.stores-summary .ssum-v{font-family:var(--mono);font-size:22px;font-weight:500;line-height:1}
+.stores-summary .ssum-v.r{color:var(--red)}
+.stores-summary .ssum-v.g{color:var(--green)}
+.stores-summary .ssum-s{font-size:11px;color:var(--t3);margin-top:4px}
+.store-summary{cursor:pointer;transition:background .1s}
+.store-summary:active{background:var(--s2)}
+.store-summary .card-body{grid-template-columns:1fr 1fr}
+.store-summary.empty{background:var(--s2);border-style:dashed}
+.store-summary.empty .card-name{color:var(--t2)}
+/* Card "non attivo" (negozio non ancora su GoAudits / temporaneamente disattivato).
+   Stile più tenue rispetto a .empty per distinguerla dai negozi attivi senza chiusure. */
+.store-summary.inactive{background:#f6f7f9;border-style:solid;opacity:.85}
+.store-summary.inactive .card-name{color:var(--t2)}
+.store-summary.inactive .card-date{font-style:italic;color:var(--t3)}
+.no-data-cell{font-family:var(--mono);font-size:12px;color:var(--t3)}
+/* Toggle attivo/non-attivo nelle card della tab Negozi.
+   Posizionato in alto a destra. Click → conferma → PATCH /stores/flags. */
+.store-card-head-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
+/* Garantisce che la colonna sinistra (nome + data) possa restringersi se
+   il toggle a destra è grande, evitando overflow strani. */
+.store-card-head-row > div:first-child{min-width:0;flex:1}
+.store-card-head-row .card-date{text-align:left;white-space:normal;line-height:1.3}
+.store-toggle{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;
+  padding:4px 10px;border-radius:999px;cursor:pointer;user-select:none;
+  border:1px solid transparent;transition:all .12s ease;flex-shrink:0;white-space:nowrap}
+.store-toggle.active{background:#dcfce7;color:#166534;border-color:#bbf7d0}
+.store-toggle.inactive{background:#fef3c7;color:#92400e;border-color:#fde68a}
+.store-toggle:hover{filter:brightness(.97)}
+.store-toggle:active{transform:scale(.96)}
+/* Stato readonly per utenti non admin: badge solo informativo, niente cursore */
+.store-toggle.readonly{cursor:default}
+.store-toggle.readonly:hover{filter:none}
+.store-toggle.readonly:active{transform:none}
+/* Mobile (≤480px): toggle + data del card più piccoli per non comprimere
+   il nome del negozio. La data ("aggiornato 07/05/2026 · 15 chiusure")
+   altrimenti va a capo su 2-3 righe. */
+@media (max-width:480px){
+  .store-toggle{font-size:10px;padding:3px 7px;letter-spacing:.3px}
+  .store-card-head-row .card-date{font-size:10px}
+  .card-name{font-size:14px}
+}
+
+/* ── SHEET STORICO SALDO (dettaglio negozio) ── */
+.saldo-summary{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--bd);border-bottom:1px solid var(--bd)}
+.saldo-summary-cell{background:var(--s1);padding:14px 12px;text-align:center}
+.saldo-summary-l{font-size:10px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+.saldo-summary-v{font-family:var(--mono);font-size:15px;font-weight:500}
+.saldo-summary-v.r{color:var(--red)}
+.saldo-summary-v.g{color:var(--green)}
+.saldo-summary-v.b{color:var(--blue)}
+.saldo-summary-v.w{color:var(--warn)}
+.saldo-row{display:flex;justify-content:space-between;align-items:center;padding:13px 20px;border-bottom:1px solid var(--bd);cursor:pointer;transition:background .1s}
+.saldo-row:active{background:var(--s2)}
+.saldo-row:last-child{border-bottom:none}
+.saldo-row-date{font-size:13px;font-weight:500;color:var(--t1)}
+.saldo-row-detail{font-size:11px;color:var(--t3);margin-top:3px;font-family:var(--mono)}
+.saldo-row-delta{font-family:var(--mono);font-size:14px;font-weight:500;text-align:right;flex-shrink:0;margin-left:12px}
+.saldo-row-delta.r{color:var(--red)}
+.saldo-row-delta.g{color:var(--green)}
+.saldo-row-delta.n{color:var(--t2)}
+
+/* ── RIGA SETTIMANA (collassata, cliccabile) ── */
+.week-row{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-bottom:1px solid var(--bd);cursor:pointer;background:var(--s2);transition:background .1s}
+.week-row:active{background:var(--s3)}
+.week-row.empty{cursor:default;opacity:.65}
+.week-row.empty:active{background:var(--s2)}
+.week-label{font-size:13px;font-weight:600;color:var(--t1)}
+.week-detail{font-size:11px;color:var(--t2);margin-top:3px;font-family:var(--mono)}
+.week-delta-wrap{display:flex;align-items:center;gap:10px;flex-shrink:0;margin-left:12px}
+.week-chev{display:inline-block;font-size:9px;color:var(--t3);transition:transform .15s}
+.week-row.expanded .week-chev{transform:rotate(90deg)}
+.week-delta-val{font-family:var(--mono);font-size:14px;font-weight:500}
+.week-delta-val.r{color:var(--red)}
+.week-delta-val.g{color:var(--green)}
+.week-delta-val.n{color:var(--t2)}
+.week-days{background:linear-gradient(to right,var(--s2) 0,var(--s2) 4px,var(--s1) 4px)}
+.week-days .saldo-row{padding-left:28px}
+
+/* ── ANDAMENTO TAB (v2: gerarchica anno → mesi → giorni) ────────────────
+   Layout: in alto i filtri (Brand multi-select, Punto Vendita multi-select,
+   toggle vs Target/vs Anno scorso), poi una sezione di Year cards
+   espandibili. Ciascun anno → mesi → giorni.
+   Convenzione: prefisso .am- (Andamento) per evitare collisioni con altri
+   stili della dashboard. */
+.tempo-wrap{padding:16px;display:flex;flex-direction:column;gap:12px;padding-bottom:32px}
+/* Su iPhone riduco anche il padding orizzontale del container Andamento
+   per dare ulteriore spazio alla card e ai numeri lunghi. */
+@media (max-width:480px){
+  .tempo-wrap{padding:12px 10px 32px}
+}
+
+/* — Filtri multi-select (chip dropdown con checkbox) — */
+.tempo-filters{display:flex;flex-wrap:wrap;gap:8px;flex-shrink:0;align-items:center;position:relative;z-index:5}
+.am-filter-btn{display:flex;align-items:center;gap:6px;padding:9px 12px;border-radius:10px;border:1px solid var(--bd2);background:var(--s2);font-family:var(--font);font-size:13px;font-weight:600;color:var(--t1);cursor:pointer;transition:all .12s;min-height:38px;position:relative;-webkit-appearance:none}
+.am-filter-btn:hover{background:var(--s3)}
+.am-filter-btn.has-sel{background:#dbeafe;border-color:var(--acc);color:var(--acc)}
+.am-filter-btn .am-count{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--acc);color:#fff;font-size:11px;font-weight:700;margin-left:4px}
+.am-filter-btn .am-arrow{font-size:9px;color:var(--t3);margin-left:2px;transition:transform .15s}
+.am-filter-btn.open .am-arrow{transform:rotate(180deg)}
+.am-filter-panel{position:absolute;top:46px;background:#fff;border:1px solid var(--bd);border-radius:12px;padding:6px;box-shadow:0 8px 24px rgba(0,0,0,.08);min-width:240px;max-height:340px;overflow-y:auto;display:none;z-index:50;font-family:var(--font)}
+.am-filter-panel.open{display:block}
+.am-filter-opt{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:8px;cursor:pointer;font-size:13px;color:var(--t1);transition:background .1s}
+.am-filter-opt:hover{background:var(--s2)}
+.am-filter-opt input{margin:0;cursor:pointer;accent-color:var(--acc)}
+.am-filter-opt .am-bcolor{display:inline-block;width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.am-filter-divider{height:1px;background:var(--bd);margin:4px 0}
+.am-filter-grouphead{font-size:10px;color:var(--t3);padding:6px 10px 2px;text-transform:uppercase;letter-spacing:.5px;font-weight:700}
+.am-filter-actions{display:flex;gap:6px;padding:8px 4px 4px;border-top:1px solid var(--bd);margin-top:4px;flex-wrap:wrap}
+.am-filter-action{flex:1;min-width:60px;padding:7px 10px;border-radius:6px;background:var(--s2);font-size:12px;font-weight:600;color:var(--t2);cursor:pointer;text-align:center;border:none;font-family:var(--font);transition:background .12s}
+.am-filter-action:hover{background:var(--s3)}
+.am-filter-action.primary{flex:1.5;background:var(--acc);color:#fff}
+.am-filter-action.primary:hover{background:#1d4ed8}
+
+/* — Toggle vs Target / vs Anno scorso (mantenuti dalla v1).
+   `flex-basis:100%` forza i due toggle su una riga propria sotto i filtri,
+   non più appiccicati a destra (su mobile altrimenti uscivano dal viewport). */
+.tempo-compare{display:flex;gap:8px;flex-shrink:0;flex-basis:100%}
+.tempo-toggle{padding:9px 12px;border:1px solid var(--bd2);border-radius:10px;background:var(--s2);color:var(--t2);font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer;-webkit-appearance:none;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:6px}
+.tempo-toggle:active{transform:scale(.97)}
+.tempo-toggle.on{background:#dbeafe;color:var(--acc);border-color:var(--acc)}
+.tempo-toggle::before{content:'';width:14px;height:14px;border-radius:3px;border:1.5px solid currentColor;flex-shrink:0;background:transparent;transition:background .15s}
+.tempo-toggle.on::before{background:var(--acc);border-color:var(--acc);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='%23fff' d='M6 11.5L2 7.5l1.5-1.5L6 8.5l6.5-6.5 1.5 1.5z'/%3E%3C/svg%3E");background-size:11px 11px;background-position:center;background-repeat:no-repeat}
+
+/* — Cards gerarchiche: anno (top), mese (livello 2), giorno (livello 3) — */
+.am-card{background:var(--s1);border:1px solid var(--bd);border-radius:12px;margin-bottom:8px;overflow:hidden}
+.am-card-row{display:grid;grid-template-columns:24px 1fr auto;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;user-select:none;transition:background .1s}
+.am-card-row:hover{background:#f7f8fa}
+.am-card-row:active{background:var(--s2)}
+.am-chev{font-size:12px;color:var(--t3);transition:transform .2s;display:inline-block;width:24px;text-align:center;flex-shrink:0}
+.am-chev.open{transform:rotate(90deg)}
+.am-row-title{font-size:16px;font-weight:700;letter-spacing:-0.01em}
+.am-row-sub{font-size:12px;color:var(--t3);font-weight:500;margin-top:2px;line-height:1.3}
+.am-row-right{display:flex;flex-direction:column;align-items:flex-end;gap:4px;min-width:0;flex-shrink:0}
+/* I numeri sono potenzialmente lunghi (€ 20.064.018,68); su schermi stretti
+   non li forziamo nowrap — è meglio che vadano a capo che essere tagliati. */
+.am-row-net{font-size:15px;font-weight:600;color:var(--green);text-align:right;line-height:1.25}
+.am-row-net.future{color:var(--t2)}
+.am-row-net.partial{color:var(--blue)}
+.am-row-tgt{font-size:11px;color:var(--t3);text-align:right;font-weight:500}
+.am-badge{display:inline-flex;align-items:center;font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px;line-height:1.4;white-space:nowrap}
+.am-badge.green {background:#dcfce7;color:#166534}
+.am-badge.yellow{background:#fef3c7;color:#92400e}
+.am-badge.red   {background:#fee2e2;color:#991b1b}
+.am-badge.muted {background:#f3f4f6;color:var(--t3);font-weight:600}
+/* Default: marker inline (per quando è dentro al day-row "Ven 08/05 OGGI"
+   dove sta bene di fianco al titolo, riga corta). Per anno e mese in corso
+   uso una variante .block per metterlo sotto al titolo (margin-left:0,
+   margin-top:4px) — più allineato visivamente con la cifra principale. */
+.am-today-marker{display:inline-flex;align-items:center;background:var(--acc);color:#fff;font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;margin-left:8px;letter-spacing:.4px;text-transform:uppercase;vertical-align:middle;white-space:nowrap}
+.am-today-marker.block{display:inline-flex;margin:4px 0 0;width:max-content}
+/* — Mobile (≤480px) — i numeri lunghi devono stare su una riga sola.
+   Strategia: stringo padding+gap per liberare spazio orizzontale, riduco
+   leggermente il font dei numeri, e forzo white-space:nowrap così
+   "€ X / € Y NET" non spezza mai. La colonna sinistra (titolo) si
+   restringe automaticamente grazie a min-width:0. */
+@media (max-width:480px){
+  .am-card-row{padding:12px 10px;gap:6px;grid-template-columns:20px 1fr auto}
+  .am-child-row{padding:10px 10px;gap:6px;grid-template-columns:20px 1fr auto}
+  .am-day-row{padding:8px 10px 8px 28px;gap:6px;grid-template-columns:30px 1fr auto}
+  .am-card-row > div, .am-child-row > div, .am-day-row > div{min-width:0}
+  .am-row-title{font-size:15px}
+  .am-row-net{font-size:12px;line-height:1.3;white-space:nowrap}
+  .am-child-row .am-row-net,
+  .am-day-row .am-row-net{font-size:11px}
+  .am-row-sub{font-size:11px}
+  .am-today-marker{font-size:8px;padding:2px 5px;margin-left:6px;letter-spacing:.3px}
+  .am-today-marker.block{margin:3px 0 0}
+  /* Badge piccoli per non rubare spazio ai numeri */
+  .am-badge{font-size:10px;padding:1px 6px}
+}
+.am-children{display:none;border-top:1px solid var(--bd);background:#fafbfc}
+.am-children.open{display:block}
+.am-child-row{display:grid;grid-template-columns:24px 1fr auto;gap:12px;padding:11px 16px;border-bottom:1px solid var(--bd);align-items:center;cursor:pointer;transition:background .1s}
+.am-child-row:last-child{border-bottom:none}
+.am-child-row:hover{background:#f4f5f7}
+.am-child-row .am-row-title{font-size:14px;font-weight:600}
+.am-child-row .am-row-sub{font-size:11px}
+.am-child-row .am-row-net{font-size:13px;font-weight:600}
+.am-child-row.future .am-row-title{color:var(--t2);font-weight:500}
+/* Day rows: foglie. Niente expand, niente chevron, niente cursor pointer. */
+.am-day-row{display:grid;grid-template-columns:36px 1fr auto;gap:12px;padding:9px 16px 9px 36px;border-bottom:1px solid var(--bd);background:#fefefe;align-items:center;font-size:13px;cursor:default}
+.am-day-row:last-child{border-bottom:none}
+.am-day-row .am-row-title{font-size:13px;font-weight:600}
+.am-day-row.future .am-row-title{color:var(--t2);font-weight:500}
+.am-day-row .am-row-net{font-size:12px}
+.am-day-row .am-row-net.future-only{color:var(--t3);font-style:italic}
+
+.empty-state{text-align:center;padding:48px 24px;color:var(--t3)}
+.empty-icon{font-size:40px;margin-bottom:12px;opacity:.5}
+.empty-text{font-size:14px}
+
+/* ── ACCOUNT TAB (admin: gestione utenti) ── */
+.account-section{background:var(--s1);border:1px solid var(--bd);border-radius:14px;overflow:hidden;margin-bottom:12px}
+.account-section-title{padding:12px 16px;font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.6px;border-bottom:1px solid var(--bd);background:var(--s2);display:flex;justify-content:space-between;align-items:center}
+.account-row{padding:14px 16px;border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.account-row:last-child{border-bottom:none}
+.account-info{flex:1;min-width:160px}
+.account-name{font-size:14px;font-weight:500;color:var(--t1)}
+.account-email{font-size:12px;color:var(--t2);font-family:var(--mono);margin-top:2px}
+.account-meta{font-size:11px;color:var(--t3);margin-top:4px}
+.account-badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-right:6px}
+.account-badge.admin{background:#ddd6fe;color:#5b21b6}
+.account-badge.editor{background:#cffafe;color:#155e75}
+.account-badge.pending{background:#fef3c7;color:#a16207}
+.account-badge.active{background:#dcfce7;color:#166534}
+/* Bottoni azione (Promuovi a editor, Promuovi admin, Disabilita, Elimina).
+   Devono stare in una sola riga: nowrap + allineati a sinistra. Su mobile
+   le dimensioni sono ridotte (vedi @media sotto) per far entrare tutti e 4
+   senza tagliare l'ultimo. */
+.account-actions{display:flex;gap:5px;flex-wrap:nowrap;justify-content:flex-start;width:100%}
+.acct-btn{padding:6px 10px;border-radius:6px;border:1px solid var(--bd2);background:var(--s2);color:var(--t1);font-family:var(--font);font-size:11px;font-weight:500;cursor:pointer;transition:background .15s;white-space:nowrap;flex-shrink:1}
+@media (max-width:480px){
+  .acct-btn{padding:5px 8px;font-size:10px;letter-spacing:-0.01em}
+}
+.acct-btn:active{background:var(--s3)}
+.acct-btn.approve{background:#dcfce7;color:#166534;border-color:#86efac}
+.acct-btn.deny{background:#fef2f2;color:var(--red);border-color:#fecaca}
+.acct-btn.promote{background:#ddd6fe;color:#5b21b6;border-color:#c4b5fd}
+
+/* ── BOTTOM NAV ── */
+/* La nav inferiore: oltre alla safe area di iOS aggiungo 8px extra in basso
+   così le icone non sembrano appiccicate al bordo / home indicator. Aumento
+   anche il padding verticale degli item per superficie touch più comoda. */
+.bottom-nav{display:flex;align-items:center;background:rgba(255,255,255,.92);backdrop-filter:blur(20px);border-top:1px solid var(--bd);flex-shrink:0;padding-bottom:calc(var(--safe-bot) + 8px);padding-top:4px}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:12px 4px;cursor:pointer;color:var(--t3);transition:color .15s;font-size:10px;font-weight:500}
+.nav-item.active{color:var(--acc)}
+.nav-icon{font-size:20px;line-height:1}
+
+/* ── SETTINGS TAB ── */
+.settings-inner{padding:16px;display:flex;flex-direction:column;gap:12px;padding-bottom:32px}
+.settings-section{background:var(--s1);border:1px solid var(--bd);border-radius:14px;overflow:hidden}
+.settings-row{padding:14px 16px;border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between}
+.settings-row:last-child{border-bottom:none}
+.settings-label{font-size:14px}
+.settings-value{font-size:12px;color:var(--t3);font-family:var(--mono);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.settings-btn{width:100%;padding:14px;border-radius:12px;border:1px solid var(--bd2);background:var(--s2);color:var(--t1);font-family:var(--font);font-size:14px;cursor:pointer;-webkit-appearance:none;transition:background .15s}
+.settings-btn:active{background:var(--s3)}
+.settings-btn.danger{border-color:#fecaca;color:var(--red);background:#fef2f2}
+
+/* ── LOADING + SHEET ── */
+#loading{position:fixed;inset:0;background:rgba(250,251,252,.88);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;z-index:300;flex-direction:column;gap:14px}
+#loading.show{display:flex}
+.spinner{width:28px;height:28px;border:2px solid var(--bd2);border-top-color:var(--acc);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-msg{font-family:var(--mono);font-size:12px;color:var(--t2);max-width:220px;text-align:center}
+#sheet{position:fixed;inset:0;z-index:200;display:none;align-items:flex-end;background:rgba(0,0,0,.6);backdrop-filter:blur(4px)}
+#sheet.show{display:flex}
+.sheet-body{width:100%;background:var(--s1);border-radius:20px 20px 0 0;padding:0 0 var(--safe-bot);max-height:88vh;overflow-y:auto;animation:slideup .25s cubic-bezier(.32,1,.57,1)}
+@keyframes slideup{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.sheet-handle{width:36px;height:4px;background:var(--bd2);border-radius:2px;margin:12px auto 0}
+.sheet-header{padding:16px 20px;border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between}
+.sheet-title{font-size:16px;font-weight:600}
+.sheet-sub{font-size:12px;color:var(--t3);margin-top:2px}
+.sheet-close{font-size:22px;color:var(--t3);cursor:pointer;width:32px;height:32px;display:flex;align-items:center;justify-content:center}
+.sheet-rows{padding:8px 0}
+.sheet-row{display:flex;justify-content:space-between;align-items:center;padding:13px 20px;border-bottom:1px solid var(--bd)}
+.sheet-row:last-child{border-bottom:none}
+.sheet-row.divider{background:var(--s2);padding:7px 20px}
+.sheet-row.divider span{font-size:10px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.6px}
+.row-l{font-size:13px;color:var(--t2)}
+.row-v{font-family:var(--mono);font-size:14px;font-weight:500}
+.row-v.g{color:var(--green)}.row-v.r{color:var(--red)}.row-v.b{color:var(--blue)}
+
+/* Calendar overlay per il filtro data */
+.cal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:400;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);padding:16px;animation:fadein .15s ease}
+.cal-panel{background:var(--s1);border-radius:18px;width:100%;max-width:380px;padding:14px 0 14px;box-shadow:0 12px 40px rgba(0,0,0,.25);animation:slideup .22s cubic-bezier(.32,1,.57,1)}
+.cal-header{display:flex;align-items:center;justify-content:space-between;padding:6px 16px 12px}
+.cal-title{font-size:16px;font-weight:600;color:var(--t1);text-transform:capitalize}
+.cal-nav{background:none;border:none;font-size:22px;color:var(--acc);cursor:pointer;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:background .15s;line-height:1}
+.cal-nav:hover{background:var(--s2)}
+.cal-nav:disabled{opacity:.3;cursor:default}
+.cal-grid-head{display:grid;grid-template-columns:repeat(7,1fr);padding:6px 12px 4px;font-size:11px;color:var(--t3);text-align:center;font-weight:600;letter-spacing:.4px}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;padding:0 12px}
+.cal-day{background:none;border:none;cursor:pointer;aspect-ratio:1;border-radius:50%;font-size:14px;color:var(--t1);display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative;transition:background .15s,color .15s;padding:0}
+.cal-day:hover:not(.empty):not(.blank){background:var(--s2)}
+.cal-day.blank{visibility:hidden}
+.cal-day.empty{color:var(--t3);cursor:default;opacity:.35}
+.cal-day.today:not(.selected){color:var(--red);font-weight:700}
+.cal-day.selected{background:var(--acc);color:#fff;font-weight:600}
+.cal-day.selected:hover{background:var(--acc)}
+.cal-count{position:absolute;bottom:1px;font-size:8px;font-weight:700;color:var(--t3);letter-spacing:-.2px;line-height:1}
+.cal-day.selected .cal-count{color:rgba(255,255,255,.85)}
+.cal-day.today:not(.selected) .cal-count{color:var(--red)}
+.cal-footer{border-top:1px solid var(--bd);padding:14px 16px 0;margin-top:14px}
+.cal-all{width:100%;background:var(--s2);border:none;border-radius:10px;padding:12px;font-size:13px;font-weight:500;color:var(--t1);cursor:pointer;transition:background .15s}
+.cal-all:hover{background:var(--bd)}
+.cal-all.active{background:var(--acc);color:#fff}
+@keyframes fadein{from{opacity:0}to{opacity:1}}
+
+/* Editable row: input invisibile in stato di riposo, evidenziato al focus */
+.row-v-edit{display:flex;align-items:center;gap:8px;justify-content:flex-end}
+.row-input{font-family:var(--mono);font-size:14px;font-weight:500;color:var(--t1);
+  background:transparent;border:1px solid transparent;border-radius:6px;
+  padding:6px 10px;width:130px;text-align:right;-webkit-appearance:none;appearance:none;
+  cursor:text;transition:border-color .15s,background .15s}
+.row-input:hover{border-color:var(--bd)}
+.row-input:focus{outline:none;border-color:var(--acc);background:var(--s1)}
+.row-input.modified{color:#a05a00;background:#fff8e6;border-color:#f3c969}
+.row-v.modified-ro{color:#a05a00}
+.row-input.modified:focus{border-color:#d99a1f;background:#fff4d4}
+.row-input.saving{opacity:.55}
+.ovr-badge{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:600;
+  color:#a05a00;background:#fff4d4;border:1px solid #f3c969;border-radius:10px;
+  padding:2px 8px;cursor:help;text-transform:uppercase;letter-spacing:.4px;line-height:1.3}
+.ovr-reset{font-size:10px;color:var(--t3);background:none;border:none;cursor:pointer;
+  padding:2px 4px;text-decoration:underline;font-weight:500}
+.ovr-reset:hover{color:var(--red)}
+.row-cash-result{padding:14px 20px;background:var(--s2);font-size:13px;font-weight:600;
+  display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--bd)}
+.row-cash-result.ok{color:var(--green)}
+.row-cash-result.ko{color:var(--red)}
+.row-cash-result .delta{font-family:var(--mono);font-size:14px}
+
+/* ════════════════════════════════════════════════════════════════════
+   TAB KPI (Ingressi/CR/UPT) — Q25/26/27 della checklist GoAudits
+   Layout focus singolo KPI + heatmap interna + drill-down per negozio
+   ════════════════════════════════════════════════════════════════════ */
+.kpi-wrap{padding:0 0 24px;display:flex;flex-direction:column}
+
+/* Selettore KPI (3 card cliccabili in alto) */
+.kpi-tabs{display:flex;gap:6px;padding:14px 16px 8px}
+.kpi-tab{flex:1;padding:10px 8px;border:1px solid var(--bd2);background:var(--s1);border-radius:12px;font-family:var(--font);font-size:12px;font-weight:600;color:var(--t2);cursor:pointer;-webkit-appearance:none;display:flex;flex-direction:column;align-items:center;gap:3px;transition:all .15s;min-width:0}
+.kpi-tab .kt-l{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+.kpi-tab .kt-v{font-family:var(--mono);font-size:18px;font-weight:700;color:var(--t1);overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.kpi-tab .kt-d{font-size:10px;font-weight:600}
+.kpi-tab .kt-d.up{color:var(--green)}
+.kpi-tab .kt-d.dn{color:var(--red)}
+.kpi-tab .kt-d.flat{color:var(--t3)}
+.kpi-tab.on{border-color:var(--acc);background:#2563eb0c}
+.kpi-tab.on .kt-l{color:var(--acc)}
+.kpi-tab.on .kt-v{color:var(--acc)}
+
+/* Filtri Brand + Store (multi-select dropdown) */
+.kpi-filters{display:flex;flex-wrap:wrap;gap:6px;padding:6px 16px 4px;position:relative;z-index:10}
+.kfbtn{display:flex;align-items:center;gap:5px;padding:8px 11px;border-radius:10px;border:1px solid var(--bd2);background:var(--s2);font-family:var(--font);font-size:12px;font-weight:600;color:var(--t1);cursor:pointer;-webkit-appearance:none;position:relative;min-height:34px}
+.kfbtn.has-sel{background:#dbeafe;border-color:var(--acc);color:var(--acc)}
+.kfbtn .kfcnt{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--acc);color:#fff;font-size:10px;font-weight:700}
+.kfbtn .kfarrow{font-size:9px;color:var(--t3)}
+.kfpanel{position:absolute;top:42px;left:0;background:#fff;border:1px solid var(--bd);border-radius:12px;padding:6px;box-shadow:0 8px 24px rgba(0,0,0,.12);min-width:220px;max-height:300px;overflow-y:auto;display:none;z-index:50;font-family:var(--font)}
+.kfpanel.open{display:block}
+.kfrow{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;cursor:pointer;font-size:13px}
+.kfrow:hover{background:var(--s2)}
+.kfrow input{accent-color:var(--acc);width:16px;height:16px}
+.kfactions{display:flex;gap:4px;padding:6px 4px 2px;border-top:1px solid var(--bd);margin-top:4px}
+.kfactions button{flex:1;padding:7px 8px;border:1px solid var(--bd2);background:var(--s2);border-radius:8px;font-size:11px;font-weight:600;color:var(--t2);font-family:var(--font);cursor:pointer}
+.kfactions button.primary{background:var(--acc);color:#fff;border-color:var(--acc)}
+
+/* Pill rows (granularità + range temporale) */
+.kpi-pillrow{display:flex;gap:6px;padding:6px 16px 4px;align-items:center}
+.kpi-pill{flex:1;padding:8px 6px;border:1px solid var(--bd2);background:var(--s2);border-radius:10px;font-family:var(--font);font-size:12px;font-weight:600;color:var(--t2);cursor:pointer;-webkit-appearance:none;text-align:center}
+.kpi-pill.on{background:var(--acc);color:#fff;border-color:var(--acc)}
+
+/* Toggle confronti (vs PY / vs Brand / vs Periodo prec.) */
+.kpi-cmprow{display:flex;gap:6px;padding:8px 16px 12px;flex-wrap:wrap}
+.kpi-cmp{padding:6px 10px;border:1px solid var(--bd2);background:var(--s2);border-radius:8px;font-family:var(--font);font-size:11px;font-weight:600;color:var(--t2);cursor:pointer;-webkit-appearance:none;display:flex;align-items:center;gap:6px}
+.kpi-cmp::before{content:'';width:10px;height:10px;border-radius:2px;background:transparent;border:1.5px solid currentColor}
+.kpi-cmp.on{background:#dbeafe;color:var(--acc);border-color:var(--acc)}
+.kpi-cmp.on::before{background:var(--acc);border-color:var(--acc);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath fill='%23fff' d='M4.5 8.7L2 6.2l1-1L4.5 6.7 9 2l1 1z'/%3E%3C/svg%3E");background-size:9px 9px;background-position:center;background-repeat:no-repeat}
+
+/* View tabs (Grafico / Heatmap) */
+.kpi-viewtabs{display:flex;gap:0;padding:0 16px;border-bottom:1px solid var(--bd)}
+.kpi-vtab{flex:1;padding:11px 8px;border:none;background:transparent;font-family:var(--font);font-size:13px;font-weight:600;color:var(--t3);cursor:pointer;border-bottom:2px solid transparent;-webkit-appearance:none}
+.kpi-vtab.on{color:var(--acc);border-bottom-color:var(--acc)}
+
+/* Chart principale */
+.kpi-chart-wrap{padding:14px 14px 8px;background:var(--s1);margin:12px 12px 0;border-radius:14px;border:1px solid var(--bd)}
+.kpi-chart-title{font-size:12px;font-weight:600;color:var(--t2);margin-bottom:6px;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.kpi-chart-title .kpi-chart-sum{font-family:var(--mono);font-size:11px;color:var(--t3);font-weight:500;text-align:right;white-space:nowrap}
+.kpi-chart-box{position:relative;height:240px}
+
+/* Heatmap (negozi × tempo) */
+.kpi-hm-wrap{padding:0 12px}
+.kpi-hm-card{background:var(--s1);border:1px solid var(--bd);border-radius:14px;padding:12px;margin-top:12px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.kpi-hm-table{border-collapse:separate;border-spacing:2px;font-size:10px;font-family:var(--mono)}
+.kpi-hm-table th{background:transparent;color:var(--t3);font-weight:600;text-align:center;padding:2px 4px;font-size:9px;text-transform:uppercase;letter-spacing:.5px;writing-mode:vertical-rl;transform:rotate(180deg);height:60px;vertical-align:bottom}
+.kpi-hm-table th.row-h{writing-mode:horizontal-tb;transform:none;text-align:left;padding:4px 8px 4px 4px;width:120px;max-width:120px;color:var(--t2);font-size:10px;font-weight:600;height:auto;text-transform:none;letter-spacing:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi-hm-table td{min-width:22px;height:22px;border-radius:3px;text-align:center;color:#fff;font-weight:700;font-size:9px;cursor:default;padding:0 2px}
+.kpi-hm-table td.na{background:var(--s3);color:var(--t3)}
+.kpi-hm-legend{display:flex;align-items:center;gap:6px;justify-content:flex-end;font-size:10px;color:var(--t3);padding:8px 4px 0}
+.kpi-hl-grad{flex:0 0 120px;height:8px;border-radius:4px;background:linear-gradient(to right,#fee2e2,#fef3c7,#dcfce7,#16a34a)}
+
+/* Ranking negozi */
+.kpi-rank-wrap{padding:0 12px}
+.kpi-rank-card{background:var(--s1);border:1px solid var(--bd);border-radius:14px;padding:6px 0;margin-top:12px}
+.kpi-rank-h{padding:10px 14px 8px;font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.6px;display:flex;justify-content:space-between;align-items:center}
+.kpi-rank-h .kpi-rank-sort{font-size:10px;color:var(--acc);font-weight:700;cursor:pointer;text-transform:none;letter-spacing:0}
+.kpi-rank-row{display:flex;align-items:center;gap:10px;padding:9px 14px;border-top:1px solid var(--bd);cursor:pointer}
+.kpi-rank-row:active{background:var(--s2)}
+.kpi-rank-row:first-of-type{border-top:none}
+.kpi-rank-pos{width:22px;font-family:var(--mono);font-size:11px;color:var(--t3);font-weight:700;text-align:center;flex-shrink:0}
+.kpi-rank-name{flex:1;min-width:0}
+.kpi-rank-brand{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.4px;font-weight:600}
+.kpi-rank-loc{font-size:12px;font-weight:600;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kpi-rank-spark{flex:0 0 56px;height:24px}
+.kpi-rank-val{font-family:var(--mono);font-size:13px;font-weight:700;color:var(--t1);text-align:right;min-width:50px;flex-shrink:0}
+.kpi-rank-delta{font-family:var(--mono);font-size:10px;font-weight:600;min-width:42px;text-align:right;flex-shrink:0}
+.kpi-rank-delta.up{color:var(--green)}
+.kpi-rank-delta.dn{color:var(--red)}
+.kpi-rank-delta.flat{color:var(--t3)}
+.kpi-rank-empty{padding:30px 16px;text-align:center;color:var(--t3);font-size:13px}
+
+/* Drill-down modal (bottom-sheet stile iOS) */
+.kpi-drill-overlay{position:fixed;inset:0;background:rgba(15,17,21,.55);display:none;align-items:flex-end;justify-content:center;z-index:200}
+.kpi-drill-overlay.open{display:flex}
+.kpi-drill-sheet{width:100%;max-width:560px;max-height:92%;background:var(--s1);border-radius:20px 20px 0 0;padding:14px 16px 32px;overflow-y:auto;animation:kpiSlideUp .22s ease}
+@keyframes kpiSlideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.kpi-drill-grip{width:40px;height:4px;border-radius:2px;background:var(--bd2);margin:0 auto 12px}
+.kpi-drill-h{display:flex;flex-direction:column;margin-bottom:14px}
+.kpi-drill-name{font-size:16px;font-weight:700;color:var(--t1)}
+.kpi-drill-brand{font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
+.kpi-drill-mini{margin-bottom:12px;background:var(--s2);border-radius:12px;padding:10px 12px}
+.kpi-drill-mini-h{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;gap:8px}
+.kpi-drill-mini-l{font-size:11px;font-weight:700;color:var(--t2);text-transform:uppercase;letter-spacing:.5px}
+.kpi-drill-mini-v{font-family:var(--mono);font-size:18px;font-weight:700;color:var(--t1);white-space:nowrap}
+.kpi-drill-mini-v .dm-delta{font-size:11px;margin-left:6px;font-weight:600}
+.kpi-drill-mini-box{height:90px;position:relative}
+.kpi-drill-close{display:block;width:100%;margin-top:8px;padding:12px;background:var(--s2);border:1px solid var(--bd2);border-radius:12px;font-family:var(--font);font-size:13px;font-weight:600;color:var(--t2);cursor:pointer}
+
+/* ── STORE ROW (lista semplice tab Negozi) ── */
+.stores-brand-block{background:var(--s1);border:1px solid var(--bd);border-radius:14px;overflow:hidden;margin:0 16px 10px}
+.stores-brand-hd{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--bd)}
+.stores-brand-hd-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px}
+.stores-brand-hd-count{font-size:11px;color:var(--t3)}
+.store-row{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:var(--s1);cursor:pointer;border-bottom:1px solid var(--bd);transition:background .1s}
+.store-row:last-child{border-bottom:none}
+.store-row:active{background:var(--s2)}
+.store-row.inactive-row{background:var(--s2)}
+.store-row.inactive-row:active{background:var(--s2)}
+.store-row-left{flex:1;min-width:0}
+.store-row-name{font-size:14px;font-weight:600;color:var(--t1)}
+.store-row-name.dimmed{color:var(--t2);font-weight:500}
+.store-row-right{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.store-row-arrow{font-size:16px;color:var(--t3)}
+/* Badge toggle attivo/non attivo */
+.srt{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:4px 10px;border-radius:999px;border:1px solid transparent;white-space:nowrap;-webkit-appearance:none;background:none;font-family:var(--font);line-height:1;transition:all .12s}
+.srt.on{background:#dcfce7;color:#166534;border-color:#bbf7d0;cursor:pointer}
+.srt.on:active{filter:brightness(.95)}
+.srt.off{background:#fef3c7;color:#92400e;border-color:#fde68a;cursor:pointer}
+.srt.off:active{filter:brightness(.95)}
+.srt.readonly{cursor:default}
+.srt.readonly:active{filter:none}
+
+/* ── DATE RANGE BAR (tab Negozi) ── */
+.stores-date-bar{padding:12px 16px 4px;display:flex;align-items:center;gap:10px}
+.date-range-pill{flex:1;display:flex;align-items:center;gap:10px;padding:11px 14px;background:var(--s1);border:1px solid var(--bd);border-radius:12px;cursor:pointer;transition:background .12s;-webkit-appearance:none;font-family:var(--font)}
+.date-range-pill:active{background:var(--s2)}
+.date-range-pill.rng-active{border-color:#e2231a;background:#e2231a08}
+.drp-icon{font-size:16px;flex-shrink:0}
+.drp-text{flex:1;font-size:13px;font-weight:600;color:var(--t1);text-align:left}
+.drp-reset{font-size:20px;color:var(--t3);line-height:1;display:none;cursor:pointer;background:none;border:none;padding:0 2px;font-family:var(--font)}
+.drp-reset.show{display:block}
+
+/* ── CALENDARIO DATE RANGE — stile widget nativo ── */
+#cal-overlay{position:fixed;inset:0;z-index:260;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.32);backdrop-filter:blur(8px);padding:24px}
+#cal-overlay.show{display:flex}
+.cal-sheet{background:#ffffff;border-radius:16px;width:min(300px,calc(100vw - 48px));padding:16px 14px 14px;box-shadow:0 20px 60px rgba(0,0,0,.22);animation:popIn .2s cubic-bezier(.32,1,.57,1)}
+.cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.cal-month-title{font-size:14px;font-weight:800;color:#e2231a;text-transform:uppercase;letter-spacing:.6px}
+.cal-nav{display:flex;gap:4px;align-items:center}
+.cal-nav-btn{width:28px;height:28px;border-radius:50%;border:none;background:transparent;font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#8c959f;-webkit-appearance:none;font-family:var(--font);transition:background .12s;line-height:1}
+.cal-nav-btn:active{background:#f0f0f0}
+.cal-hint{font-size:11px;color:#8c959f;text-align:center;min-height:20px;margin-bottom:8px;line-height:1.4}
+/* Unica griglia 7 colonne: intestazioni + numeri nello stesso grid container */
+#cal-main-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:0;margin-bottom:4px}
+.cal-dow-cell{display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:#8c959f;padding:4px 0 6px}
+/* Base: ogni cella è un cerchio */
+.cal-day{aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:50%;font-size:13px;font-weight:500;cursor:pointer;transition:background .1s;-webkit-appearance:none;border:none;background:transparent;font-family:var(--font);color:#1f2328;position:relative;margin:1px 0}
+.cal-day:active{opacity:.7}
+.cal-day.other-month{color:#c8c8cc}
+/* Oggi: cerchio rosso pieno + testo bianco */
+.cal-day.today{background:#e2231a;color:#ffffff;font-weight:700}
+/* Selezione singola o estremi range: cerchio rosso */
+.cal-day.sel-start,.cal-day.sel-end,.cal-day.sel-single{background:#e2231a;color:#ffffff;font-weight:700;border-radius:50%;z-index:1}
+/* Range intermedio: sfondo rosa tenue, rettangolare */
+.cal-day.in-range{background:#fde8e7;border-radius:0;color:#1f2328}
+/* Connettori: estende lo sfondo rosa dai bordi degli estremi */
+.cal-day.sel-start:not(.sel-single){border-radius:50% 0 0 50%}
+.cal-day.sel-end:not(.sel-single){border-radius:0 50% 50% 0}
+/* Se oggi cade dentro un range: mantiene il cerchio rosso */
+.cal-day.today.in-range{background:#e2231a;color:#fff;border-radius:50%}
+.cal-day.disabled{opacity:.25;cursor:default;pointer-events:none}
+/* Pulsanti azione: piccoli e discreti in fondo */
+.cal-actions{display:flex;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid #f0f0f0}
+.cal-btn-reset{flex:1;padding:10px;border:1px solid #e1e4e8;border-radius:10px;background:#f4f5f7;font-family:var(--font);font-size:13px;font-weight:600;color:#57606a;cursor:pointer;-webkit-appearance:none}
+.cal-btn-reset:active{background:#e9ecef}
+.cal-btn-apply{flex:2;padding:10px;background:#e2231a;color:#fff;border:none;border-radius:10px;font-family:var(--font);font-size:13px;font-weight:700;cursor:pointer;-webkit-appearance:none}
+.cal-btn-apply:active{background:#c01a12}
+.cal-btn-apply:disabled{background:#f0b4b1;cursor:default}
+
+/* ── STORE POPUP CENTRATO ── */
+#store-popup-overlay{position:fixed;inset:0;z-index:250;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.45);backdrop-filter:blur(4px);padding:24px}
+#store-popup-overlay.show{display:flex}
+.store-popup{background:var(--s1);border-radius:20px;width:100%;max-width:340px;padding:22px 20px 18px;box-shadow:0 20px 60px rgba(0,0,0,.2);animation:popIn .2s cubic-bezier(.32,1,.57,1)}
+@keyframes popIn{from{transform:scale(.9);opacity:0}to{transform:scale(1);opacity:1}}
+.spu-header{margin-bottom:18px}
+.spu-brand{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--t3);margin-bottom:4px}
+.spu-title{font-size:18px;font-weight:700;color:var(--t1);line-height:1.2}
+.spu-sub{font-size:12px;color:var(--t3);margin-top:4px}
+.spu-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.spu-btn-versamenti{width:100%;padding:13px;border-radius:12px;border:1px solid var(--bd2);background:var(--s2);font-family:var(--font);font-size:14px;font-weight:600;color:var(--acc);cursor:pointer;-webkit-appearance:none;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:14px;transition:background .12s}
+.spu-btn-versamenti:active{background:var(--s3)}
+.spu-btn{padding:16px 12px 14px;border-radius:14px;border:1px solid var(--bd);background:var(--s2);cursor:pointer;font-family:var(--font);text-align:left;transition:all .12s;-webkit-appearance:none;display:flex;flex-direction:column;gap:6px}
+.spu-btn:active{transform:scale(.96);background:var(--s3)}
+.spu-btn-icon{font-size:22px;line-height:1}
+.spu-btn-l{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;font-weight:700;line-height:1}
+.spu-btn-v{font-size:16px;font-weight:700;color:var(--t1);font-family:var(--mono);line-height:1}
+.spu-btn-v.no-data{color:var(--t3);font-size:13px;font-weight:500}
+.spu-close{width:100%;padding:12px;border-radius:12px;border:1px solid var(--bd2);background:var(--s2);font-family:var(--font);font-size:14px;font-weight:600;color:var(--t2);cursor:pointer;-webkit-appearance:none;transition:background .12s}
+.spu-close:active{background:var(--s3)}
+
+/* ── FRECCE NAVIGAZIONE GIORNI (tab Chiusure) ── */
+.date-arrow{flex-shrink:0;width:34px;height:34px;border-radius:50%;border:1px solid var(--bd2);background:var(--s2);color:var(--acc);font-size:18px;font-weight:700;display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-appearance:none;font-family:var(--font);transition:background .12s,opacity .12s;line-height:1;padding:0}
+.date-arrow:active{background:var(--s3)}
+.date-arrow:disabled{opacity:.3;cursor:default}
+
+/* ── ORDINAMENTO CARD (tab Chiusure) ── */
+.search-row{display:flex;gap:8px;padding:0 16px 12px;align-items:center}
+.search-row .search-field{flex:1}
+.sort-select{flex-shrink:0;padding:11px 28px 11px 12px;background:var(--s1);border:1px solid var(--bd);border-radius:10px;color:var(--t2);font-family:var(--font);font-size:12px;font-weight:600;outline:none;-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%238c959f' d='M0 0l5 6 5-6z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;max-width:140px}
+
+/* ── CARD CHIUSURA v2: gerarchia visiva + barra target ── */
+.card-main{padding:4px 16px 12px}
+.card-main-v{font-family:var(--mono);font-size:24px;font-weight:700;color:var(--t1);line-height:1.1}
+.card-main-l{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px}
+.tgt-bar-wrap{height:6px;border-radius:3px;background:var(--s3);margin-top:10px;overflow:hidden;position:relative}
+.tgt-bar{height:100%;border-radius:3px;transition:width .3s ease}
+.tgt-bar.green{background:var(--green)}
+.tgt-bar.yellow{background:#eab308}
+.tgt-bar.red{background:var(--red)}
+.tgt-bar-lbl{display:flex;justify-content:space-between;font-size:10px;color:var(--t3);margin-top:4px;font-family:var(--mono)}
+.card-sec{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--bd);border-top:1px solid var(--bd)}
+.card-sec .card-cell{padding:8px 12px}
+/* Gruppi brand collassabili */
+.brand-header.clickable{cursor:pointer;user-select:none}
+.brand-chev{display:inline-block;font-size:9px;color:inherit;opacity:.7;margin-right:6px;transition:transform .15s}
+.brand-header.collapsed .brand-chev{transform:rotate(-90deg)}
+
+/* ── TAB OGGI (home riepilogo giornata) ── */
+.oggi-wrap{padding:16px;display:flex;flex-direction:column;gap:12px;padding-bottom:32px}
+.oggi-date-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.oggi-date-title{font-size:18px;font-weight:700}
+.oggi-date-sub{font-size:12px;color:var(--t3);margin-top:2px}
+.oggi-banner{display:flex;align-items:center;gap:10px;padding:13px 14px;border-radius:12px;cursor:pointer;border:1px solid transparent;transition:background .12s}
+.oggi-banner.ok{background:#dcfce7;border-color:#bbf7d0;color:#166534}
+.oggi-banner.warn{background:#fef3c7;border-color:#fde68a;color:#92400e}
+.oggi-banner .ob-icon{font-size:20px;flex-shrink:0}
+.oggi-banner .ob-text{flex:1;font-size:13px;font-weight:600;line-height:1.4}
+.oggi-banner .ob-arrow{font-size:16px;opacity:.6}
+.oggi-hero{background:var(--s1);border:1px solid var(--bd);border-radius:16px;padding:16px}
+.oggi-hero-l{font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.6px}
+.oggi-hero-v{font-family:var(--mono);font-size:32px;font-weight:800;margin:4px 0 10px;line-height:1}
+.oggi-hero-badges{display:flex;gap:6px;flex-wrap:wrap}
+.oggi-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.oggi-mini{background:var(--s1);border:1px solid var(--bd);border-radius:12px;padding:11px 12px}
+.oggi-mini.alert{background:#fef2f2;border-color:#fecaca}
+.oggi-mini-l{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px}
+.oggi-mini-v{font-family:var(--mono);font-size:15px;font-weight:700}
+.oggi-mini.alert .oggi-mini-v{color:var(--red)}
+.oggi-sec-title{font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.6px;padding:6px 4px 0}
+.oggi-list{background:var(--s1);border:1px solid var(--bd);border-radius:14px;overflow:hidden}
+.oggi-row{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--bd);cursor:pointer;transition:background .1s}
+.oggi-row:last-child{border-bottom:none}
+.oggi-row:active{background:var(--s2)}
+.oggi-row-icon{font-size:16px;flex-shrink:0;width:22px;text-align:center}
+.oggi-row-name{flex:1;min-width:0;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.oggi-row-name .orn-brand{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--t3);display:block}
+.oggi-row-val{font-size:12px;font-family:var(--mono);font-weight:600;flex-shrink:0}
+.oggi-row-val.warn{color:var(--warn)}
+.oggi-row-val.bad{color:var(--red)}
+.oggi-empty-ok{display:flex;align-items:center;gap:10px;padding:14px;font-size:13px;color:var(--green);font-weight:600}
+.oggi-brandbar{display:flex;flex-direction:column;gap:6px}
+.oggi-bb-row{display:flex;align-items:center;gap:10px}
+.oggi-bb-name{flex:0 0 84px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.oggi-bb-track{flex:1;height:14px;border-radius:7px;background:var(--s3);overflow:hidden}
+.oggi-bb-fill{height:100%;border-radius:7px}
+.oggi-bb-val{flex:0 0 86px;text-align:right;font-family:var(--mono);font-size:11px;font-weight:600;color:var(--t2)}
+
+/* ── SEGMENTED CONTROL (tab Analisi: Vendite/KPI) ── */
+.seg-wrap{display:flex;gap:0;margin:0 16px;background:var(--s2);border:1px solid var(--bd2);border-radius:12px;padding:3px;flex-shrink:0}
+.seg-btn{flex:1;padding:9px 8px;border:none;border-radius:9px;background:transparent;font-family:var(--font);font-size:13px;font-weight:600;color:var(--t2);cursor:pointer;-webkit-appearance:none;transition:all .15s}
+.seg-btn.on{background:var(--s1);color:var(--acc);box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.tempo-wrap .seg-wrap{margin:0 0 4px}
+#tab-kpi .seg-wrap{margin:14px 16px 0}
+
+/* Fascia "consuntivi aggiornati al…" in cima alla sezione Analisi */
+.analisi-asof{display:flex;align-items:center;justify-content:center;gap:8px;margin:12px 16px 6px;padding:12px 14px;border-radius:12px;font-size:14px;font-weight:600;border:1px solid transparent}
+.analisi-asof b{font-weight:800}
+.analisi-asof.ok{background:#dcfce7;border-color:#86efac;color:#166534}
+.analisi-asof.none{background:#fef3c7;border-color:#fde68a;color:#92400e}
+/* Bottone "Importa da Drive" dentro il banner consuntivi (solo admin) */
+.asof-import-btn{margin-left:6px;padding:5px 11px;border-radius:8px;border:1px solid #86efac;background:#fff;color:#166534;font-size:12.5px;font-weight:700;cursor:pointer;white-space:nowrap}
+.analisi-asof.none .asof-import-btn{border-color:#fde68a;color:#92400e}
+.asof-import-btn:disabled{opacity:.55;cursor:default}
+/* Card checklist APERTURA (vista Aperture nella tab Chiusure) */
+.ap-card{background:var(--s1);border:1px solid var(--bd2);border-radius:14px;padding:12px 14px;margin:0 16px 10px;cursor:pointer;transition:box-shadow .15s}
+.ap-card:active{box-shadow:0 2px 10px rgba(0,0,0,.12)}
+.ap-card.ap-missing{opacity:.55;cursor:default}
+.ap-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:8px}
+.ap-brand{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--t3);display:block}
+.ap-store{font-weight:700;font-size:14.5px}
+.ap-fondo{font-size:17px;font-weight:800;white-space:nowrap}
+.ap-time{font-size:11px;color:var(--t3);white-space:nowrap}
+.ap-badges{display:flex;flex-wrap:wrap;gap:6px}
+.ap-badge{font-size:11px;font-weight:700;padding:3px 9px;border-radius:999px;border:1px solid transparent}
+.ap-badge.ok{background:#dcfce7;border-color:#86efac;color:#166534}
+.ap-badge.ko{background:#fee2e2;border-color:#fca5a5;color:#b91c1c}
+.ap-badge.warn{background:#fef3c7;border-color:#fde68a;color:#92400e}
+.ap-badge.muted{background:var(--s2);border-color:var(--bd2);color:var(--t3)}
+.tempo-wrap .analisi-asof{margin:12px 0 6px}
+#tab-kpi .analisi-asof{margin:14px 16px 6px}
+
+/* ── TOAST DI CONFERMA ── */
+#toast-wrap{position:fixed;left:16px;right:16px;bottom:calc(var(--safe-bot) + 86px);z-index:600;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.toast{display:flex;align-items:center;gap:10px;padding:12px 16px;border-radius:12px;background:#1f2328;color:#fff;font-size:13px;font-weight:500;box-shadow:0 8px 24px rgba(0,0,0,.25);animation:toastIn .25s cubic-bezier(.32,1,.57,1);max-width:480px;margin:0 auto;width:100%}
+.toast.ok{background:#14532d}
+.toast.err{background:#7f1d1d}
+.toast.out{animation:toastOut .25s ease forwards}
+@keyframes toastIn{from{transform:translateY(16px);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes toastOut{from{transform:translateY(0);opacity:1}to{transform:translateY(8px);opacity:0}}
+
+/* ── SKELETON LOADING (card grigie pulsanti) ── */
+.sk-card{background:var(--s1);border:1px solid var(--bd);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:10px}
+.sk-line{height:12px;border-radius:6px;background:linear-gradient(90deg,var(--s2) 25%,var(--s3) 50%,var(--s2) 75%);background-size:200% 100%;animation:skShimmer 1.4s infinite}
+.sk-line.w40{width:40%}.sk-line.w60{width:60%}.sk-line.w80{width:80%}
+.sk-line.tall{height:22px}
+@keyframes skShimmer{to{background-position:-200% 0}}
+
+/* ── BANNER COLD START SERVER ── */
+.coldstart-note{margin-top:6px;font-size:11px;color:var(--warn);max-width:260px;text-align:center;line-height:1.5;display:none}
+.coldstart-note.show{display:block}
+
+/* ── PULL TO REFRESH ── */
+.ptr-indicator{display:flex;align-items:center;justify-content:center;gap:8px;height:0;overflow:hidden;color:var(--t3);font-size:12px;transition:height .2s ease}
+.ptr-indicator.armed{color:var(--acc)}
+.ptr-indicator .spinner{width:16px;height:16px;border-width:2px}
+
+/* ── TAB ALTRO (sezioni) ── */
+.settings-head{font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.6px;padding:8px 4px 0}
+.settings-btn.nav-like{display:flex;align-items:center;justify-content:space-between;text-align:left}
+.settings-btn.nav-like .sbn-arrow{color:var(--t3);font-size:16px}
+
+/* ── SCHEDA NEGOZIO 360° ── */
+.s360-head{padding:4px 20px 14px}
+.s360-metrics{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px 16px}
+.s360-metric{background:var(--s2);border:1px solid var(--bd);border-radius:12px;padding:11px 12px;cursor:pointer;transition:background .12s;-webkit-appearance:none;font-family:var(--font);text-align:left}
+.s360-metric:active{background:var(--s3)}
+.s360-metric-l{font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:3px}
+.s360-metric-v{font-family:var(--mono);font-size:16px;font-weight:700}
+.s360-metric-v.nodata{color:var(--t3);font-size:13px;font-weight:500}
+.s360-chart-wrap{margin:0 16px;background:var(--s2);border:1px solid var(--bd);border-radius:12px;padding:12px}
+.s360-chart-title{font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;display:flex;justify-content:space-between}
+.s360-chart-box{position:relative;height:130px}
+.s360-saldo{display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--bd);border:1px solid var(--bd);border-radius:12px;overflow:hidden;margin:12px 16px}
+.s360-saldo-cell{background:var(--s1);padding:11px 10px;text-align:center}
+.s360-row-btn{display:flex;align-items:center;justify-content:space-between;margin:0 16px 12px;padding:13px 14px;background:var(--s2);border:1px solid var(--bd2);border-radius:12px;font-family:var(--font);font-size:13px;font-weight:600;color:var(--acc);cursor:pointer;-webkit-appearance:none;width:calc(100% - 32px)}
+.s360-row-btn:active{background:var(--s3)}
