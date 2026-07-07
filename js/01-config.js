@@ -94,10 +94,30 @@ let storeFlagsByKey={};
 // Segnalazioni guasti via email già inviate, da GET /segnalazioni.
 // Forma: { "adidas|brindisi city|2026-07-07": {user:"l.colucci", sent_at:"2026-07-07T15:45:00+00:00"} }
 let segnalazioniByKey={};
-// Destinatari delle email di segnalazione guasto (mailto:). Vuoto = campo A:
-// vuoto, lo compila l'utente in Outlook. Predisposto per il futuro: chiave
-// brand in minuscolo oppure 'default', es. {'default':'manutenzione@rinopetino.it'}
-const SEGNALAZIONI_DEST={};
+// Template email segnalazioni guasti: base comune + tipo di danno riconosciuto
+// automaticamente dalle parole chiave nella nota del negozio (primo tipo che
+// matcha vince, 'generico' è il fallback e va tenuto per ultimo).
+// Segnaposto disponibili in subject/body: {BRAND} {NEGOZIO} {DATA} {NOTA} {TIPO} {FRASE}.
+// dest vuoto = campo A: vuoto in Outlook, lo compila l'utente.
+// Questi sono i DEFAULT: la versione modificata dagli admin (Altro → Template
+// segnalazioni) vive sul backend e arriva in segnalazioniConfig a ogni sync.
+const SEGNALAZIONI_DEFAULT={
+  base:{
+    subject:'Segnalazione guasto — {BRAND} {NEGOZIO} — {DATA}',
+    body:'Ciao,\n\ndalla checklist di apertura del {DATA} il negozio {BRAND} {NEGOZIO} segnala {FRASE}.\n\nNota del negozio: "{NOTA}"\n\nSaluti',
+  },
+  tipi:[
+    {id:'condizionatore',label:'Condizionatore',   frase:'un guasto al condizionatore',    dest:'', keywords:'condizionator, aria condizionata, clima'},
+    {id:'cassa',         label:'Cassa',            frase:'un guasto alla cassa',           dest:'', keywords:'cassa, registratore, pos'},
+    {id:'insegna',       label:'Insegna',          frase:"un guasto all'insegna",          dest:'', keywords:'insegna'},
+    {id:'illuminazione', label:'Corpi illuminanti',frase:'un guasto ai corpi illuminanti', dest:'', keywords:'luce, luci, lampad, faro, faretti, illuminaz, neon'},
+    {id:'computer',      label:'Computer',         frase:'un guasto al computer',          dest:'', keywords:'computer, pc, monitor'},
+    {id:'telefono',      label:'Telefono',         frase:'un guasto al telefono',          dest:'', keywords:'telefono, telefonic'},
+    {id:'generico',      label:'Generico',         frase:'un guasto alle apparecchiature', dest:'', keywords:''},
+  ],
+};
+// Config personalizzata dal backend (GET /segnalazioni/config). null = default.
+let segnalazioniConfig=null;
 // Stato autenticazione: user info + token cache. I token sono anche salvati
 // in localStorage per sopravvivere ai refresh della pagina.
 let auth={user:null, accessToken:null, refreshToken:null};
@@ -229,6 +249,8 @@ function applyRoleVisibility(){
   if(headAdmin) headAdmin.style.display = isAdmin ? '' : 'none';
   const btnAccount=document.getElementById('btn-account-open');
   if(btnAccount) btnAccount.style.display = isAdmin ? 'flex' : 'none';
+  const btnTemplate=document.getElementById('btn-template-open');
+  if(btnTemplate) btnTemplate.style.display = isAdmin ? 'flex' : 'none';
   const btnTargets=document.getElementById('btn-targets-upload');
   if(btnTargets) btnTargets.style.display = isAdmin ? '' : 'none';
   const btnHistoricalPY=document.getElementById('btn-historical-py-upload');

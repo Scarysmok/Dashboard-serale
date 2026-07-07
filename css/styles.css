@@ -727,6 +727,13 @@ body{display:flex;flex-direction:column}
 .oggi-row-val{font-size:12px;font-family:var(--mono);font-weight:600;flex-shrink:0}
 .oggi-row-val.warn{color:var(--warn)}
 .oggi-row-val.bad{color:var(--red)}
+/* Editor template segnalazioni (Altro → Template segnalazioni, admin) */
+.tpl-card{background:var(--s1);border:1px solid var(--bd);border-radius:14px;padding:16px;margin-bottom:12px}
+.tpl-card .field{font-size:13px}
+.tpl-body{resize:vertical;min-height:120px;line-height:1.45}
+.tpl-hint{margin-top:10px;font-size:11.5px;color:var(--t3);line-height:1.5}
+.tpl-tipo-title{font-size:13px;font-weight:700;margin-bottom:10px}
+.tpl-gen-note{font-size:11px;font-weight:500;color:var(--t3)}
 /* Icona segnalazione guasto via email (righe guasti della home).
    Padding generoso = area cliccabile comoda anche su touch. */
 .segnala-icon{flex-shrink:0;padding:6px 8px;margin:-6px -4px -6px 2px;font-size:15px;cursor:pointer;border-radius:8px;line-height:1}

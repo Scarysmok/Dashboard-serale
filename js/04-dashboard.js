@@ -209,21 +209,44 @@ function _segnalaIconHTML(a,i){
   }
   return `<span class="segnala-icon" title="Segnala via e-mail il guasto" onclick="event.stopPropagation();segnalaGuasto(${i})">✉️</span>`;
 }
+// Config template effettiva: quella salvata dagli admin sul backend, o i default.
+function _segnalazioniCfg(){
+  return segnalazioniConfig || SEGNALAZIONI_DEFAULT;
+}
+// Riconoscimento automatico del tipo di danno dalla nota del negozio: vince il
+// primo tipo (nell'ordine della config) con una parola chiave contenuta nella
+// nota. Nessun match o nota assente → 'generico' (ultimo della lista).
+function detectTipoGuasto(note){
+  const cfg=_segnalazioniCfg();
+  const n=String(note||'').toLowerCase();
+  if(n){
+    for(const t of cfg.tipi){
+      const kws=String(t.keywords||'').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean);
+      if(kws.some(k=>n.includes(k))) return t;
+    }
+  }
+  return cfg.tipi.find(t=>t.id==='generico')||cfg.tipi[cfg.tipi.length-1];
+}
 // Apre il client di posta predefinito (Outlook) con l'email di segnalazione
-// già compilata. Il destinatario viene da SEGNALAZIONI_DEST (per ora vuota →
-// campo A: vuoto, lo aggiunge l'utente). Il mailto: non dice all'app se
-// l'email è stata davvero spedita, quindi chiediamo conferma all'utente e
-// solo allora registriamo la segnalazione sul backend (visibile a tutti).
+// già compilata dal template (base + tipo di danno auto-riconosciuto): oggetto,
+// corpo e destinatario arrivano dalla config modificabile in Altro → Template
+// segnalazioni. Il mailto: non dice all'app se l'email è stata davvero spedita,
+// quindi chiediamo conferma all'utente e solo allora registriamo la
+// segnalazione sul backend (visibile a tutti).
 function segnalaGuasto(i){
   const a=allAperture[i];
   if(!a) return;
   const dd=a.dateISO?a.dateISO.split('-').reverse().join('/'):'—';
-  const dest=SEGNALAZIONI_DEST[String(a.brand||'').toLowerCase()]||SEGNALAZIONI_DEST.default||'';
-  const subject=encodeURIComponent(`Segnalazione guasto — ${a.brand} ${a.location} — ${dd}`);
-  const body=encodeURIComponent(
-    `Ciao,\n\ndalla checklist di apertura del ${dd} il negozio ${a.brand} ${a.location} `+
-    `segnala un guasto:\n\n"${a.insegnaNote||'guasto apparecchiature (nessuna nota dal negozio)'}"\n\nSaluti`);
-  window.location.href=`mailto:${dest}?subject=${subject}&body=${body}`;
+  const cfg=_segnalazioniCfg();
+  const tipo=detectTipoGuasto(a.insegnaNote);
+  const fill=s=>String(s||'')
+    .replace(/{BRAND}/g,a.brand).replace(/{NEGOZIO}/g,a.location)
+    .replace(/{DATA}/g,dd).replace(/{NOTA}/g,a.insegnaNote||'nessuna nota dal negozio')
+    .replace(/{TIPO}/g,tipo.label||'').replace(/{FRASE}/g,tipo.frase||'');
+  const dest=String(tipo.dest||'').trim();
+  const subject=encodeURIComponent(fill(cfg.base.subject));
+  const body=encodeURIComponent(fill(cfg.base.body));
+  window.location.href=`mailto:${encodeURIComponent(dest)}?subject=${subject}&body=${body}`;
   // Piccolo respiro per lasciare aprire Outlook prima del dialogo di conferma.
   setTimeout(async()=>{
     if(!confirm(`Outlook aperto per ${a.brand} ${a.location}.\n\nConfermi che l'email di segnalazione è stata inviata?`)) return;

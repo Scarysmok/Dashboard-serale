@@ -421,9 +421,18 @@
       <!-- Amministrazione: visibile solo agli admin via applyRoleVisibility() -->
       <div class="settings-head" id="head-admin" style="display:none">Amministrazione</div>
       <button class="settings-btn nav-like" id="btn-account-open" style="display:none" onclick="switchTab('account')"><span>👥 Gestione utenti</span><span class="sbn-arrow">›</span></button>
+      <button class="settings-btn nav-like" id="btn-template-open" style="display:none" onclick="switchTab('template')"><span>✉️ Template segnalazioni</span><span class="sbn-arrow">›</span></button>
 
       <div class="settings-head">Sessione</div>
       <button class="settings-btn danger" onclick="doLogout()">⎋ Disconnetti</button>
+    </div>
+  </div>
+
+  <!-- TAB TEMPLATE SEGNALAZIONI (admin only: editor email guasti, da Altro) -->
+  <div class="scroll-area" id="tab-template" style="display:none">
+    <div class="settings-inner">
+      <button class="settings-btn nav-like" onclick="switchTab('settings')"><span>‹ Torna a Altro</span></button>
+      <div id="template-editor-wrap"></div>
     </div>
   </div>
 

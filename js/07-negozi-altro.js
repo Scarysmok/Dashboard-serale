@@ -726,6 +726,76 @@ function openStoreSheet(brand, location){
   document.getElementById('sheet').classList.add('show');
 }
 
+// ── EDITOR TEMPLATE SEGNALAZIONI (Altro → Template segnalazioni, admin) ──
+// Form per modificare il template email delle segnalazioni guasti: base comune
+// (oggetto+corpo con segnaposto) e, per ogni tipo di danno, frase {FRASE},
+// destinatario e parole chiave del riconoscimento automatico. Il salvataggio
+// scrive tutta la config sul backend: vale subito per tutti gli utenti.
+// Snapshot dei tipi mostrati nel form: serve a saveTemplateConfig per
+// riabbinare id/label ai campi anche dopo "Ricarica default".
+let _tplTipiSnapshot=null;
+function renderTemplateEditor(fromDefaults){
+  const wrap=document.getElementById('template-editor-wrap');
+  if(!wrap) return;
+  const cfg=fromDefaults?SEGNALAZIONI_DEFAULT:_segnalazioniCfg();
+  _tplTipiSnapshot=cfg.tipi;
+  const esc=v=>_escHtml(String(v==null?'':v)).replace(/"/g,'&quot;');
+  let h=`
+    <div class="settings-head">Email di base</div>
+    <div class="tpl-card">
+      <div class="field-label">Oggetto</div>
+      <input class="field" id="tpl-subject" value="${esc(cfg.base.subject)}"/>
+      <div class="field-label" style="margin-top:12px">Corpo</div>
+      <textarea class="field tpl-body" id="tpl-body" rows="7">${_escHtml(cfg.base.body)}</textarea>
+      <div class="tpl-hint">Segnaposto disponibili: <b>{BRAND}</b> <b>{NEGOZIO}</b> <b>{DATA}</b> <b>{NOTA}</b> (testo scritto dal negozio) <b>{TIPO}</b> <b>{FRASE}</b> (dal tipo di danno riconosciuto qui sotto)</div>
+    </div>
+    <div class="settings-head">Tipi di danno</div>`;
+  cfg.tipi.forEach((t,idx)=>{
+    const isGen=t.id==='generico';
+    h+=`<div class="tpl-card">
+      <div class="tpl-tipo-title">${_escHtml(t.label)}${isGen?' <span class="tpl-gen-note">— usato quando nessuna parola chiave corrisponde</span>':''}</div>
+      <div class="field-label">Frase nel corpo ({FRASE})</div>
+      <input class="field" id="tpl-frase-${idx}" value="${esc(t.frase)}"/>
+      <div class="field-label" style="margin-top:12px">Destinatario (vuoto = lo scegli in Outlook)</div>
+      <input class="field" type="email" id="tpl-dest-${idx}" placeholder="es. manutenzione@rinopetino.it" value="${esc(t.dest)}"/>
+      ${isGen?'':`<div class="field-label" style="margin-top:12px">Parole chiave riconoscimento (separate da virgola)</div>
+      <input class="field" id="tpl-kw-${idx}" value="${esc(t.keywords)}"/>`}
+    </div>`;
+  });
+  h+=`
+    <button class="settings-btn" onclick="saveTemplateConfig()">💾 Salva template</button>
+    <button class="settings-btn" onclick="resetTemplateForm()">↺ Ricarica i default nel form</button>`;
+  wrap.innerHTML=h;
+}
+function resetTemplateForm(){
+  if(!confirm('Ricarico i testi di default nel form?\n\nNiente viene salvato finché non premi "Salva template".')) return;
+  renderTemplateEditor(true);
+}
+async function saveTemplateConfig(){
+  const val=id=>{const el=document.getElementById(id);return el?el.value:'';};
+  const tipi=(_tplTipiSnapshot||_segnalazioniCfg().tipi).map((t,idx)=>({
+    id:t.id, label:t.label,
+    frase:val('tpl-frase-'+idx).trim(),
+    dest:val('tpl-dest-'+idx).trim(),
+    keywords:t.id==='generico'?'':val('tpl-kw-'+idx).trim(),
+  }));
+  const cfg={base:{subject:val('tpl-subject').trim(), body:val('tpl-body')}, tipi};
+  if(!cfg.base.subject||!cfg.base.body.trim()){alert('Oggetto e corpo non possono essere vuoti.');return;}
+  try{
+    const r=await api('/segnalazioni/config',{method:'POST',body:JSON.stringify({config:cfg})});
+    if(!r.ok){
+      let d='Errore '+r.status;
+      try{const e=await r.json(); if(e.detail)d=typeof e.detail==='string'?e.detail:JSON.stringify(e.detail);}catch(_){}
+      throw new Error(d);
+    }
+    segnalazioniConfig=cfg;
+    showToast('✓ Template salvato','ok');
+  }catch(e){
+    console.error('saveTemplateConfig',e);
+    alert('Salvataggio non riuscito:\n'+(e.message||e));
+  }
+}
+
 // ── EXPORT CSV ──
 // Formato "wide": una riga per negozio+data, una colonna per ogni domanda
 // della checklist (28 in totale). Le colonne Q&A vengono ricavate dall'unione

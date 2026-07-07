@@ -19,7 +19,7 @@ async function syncNow(){
     // overrides per le correzioni manuali, targets per il badge %
     // realizzazione, historical per il confronto anno-su-anno e per la
     // timeline pre-GoAudits del 2026.
-    const [files, backendCache, overrides, targets, historical, historicalKpi, storeFlags, segnalazioni] = await Promise.all([
+    const [files, backendCache, overrides, targets, historical, historicalKpi, storeFlags, segnalazioni, segnCfg] = await Promise.all([
       listFiles(),
       fetchPdfCache(),
       fetchOverrides(),
@@ -28,9 +28,11 @@ async function syncNow(){
       fetchHistoricalKpi(),
       fetchStoreFlags(),
       fetchSegnalazioni(),
+      fetchSegnalazioniConfig(),
     ]);
     targetsByKey = targets;
     segnalazioniByKey = segnalazioni;
+    segnalazioniConfig = segnCfg;
     historicalByKey = historical;
     historicalKpiByKey = historicalKpi;
     // Applico override dei flag monitored PRIMA di calcolare missing/KPI così
@@ -335,6 +337,16 @@ async function importConsuntiviFromDriveManual(){
 // backend ne ritorna uno vecchio (boolean diretto, da una build precedente),
 // lo convertiamo qui in {monitored: bool, activeFrom: null} per evitare
 // di rompere il frontend durante un rolling deploy.
+// Template segnalazioni personalizzato dagli admin. Non-fatale: null =
+// endpoint assente/mai salvato/errore → si usano i default in 01-config.js.
+async function fetchSegnalazioniConfig(){
+  try{
+    const r=await api('/segnalazioni/config');
+    if(!r.ok) return null;
+    const data=await r.json();
+    return (data && data.base && Array.isArray(data.tipi)) ? data : null;
+  }catch(e){ return null; }
+}
 // Segnalazioni guasti già inviate. Non-fatale: se il backend non ha ancora
 // l'endpoint (404 pre-redeploy) o fallisce, torno {} e le icone restano ✉️.
 async function fetchSegnalazioni(){

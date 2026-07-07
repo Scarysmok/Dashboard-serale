@@ -243,19 +243,20 @@ function setChip(el,f){
   el.classList.add('on');renderCards();
 }
 function switchTab(t){
-  ['oggi','negozi','stores','tempo','kpi','settings','account'].forEach(n=>{
+  ['oggi','negozi','stores','tempo','kpi','settings','account','template'].forEach(n=>{
     const el=document.getElementById('tab-'+n);
     if(el)el.style.display=n===t?'block':'none';
   });
   // Mappa tab → voce della bottom nav da evidenziare. Andamento (tempo) e KPI
-  // vivono entrambe sotto "Analisi"; la gestione utenti (account) sotto "Altro".
-  const navMap={oggi:'oggi',negozi:'negozi',stores:'stores',tempo:'analisi',kpi:'analisi',settings:'settings',account:'settings'};
+  // vivono entrambe sotto "Analisi"; gestione utenti (account) e template
+  // segnalazioni (template) sotto "Altro".
+  const navMap={oggi:'oggi',negozi:'negozi',stores:'stores',tempo:'analisi',kpi:'analisi',settings:'settings',account:'settings',template:'settings'};
   const activeNav=navMap[t]||t;
   ['oggi','negozi','analisi','stores','settings'].forEach(n=>{
     const nav=document.getElementById('nav-'+n);
     if(nav)nav.classList.toggle('active',n===activeNav);
   });
-  const titles={oggi:'Dashboard',negozi:'Chiusure giornaliere',stores:'Negozi',tempo:'Analisi · Vendite',kpi:'Analisi · KPI negozio',settings:'Altro',account:'Gestione utenti'};
+  const titles={oggi:'Dashboard',negozi:'Chiusure giornaliere',stores:'Negozi',tempo:'Analisi · Vendite',kpi:'Analisi · KPI negozio',settings:'Altro',account:'Gestione utenti',template:'Template segnalazioni'};
   const titleEl=document.getElementById('app-title');
   if(titleEl)titleEl.textContent=titles[t]||'Chiusure';
   if(t==='oggi')renderOggi();
@@ -263,6 +264,7 @@ function switchTab(t){
   if(t==='stores')renderStores();
   if(t==='account')renderAccount();
   if(t==='kpi')renderKpiAll();
+  if(t==='template')renderTemplateEditor();
 }
 function closeSheet(e){
   if(!e||e.target===document.getElementById('sheet'))
