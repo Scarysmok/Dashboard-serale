@@ -4591,8 +4591,8 @@ function renderTempo(){
   for(const dateISO of allDates.sort()){
     const yr = dateISO.slice(0,4);
     const mo = dateISO.slice(0,7);
-    if(!years[yr]) years[yr] = { yr, months:{}, netPast:0, tgtPast:0, tgtAll:0, daysPast:0, daysFuture:0 };
-    if(!years[yr].months[mo]) years[yr].months[mo] = { mo, days:[], netPast:0, tgtPast:0, tgtAll:0, daysPast:0, daysFuture:0 };
+    if(!years[yr]) years[yr] = { yr, months:{}, netPast:0, tgtPast:0, tgtAll:0, daysPast:0, daysFuture:0, daysPending:0 };
+    if(!years[yr].months[mo]) years[yr].months[mo] = { mo, days:[], netPast:0, tgtPast:0, tgtAll:0, daysPast:0, daysFuture:0, daysPending:0 };
     const d = dailySums[dateISO];
     const isFuture = dateISO > todayISO;
     const isToday  = dateISO === todayISO;
@@ -4602,12 +4602,22 @@ function renderTempo(){
     m.tgtAll += d.tgt;
     years[yr].tgtAll += d.tgt;
     if(!isFuture){
-      m.netPast += d.net;
-      m.tgtPast += d.tgt;
-      m.daysPast++;
-      years[yr].netPast += d.net;
-      years[yr].tgtPast += d.tgt;
-      years[yr].daysPast++;
+      // Un giorno trascorso entra nei CONFRONTI (vs TGT / vs PY) solo se ha
+      // consuntivi (net > 0). Oggi prima delle chiusure serali — o un giorno
+      // con dati mancanti — resta "in corso": senza questo filtro il suo
+      // target pieno finiva nel denominatore contro un incasso vuoto,
+      // schiacciando artificialmente i badge del periodo corrente.
+      if(d.net > 0){
+        m.netPast += d.net;
+        m.tgtPast += d.tgt;
+        m.daysPast++;
+        years[yr].netPast += d.net;
+        years[yr].tgtPast += d.tgt;
+        years[yr].daysPast++;
+      } else {
+        m.daysPending++;
+        years[yr].daysPending++;
+      }
     } else {
       m.daysFuture++;
       years[yr].daysFuture++;
@@ -4641,6 +4651,10 @@ function renderTempo(){
     let cur = 0, py = 0, n = 0;
     for(const d of days){
       if(d.isFuture) continue;            // i giorni futuri non hanno consuntivo
+      if(!(d.net > 0)) continue;          // giorno senza consuntivi (es. oggi
+                                          // prima delle chiusure serali): fuori
+                                          // dal confronto, entrerà quando i
+                                          // dati arrivano
       const pv = dailySums[pyDateISO(d.dateISO)];
       const pyNet = pv ? pv.net : 0;
       if(pyNet > 0){ cur += d.net; py += pyNet; n++; }
@@ -4735,7 +4749,7 @@ function renderTempo(){
         mSub = `${m.days.length} giorni · solo previsionale`;
       } else {
         mMain = `<div class="am-row-net partial">${fmt(m.netPast)} / ${fmt(m.tgtAll)}&nbsp;NET</div>`;
-        mSub = `${m.days.length} giorni · ${m.daysPast} consuntivati · ${m.daysFuture} previsionali`;
+        mSub = `${m.days.length} giorni · ${m.daysPast} consuntivati${m.daysPending?` · ${m.daysPending} in corso`:''} · ${m.daysFuture} previsionali`;
         if(compareTgt && m.tgtPast > 0){
           const dlt = (m.netPast - m.tgtPast) / m.tgtPast * 100;
           mBadge += `<span class="am-badge ${badgeCls(dlt)}">${fmtPctSign(dlt)} vs TGT (parziale)</span>`;
