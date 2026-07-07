@@ -2008,6 +2008,33 @@ async function parseAperturaPDF(ab,fname,modifiedTime,fileId){
     }
     return null;
   };
+  // NOTA dopo la risposta SI/NO: i negozi scrivono il motivo su una riga a sé
+  // (es. "NO" → "Condizionatore non funzionante"). Raccolgo le righe di testo
+  // libere dopo il SI/NO fermandomi a qualunque confine del template GoAudits
+  // (altra domanda, timestamp foto, header pagina, DECLARATION, ecc.).
+  const NOTE_BOUNDARY=/^(Q#\s*QUESTION|Page\s+\d+\s+of|Powered By|Ref\s*:|Location Map|Auditor|D\s*E\s*C\s*L|CHECKLIST APERTURA|RINO PETINO)/i;
+  const NOTE_TS=/^\d{1,2}\s+[A-Za-z]{3}\s+\d{2}\s+\d{1,2}:\d{2}(\s*(AM|PM))?$/i;
+  const NOTE_Q=/(fondo\s+cassa|check\s+pulizia|stato\s+negozio|controllo\s+insegna|inventario)/i;
+  const NOTE_HDR=/^[A-Z0-9 &'.\-]+\d{2}\s+[A-Z]{3}\s+\d{2}$/;  // "CARPISA - CASAMASSIMA 05 JUL 26"
+  const SINO_LINE=/^\s*(SI|SÌ|NO)\s*$/i;
+  const noteAfter=(kwRe,maxLook=8)=>{
+    for(let i=0;i<lines.length;i++){
+      if(!kwRe.test(lines[i])) continue;
+      // trovo prima la riga SI/NO della domanda, poi raccolgo le note
+      let j=i+1;
+      while(j<lines.length && j<=i+maxLook && !SINO_LINE.test(lines[j])) j++;
+      if(j>=lines.length || !SINO_LINE.test(lines[j])) return null;
+      const notes=[];
+      for(let k=j+1;k<lines.length && k<=j+4;k++){
+        const l=lines[k].trim();
+        if(!l) continue;
+        if(NOTE_BOUNDARY.test(l)||NOTE_TS.test(l)||NOTE_Q.test(l)||NOTE_HDR.test(l)||SINO_LINE.test(l)) break;
+        notes.push(l);
+      }
+      return notes.length?notes.join(' ').slice(0,300):null;
+    }
+    return null;
+  };
   // Riga solo-numero, con € opzionale PRIMA o DOPO: i negozi scrivono il fondo
   // in formati liberi ("304,61", "294,20€", "€ 300", "1.234,56").
   const NUMLINE=/^\s*€?\s*(\d[\d.,]*?)\s*€?\s*$/;
@@ -2027,9 +2054,13 @@ async function parseAperturaPDF(ab,fname,modifiedTime,fileId){
   const puliziaOk   = siNo(answerNear(/check\s+pulizia/i, SINO));
   const insegnaOk   = siNo(answerNear(/controllo\s+insegna/i, SINO, 8));
   const inventarioOk= siNo(answerNear(/inventario.*campione/i, SINO)); // opzionale, sparirà
+  const puliziaNote = noteAfter(/check\s+pulizia/i);
+  const insegnaNote = noteAfter(/controllo\s+insegna/i);
 
-  return {type:'apertura',fileId,fname,modifiedTime,brand,location,dateISO,
-          fondoCassa,puliziaOk,insegnaOk,inventarioOk};
+  // pv = versione del parser: syncAperture rilegge i PDF in cache con pv più
+  // vecchio, così le nuove estrazioni (es. note) arrivano senza svuotare tutto.
+  return {type:'apertura',pv:2,fileId,fname,modifiedTime,brand,location,dateISO,
+          fondoCassa,puliziaOk,insegnaOk,inventarioOk,puliziaNote,insegnaNote};
 }
 
 // Lista PDF aperture dal backend. [] se la cartella non è configurata (503/404)
@@ -2056,6 +2087,9 @@ async function syncAperture(backendCache){
     for(const f of files){
       const key=f.id+'_'+f.modifiedTime;
       let rec=(backendCache&&backendCache[key])||localCache[key];
+      // Cache valida solo se il parser non è cambiato: pv vecchio → rileggo il
+      // PDF (una volta sola, poi la cache si aggiorna con la nuova versione).
+      if(rec && rec.type==='apertura' && rec.pv!==2) rec=null;
       if(!rec){
         try{
           const r=await api(`/drive/file/${encodeURIComponent(f.id)}`);
@@ -2103,6 +2137,10 @@ function shiftAperturaDate(delta){
   i=Math.max(0,Math.min(days.length-1,i+delta));
   aperturaDate=days[i];
   renderAperture();
+}
+// Escape HTML per testo libero (le note dei negozi finiscono in innerHTML).
+function _escHtml(s){
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 // Ultima chiusura del negozio PRIMA del giorno dato (lookback 14gg): è il
 // termine di confronto del fondo cassa. Non per forza ieri: regge i giorni
@@ -2188,9 +2226,12 @@ function renderAperture(){
     const fondo=_fondoBadge(a);
     const time=_aperturaTimeHHMM(a);
     const badges=[fondo.html];
-    if(a.puliziaOk===false)      badges.push('<span class="ap-badge warn">🧹 non pulito</span>');
+    // Le note scritte dai negozi (es. "Condizionatore non funzionante")
+    // compaiono direttamente nel badge, troncate per non rompere il layout.
+    const noteTxt=n=>n?` · ${_escHtml(n.length>60?n.slice(0,57)+'…':n)}`:'';
+    if(a.puliziaOk===false)      badges.push(`<span class="ap-badge warn">🧹 non pulito${noteTxt(a.puliziaNote)}</span>`);
     else if(a.puliziaOk===true)  badges.push('<span class="ap-badge ok">🧹 pulito</span>');
-    if(a.insegnaOk===false)      badges.push('<span class="ap-badge warn">💡 guasto segnalato</span>');
+    if(a.insegnaOk===false)      badges.push(`<span class="ap-badge warn">💡 guasto${noteTxt(a.insegnaNote)}</span>`);
     else if(a.insegnaOk===true)  badges.push('<span class="ap-badge ok">💡 tutto funziona</span>');
     html+=`<div class="ap-card" onclick="openAperturaSheet(${i})">
       <div class="ap-head">
@@ -2227,7 +2268,9 @@ function openAperturaSheet(i){
   }
   parts.push(dividerRow('Controlli'));
   parts.push(staticRow('Check pulizia', siNoTxt(a.puliziaOk), siNoCls(a.puliziaOk)));
+  if(a.puliziaNote) parts.push(staticRow('Nota pulizia', _escHtml(a.puliziaNote), 'r'));
   parts.push(staticRow('Insegna, luci e apparecchiature', siNoTxt(a.insegnaOk), siNoCls(a.insegnaOk)));
+  if(a.insegnaNote) parts.push(staticRow('Nota guasto', _escHtml(a.insegnaNote), 'r'));
   if(a.inventarioOk!=null) parts.push(staticRow('Inventario a campione', siNoTxt(a.inventarioOk), siNoCls(a.inventarioOk)));
   const attachBtn=a.fileId
     ? `<div style="padding:16px"><button class="settings-btn" onclick="openAttachments(${i},'ap')">📎 Vedi foto allegate</button></div>`
@@ -3619,12 +3662,15 @@ function _aperturaSectionHTML(){
   counters+=counter('fondo','💶',
     fondi.length===1?'fondo cassa non allineato':'fondi cassa non allineati',
     fondi,({a,i,diff})=>storeRow(a,i,`<span class="oggi-row-val bad">Δ ${fmt(diff)}</span>`));
+  // Se il negozio ha scritto una nota (es. "Condizionatore non funzionante"),
+  // la mostro al posto dell'etichetta generica, troncata.
+  const noteVal=(note,fallback)=>`<span class="oggi-row-val warn">${note?_escHtml(note.length>40?note.slice(0,37)+'…':note):fallback}</span>`;
   counters+=counter('pulizia','🧹',
     puliti.length===1?'segnalazione pulizia':'segnalazioni pulizia',
-    puliti,({a,i})=>storeRow(a,i,`<span class="oggi-row-val warn">non pulito</span>`));
+    puliti,({a,i})=>storeRow(a,i,noteVal(a.puliziaNote,'non pulito')));
   counters+=counter('guasti','💡',
     guasti.length===1?'guasto apparecchiature':'guasti apparecchiature',
-    guasti,({a,i})=>storeRow(a,i,`<span class="oggi-row-val warn">guasto</span>`));
+    guasti,({a,i})=>storeRow(a,i,noteVal(a.insegnaNote,'guasto')));
 
   const dayLabel=`${day.slice(8,10)}/${day.slice(5,7)}`;
   const banner = missing.length
