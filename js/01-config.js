@@ -91,6 +91,13 @@ let targetsByKey={};
 // rilancio recomputeExpected() + renderAll() così tutta la dashboard riflette
 // il nuovo stato (chiusure attese, KPI, mancanti).
 let storeFlagsByKey={};
+// Segnalazioni guasti via email già inviate, da GET /segnalazioni.
+// Forma: { "adidas|brindisi city|2026-07-07": {user:"l.colucci", sent_at:"2026-07-07T15:45:00+00:00"} }
+let segnalazioniByKey={};
+// Destinatari delle email di segnalazione guasto (mailto:). Vuoto = campo A:
+// vuoto, lo compila l'utente in Outlook. Predisposto per il futuro: chiave
+// brand in minuscolo oppure 'default', es. {'default':'manutenzione@rinopetino.it'}
+const SEGNALAZIONI_DEST={};
 // Stato autenticazione: user info + token cache. I token sono anche salvati
 // in localStorage per sopravvivere ai refresh della pagina.
 let auth={user:null, accessToken:null, refreshToken:null};

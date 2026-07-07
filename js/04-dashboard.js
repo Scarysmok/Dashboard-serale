@@ -190,6 +190,60 @@ function oggiGoAperture(i){
     openAperturaSheet(i);
   }
 }
+// ── SEGNALAZIONE GUASTI VIA EMAIL (icona ✉️ sulle righe guasti della home) ──
+// Chiave segnalazione: negozio + giorno dell'apertura. Un guasto nuovo il
+// giorno dopo ripresenta l'icona ✉️ da zero.
+function _segnalazioneKey(a){
+  return storeKey(a.brand,a.location)+'|'+a.dateISO;
+}
+// Icona per la riga guasto: ✉️ da segnalare (click → mailto) oppure ✅ già
+// segnalato (tooltip con data/ora e utente). stopPropagation: il click
+// sull'icona non deve aprire la scheda del negozio come il resto della riga.
+function _segnalaIconHTML(a,i){
+  const s=segnalazioniByKey[_segnalazioneKey(a)];
+  if(s){
+    const d=new Date(s.sent_at);
+    const when=isNaN(d)?'—':`${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()} alle ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    const tip=_escHtml(`Segnalata il ${when} da ${s.user||'—'}`);
+    return `<span class="segnala-icon done" title="${tip}" onclick="event.stopPropagation()">✅</span>`;
+  }
+  return `<span class="segnala-icon" title="Segnala via e-mail il guasto" onclick="event.stopPropagation();segnalaGuasto(${i})">✉️</span>`;
+}
+// Apre il client di posta predefinito (Outlook) con l'email di segnalazione
+// già compilata. Il destinatario viene da SEGNALAZIONI_DEST (per ora vuota →
+// campo A: vuoto, lo aggiunge l'utente). Il mailto: non dice all'app se
+// l'email è stata davvero spedita, quindi chiediamo conferma all'utente e
+// solo allora registriamo la segnalazione sul backend (visibile a tutti).
+function segnalaGuasto(i){
+  const a=allAperture[i];
+  if(!a) return;
+  const dd=a.dateISO?a.dateISO.split('-').reverse().join('/'):'—';
+  const dest=SEGNALAZIONI_DEST[String(a.brand||'').toLowerCase()]||SEGNALAZIONI_DEST.default||'';
+  const subject=encodeURIComponent(`Segnalazione guasto — ${a.brand} ${a.location} — ${dd}`);
+  const body=encodeURIComponent(
+    `Ciao,\n\ndalla checklist di apertura del ${dd} il negozio ${a.brand} ${a.location} `+
+    `segnala un guasto:\n\n"${a.insegnaNote||'guasto apparecchiature (nessuna nota dal negozio)'}"\n\nSaluti`);
+  window.location.href=`mailto:${dest}?subject=${subject}&body=${body}`;
+  // Piccolo respiro per lasciare aprire Outlook prima del dialogo di conferma.
+  setTimeout(async()=>{
+    if(!confirm(`Outlook aperto per ${a.brand} ${a.location}.\n\nConfermi che l'email di segnalazione è stata inviata?`)) return;
+    const key=_segnalazioneKey(a);
+    try{
+      const r=await api('/segnalazioni',{method:'POST',body:JSON.stringify({
+        key, brand:a.brand, location:a.location, date:a.dateISO})});
+      if(!r.ok) throw new Error('Errore '+r.status);
+      const data=await r.json();
+      segnalazioniByKey[key]={user:data.user, sent_at:data.sent_at};
+      renderOggi();
+      showToast('✓ Segnalazione registrata','ok');
+    }catch(e){
+      console.error('segnalaGuasto',e);
+      alert('Email ok, ma non sono riuscito a registrare la segnalazione sul server:\n'
+        +(e.message||e)+'\n\nRiprova al prossimo sync per marcare l\'icona.');
+    }
+  },400);
+}
+
 function _aperturaSectionHTML(){
   if(!allAperture.length) return '';
   const days=[...new Set(allAperture.map(a=>a.dateISO).filter(Boolean))].sort();
@@ -244,7 +298,7 @@ function _aperturaSectionHTML(){
     puliti,({a,i})=>storeRow(a,i,noteVal(a.puliziaNote,'non pulito')));
   counters+=counter('guasti','💡',
     guasti.length===1?'guasto apparecchiature':'guasti apparecchiature',
-    guasti,({a,i})=>storeRow(a,i,noteVal(a.insegnaNote,'guasto')));
+    guasti,({a,i})=>storeRow(a,i,noteVal(a.insegnaNote,'guasto')+_segnalaIconHTML(a,i)));
 
   const dayLabel=`${day.slice(8,10)}/${day.slice(5,7)}`;
   const banner = missing.length

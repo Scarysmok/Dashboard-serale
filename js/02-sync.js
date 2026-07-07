@@ -19,7 +19,7 @@ async function syncNow(){
     // overrides per le correzioni manuali, targets per il badge %
     // realizzazione, historical per il confronto anno-su-anno e per la
     // timeline pre-GoAudits del 2026.
-    const [files, backendCache, overrides, targets, historical, historicalKpi, storeFlags] = await Promise.all([
+    const [files, backendCache, overrides, targets, historical, historicalKpi, storeFlags, segnalazioni] = await Promise.all([
       listFiles(),
       fetchPdfCache(),
       fetchOverrides(),
@@ -27,8 +27,10 @@ async function syncNow(){
       fetchHistorical(),
       fetchHistoricalKpi(),
       fetchStoreFlags(),
+      fetchSegnalazioni(),
     ]);
     targetsByKey = targets;
+    segnalazioniByKey = segnalazioni;
     historicalByKey = historical;
     historicalKpiByKey = historicalKpi;
     // Applico override dei flag monitored PRIMA di calcolare missing/KPI così
@@ -333,6 +335,16 @@ async function importConsuntiviFromDriveManual(){
 // backend ne ritorna uno vecchio (boolean diretto, da una build precedente),
 // lo convertiamo qui in {monitored: bool, activeFrom: null} per evitare
 // di rompere il frontend durante un rolling deploy.
+// Segnalazioni guasti già inviate. Non-fatale: se il backend non ha ancora
+// l'endpoint (404 pre-redeploy) o fallisce, torno {} e le icone restano ✉️.
+async function fetchSegnalazioni(){
+  try{
+    const r=await api('/segnalazioni');
+    if(!r.ok) return {};
+    const data=await r.json();
+    return (data && typeof data==='object') ? data : {};
+  }catch(e){ return {}; }
+}
 async function fetchStoreFlags(){
   try{
     const r=await api('/stores/flags');
