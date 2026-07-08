@@ -219,8 +219,20 @@ function _segnalaIconHTML(a,i){
   return `<span class="segnala-icon" title="Segnala via e-mail il guasto" onclick="event.stopPropagation();segnalaGuasto(${i})">✉️</span>`;
 }
 // Config template effettiva: quella salvata dagli admin sul backend, o i default.
+// Se ai DEFAULT vengono aggiunti tipi di danno DOPO che un admin ha già salvato
+// una config (che sovrascrive tutto), li integro qui per id — così i tipi nuovi
+// compaiono comunque in editor ed email senza toccare il DB. Il generico resta
+// in fondo: è il fallback del riconoscimento e va valutato per ultimo.
 function _segnalazioniCfg(){
-  return segnalazioniConfig || SEGNALAZIONI_DEFAULT;
+  const cfg=segnalazioniConfig;
+  if(!cfg) return SEGNALAZIONI_DEFAULT;
+  const have=new Set(cfg.tipi.map(t=>t.id));
+  const missing=SEGNALAZIONI_DEFAULT.tipi.filter(t=>!have.has(t.id));
+  if(!missing.length) return cfg;
+  const gen=t=>t.id==='generico';
+  const tipi=[...cfg.tipi.filter(t=>!gen(t)), ...missing.filter(t=>!gen(t)),
+              ...cfg.tipi.filter(gen), ...missing.filter(gen)];
+  return {...cfg, tipi};
 }
 // Riconoscimento automatico del tipo di danno dalla nota del negozio: vince il
 // primo tipo (nell'ordine della config) con una parola chiave contenuta nella

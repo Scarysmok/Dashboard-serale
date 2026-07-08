@@ -112,6 +112,7 @@ const SEGNALAZIONI_DEFAULT={
     {id:'insegna',       label:'Insegna',          frase:"un guasto all'insegna",          dest:'', keywords:'insegna'},
     {id:'illuminazione', label:'Corpi illuminanti',frase:'un guasto ai corpi illuminanti', dest:'', keywords:'luce, luci, lampad, faro, faretti, illuminaz, neon'},
     {id:'computer',      label:'Computer',         frase:'un guasto al computer',          dest:'', keywords:'computer, pc, monitor'},
+    {id:'stampante',     label:'Stampante',        frase:'un guasto alla stampante',       dest:'', keywords:'stampant, non stampa'},
     {id:'telefono',      label:'Telefono',         frase:'un guasto al telefono',          dest:'', keywords:'telefono, telefonic'},
     {id:'generico',      label:'Generico',         frase:'un guasto alle apparecchiature', dest:'', keywords:''},
   ],
