@@ -706,6 +706,9 @@ body{display:flex;flex-direction:column}
 .oggi-banner .ob-icon{font-size:20px;flex-shrink:0}
 .oggi-banner .ob-text{flex:1;font-size:13px;font-weight:600;line-height:1.4}
 .oggi-banner .ob-arrow{font-size:16px;opacity:.6}
+/* "N mancanti" cliccabile dentro il banner aperture: sottolineato per
+   distinguerlo dal resto del banner (che naviga alla vista Aperture). */
+.oggi-banner .ob-missing{text-decoration:underline;text-underline-offset:2px;cursor:pointer;white-space:nowrap}
 .oggi-hero{background:var(--s1);border:1px solid var(--bd);border-radius:16px;padding:16px}
 .oggi-hero-l{font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.6px}
 .oggi-hero-v{font-family:var(--mono);font-size:32px;font-weight:800;margin:4px 0 10px;line-height:1}

@@ -86,7 +86,14 @@ function renderAperture(){
   if(chip) chip.textContent='📅 '+aperturaDate.split('-').reverse().join('/');
 
   const recs=allAperture.filter(a=>a.dateISO===aperturaDate);
-  const got=new Map(recs.map(a=>[storeKey(a.brand,a.location),a]));
+  // Stesso negozio con più PDF nello stesso giorno (es. checklist corretta e
+  // ricaricata): vince la più recente, non l'ultima in ordine di lista.
+  const got=new Map();
+  for(const a of recs){
+    const k=storeKey(a.brand,a.location);
+    const prev=got.get(k);
+    if(!prev || String(a.modifiedTime||'')>String(prev.modifiedTime||'')) got.set(k,a);
+  }
   // Unione: negozi attesi quel giorno + eventuali aperture da negozi non attesi
   // (es. punti vendita non monitorati che comunque inviano la checklist).
   const items=[];
@@ -256,7 +263,7 @@ function switchTab(t){
     const nav=document.getElementById('nav-'+n);
     if(nav)nav.classList.toggle('active',n===activeNav);
   });
-  const titles={oggi:'Dashboard',negozi:'Chiusure giornaliere',stores:'Negozi',tempo:'Analisi · Vendite',kpi:'Analisi · KPI negozio',settings:'Altro',account:'Gestione utenti',template:'Template segnalazioni'};
+  const titles={oggi:'Dashboard',negozi:'Aperture / Chiusure',stores:'Negozi',tempo:'Analisi · Vendite',kpi:'Analisi · KPI negozio',settings:'Altro',account:'Gestione utenti',template:'Template segnalazioni'};
   const titleEl=document.getElementById('app-title');
   if(titleEl)titleEl.textContent=titles[t]||'Chiusure';
   if(t==='oggi')renderOggi();

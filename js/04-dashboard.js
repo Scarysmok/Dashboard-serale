@@ -293,7 +293,18 @@ function _aperturaSectionHTML(){
   const days=[...new Set(allAperture.map(a=>a.dateISO).filter(Boolean))].sort();
   if(!days.length) return '';
   const day=days[days.length-1];
-  const recs=allAperture.filter(a=>a.dateISO===day);
+  // Un record per NEGOZIO, non per PDF: se lo stesso negozio ha più checklist
+  // nello stesso giorno (es. PDF corretto e ricaricato, l'originale resta su
+  // Drive) tengo la più recente. Senza dedup il banner contava i PDF e usciva
+  // incoerente ("24 su 25 ricevute · 2 mancanti", visto l'08/07/2026).
+  const _byStore=new Map();
+  for(const a of allAperture){
+    if(a.dateISO!==day) continue;
+    const k=storeKey(a.brand,a.location);
+    const prev=_byStore.get(k);
+    if(!prev || String(a.modifiedTime||'')>String(prev.modifiedTime||'')) _byStore.set(k,a);
+  }
+  const recs=[..._byStore.values()];
   const expected=ALL_STORES.filter(s=>isStoreMonitoredOn(s.brand,s.location,day));
   const gotKeys=new Set(recs.map(a=>storeKey(a.brand,a.location)));
   const missing=expected.filter(s=>!gotKeys.has(storeKey(s.brand,s.location)));
@@ -345,13 +356,28 @@ function _aperturaSectionHTML(){
     guasti,({a,i})=>storeRow(a,i,noteVal(a.insegnaNote,'guasto')+_segnalaIconHTML(a,i)));
 
   const dayLabel=`${day.slice(8,10)}/${day.slice(5,7)}`;
+  // Ricevute = attesi - mancanti: così i due numeri del banner tornano sempre,
+  // anche se un negozio non monitorato invia comunque la checklist.
+  const receivedCount=expected.length-missing.length;
+  // "N mancanti" è cliccabile a sé: espande l'elenco dei negozi senza checklist
+  // QUI in home (stopPropagation: il resto del banner continua a portare alla
+  // vista Aperture). Stesso Set dei contatori: lo stato sopravvive ai re-render.
+  const missOpen=_apIssuesOpen.has('mancanti');
+  const missLabel=`${missing.length} mancant${missing.length===1?'e':'i'} ${missOpen?'▴':'▾'}`;
   const banner = missing.length
-    ? `<div class="oggi-banner warn" onclick="oggiGoAperture()"><span class="ob-icon">☀️</span><span class="ob-text">${recs.length} su ${expected.length} aperture ricevute · ${missing.length} mancant${missing.length===1?'e':'i'}</span><span class="ob-arrow">›</span></div>`
-    : `<div class="oggi-banner ok" onclick="oggiGoAperture()"><span class="ob-icon">☀️</span><span class="ob-text">Tutte le ${recs.length} aperture ricevute</span><span class="ob-arrow">›</span></div>`;
+    ? `<div class="oggi-banner warn" onclick="oggiGoAperture()"><span class="ob-icon">☀️</span><span class="ob-text">${receivedCount} su ${expected.length} aperture ricevute · <span class="ob-missing" onclick="event.stopPropagation();toggleApIssue('mancanti')">${missLabel}</span></span><span class="ob-arrow">›</span></div>`
+    : `<div class="oggi-banner ok" onclick="oggiGoAperture()"><span class="ob-icon">☀️</span><span class="ob-text">Tutte le ${expected.length} aperture ricevute</span><span class="ob-arrow">›</span></div>`;
+  const missingList = (missing.length && missOpen)
+    ? `<div class="oggi-list">${missing.map(s=>`<div class="oggi-row" style="cursor:default">
+        <span class="oggi-row-icon">📭</span>
+        <span class="oggi-row-name"><span class="orn-brand">${s.brand}</span>${s.location}</span>
+        <span class="oggi-row-val warn">mancante</span>
+      </div>`).join('')}</div>`
+    : '';
   const list = counters
     ? `<div class="oggi-list">${counters}</div>`
     : `<div class="oggi-list"><div class="oggi-empty-ok">✓ Fondi cassa allineati, nessuna segnalazione pulizia o guasti</div></div>`;
-  return `<div class="oggi-sec-title">Aperture · ${dayLabel}</div>${banner}${list}`;
+  return `<div class="oggi-sec-title">Aperture · ${dayLabel}</div>${banner}${missingList}${list}`;
 }
 // Dal riepilogo alla tab Chiusure, con la stessa giornata già filtrata.
 // showMissing=true → attiva anche il chip "Mancanti".
