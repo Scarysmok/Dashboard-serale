@@ -160,7 +160,8 @@ async function fetchAndParse(file){
 // Whitelist dei campi modificabili. Deve corrispondere a ALLOWED_OVERRIDE_FIELDS
 // nel backend (main.py). Aggiungere campi qui senza aggiornare il backend
 // causerà errori 400 al primo PUT.
-const OVR_FIELDS=['corrispettivo','contanti','pos','cambi','giftcard','annull','buonoE','buonoR'];
+const OVR_FIELDS=['corrispettivo','contanti','pos','cambi','giftcard','annull','buonoE','buonoR',
+                  'sconti','versato','daVersare'];
 
 // Snapshot dei valori parsati dal PDF (prima delle correzioni manuali).
 // Necessario per: (1) mostrare il "valore originale" nel tooltip del badge,

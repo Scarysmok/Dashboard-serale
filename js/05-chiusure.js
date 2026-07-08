@@ -630,9 +630,9 @@ function openSheet(idx){
     valueRow('Annullamenti','annull', r),
     valueRow('Buono emesso','buonoE', r),
     valueRow('Buono ritirato','buonoR', r),
-    staticRow('Sconti su vendite', fmt(r.sconti), ''),
-    staticRow('Importo da versare', fmt(r.daVersare), ''),
-    staticRow('Importo versato', fmt(r.versato), ''),
+    valueRow('Sconti su vendite','sconti', r),
+    valueRow('Importo da versare','daVersare', r),
+    valueRow('Importo versato','versato', r),
     // Verifica cassa: risultato della formula sul record corrente. Si aggiorna
     // automaticamente ogni volta che l'utente modifica un valore editabile.
     // Mango usa una formula semplificata (no cambi/giftcard/annull): segnaliamo
