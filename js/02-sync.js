@@ -7,6 +7,10 @@ async function syncNow(){
   load(true,'Lettura Google Drive…');
   renderSkeletons();
   lastErrors=[];
+  // Sezione Aperture visibile da subito con i dati dell'ultima sessione
+  // (cache locale), senza aspettare il giro completo: si aggiorna a fine sync.
+  preloadApertureFromCache();
+  if(allAperture.length){ try{ renderOggi(); if(vistaNegozi==='aperture') renderAperture(); }catch(_){} }
   try{
     // Import automatico dei consuntivi da Drive PRIMA di leggere lo storico, così
     // fetchHistorical() qui sotto vede subito i dati aggiornati. È idempotente

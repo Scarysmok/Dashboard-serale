@@ -54,7 +54,16 @@ let _oggiRefDate=null;
 function renderOggi(){
   const el=document.getElementById('oggi-content');
   if(!el) return;
-  if(!allData.length) return; // skeleton iniziale finché il primo sync non arriva
+  if(!allData.length){
+    // Chiusure non ancora arrivate (cold start Render): mostro comunque la
+    // sezione Aperture se ho dati (preload dalla cache locale o syncAperture
+    // già completato), così non "sparisce" a ogni avvio. Il riepilogo chiusure
+    // arriva col primo renderAll. Con allData vuoto il confronto fondo cassa
+    // non ha termine di paragone: le eventuali anomalie fondo compaiono dopo.
+    const ap=_aperturaSectionHTML();
+    if(ap) el.innerHTML=ap+'<div style="padding:14px 16px;font-size:12.5px;color:var(--t3)">Riepilogo chiusure in caricamento…</div>';
+    return;
+  }
   const dates=availableDates();
   const todayISO=_isoToday();
   const refDate=dates.includes(todayISO)?todayISO:dates[dates.length-1];

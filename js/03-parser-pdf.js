@@ -331,6 +331,28 @@ async function fetchApertureList(){
   }catch(e){return [];}
 }
 
+// All'avvio la sezione Aperture spariva per minuti: allAperture vive solo in
+// memoria e si riempie solo a fine syncAperture, che parte dietro cold start
+// Render + import consuntivi + fetch paralleli. Qui la ripopolo SUBITO con i
+// record apertura già salvati nella cache locale dall'ultima sessione: la home
+// mostra lo stato precedente finché il sync vero non consegna i dati freschi.
+// Accetto anche record con pv vecchio: meglio un dato leggermente stale del
+// vuoto (syncAperture li rimpiazza comunque). Dedup per fileId tenendo il
+// modifiedTime più recente (lo stesso file può stare in cache con due chiavi).
+function preloadApertureFromCache(){
+  if(allAperture.length) return;
+  try{
+    const byId={};
+    for(const rec of Object.values(loadCache())){
+      if(!rec || rec.type!=='apertura') continue;
+      const k=rec.fileId||rec.fname;
+      if(!byId[k] || String(rec.modifiedTime||'')>String(byId[k].modifiedTime||'')) byId[k]=rec;
+    }
+    const recs=Object.values(byId);
+    if(recs.length) allAperture=recs;
+  }catch(e){ console.warn('preloadApertureFromCache', e); }
+}
+
 // Sync aperture: NON bloccante rispetto alla pipeline chiusure (chiamata senza
 // await da syncNow). Riusa la stessa cache dei PDF (chiave fileId_modifiedTime,
 // locale + backend condivisa): ogni PDF si scarica e parsa una volta sola.
