@@ -280,10 +280,12 @@ function openStorePopup(brand, location){
         : `${storeRange.from.split('-').reverse().join('/')} → ${storeRange.to.split('-').reverse().join('/')}`)
     : (records.length ? `${records.length} chiusur${records.length===1?'a':'e'} totali` : 'Nessuna chiusura');
 
-  // Versamenti: sempre su tutto lo storico disponibile (come la vista saldo)
-  const allRecs=allData.filter(r=>storeKey(r.brand,r.location)===k && r.dateISO);
-  const sumDV=allRecs.reduce((s,r)=>s+(r.daVersare||0),0);
-  const sumV=allRecs.reduce((s,r)=>s+(r.versato||0),0);
+  // Versamenti: sullo stesso set filtrato delle altre card, così Da versare /
+  // Versato / Saldo rispettano la finestra temporale scelta (senza range =
+  // tutto lo storico, come prima). Il saldo qui è quindi il residuo del
+  // periodo selezionato, non più il cumulato assoluto del negozio.
+  const sumDV=records.reduce((s,r)=>s+(r.daVersare||0),0);
+  const sumV=records.reduce((s,r)=>s+(r.versato||0),0);
   const saldo=sumDV-sumV;
   const saldoCls=saldo>0.01?'r':(saldo<-0.01?'g':'');
 
