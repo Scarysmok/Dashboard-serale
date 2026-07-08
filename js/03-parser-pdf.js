@@ -255,11 +255,17 @@ async function parseAperturaPDF(ab,fname,modifiedTime,fileId){
     return null;
   };
   // NOTA dopo la risposta SI/NO: i negozi scrivono il motivo su una riga a sé
-  // (es. "NO" → "Condizionatore non funzionante"). Raccolgo le righe di testo
-  // libere dopo il SI/NO fermandomi a qualunque confine del template GoAudits
-  // (altra domanda, timestamp foto, header pagina, DECLARATION, ecc.).
-  const NOTE_BOUNDARY=/^(Q#\s*QUESTION|Page\s+\d+\s+of|Powered By|Ref\s*:|Location Map|Auditor|D\s*E\s*C\s*L|CHECKLIST APERTURA|RINO PETINO)/i;
-  const NOTE_TS=/^\d{1,2}\s+[A-Za-z]{3}\s+\d{2}\s+\d{1,2}:\d{2}(\s*(AM|PM))?$/i;
+  // (es. "NO" → "Condizionatore non funzionante"). Quando alla risposta sono
+  // allegate foto, GoAudits mette la nota DOPO le foto — anche nella pagina
+  // successiva (visto l'08/07/2026: NO a fine pagina 1, nota a pagina 2 dopo
+  // 3 foto). Quindi: scorro avanti SALTANDO il rumore del template (timestamp
+  // foto, piè/testata di pagina) e mi fermo solo ai confini veri di sezione
+  // (altra domanda, DECLARATION, Auditor). La prima sequenza di righe di testo
+  // libero è la nota; una volta iniziata, qualunque rumore la chiude.
+  const NOTE_SKIP=/^(Page\s+\d+\s+of|Powered By|Ref\s*:|CHECKLIST APERTURA|RINO PETINO)/i;
+  const NOTE_STOP=/^(Q#\s*QUESTION|Location Map|Auditor|D\s*E\s*C\s*L)/i;
+  // Timestamp foto, anche RIPETUTI sulla stessa riga ("08 Jul 26 09:32 AM 08 Jul 26 09:32 AM")
+  const NOTE_TS=/^(\d{1,2}\s+[A-Za-z]{3}\s+\d{2}\s+\d{1,2}:\d{2}(\s*(AM|PM))?\s*)+$/i;
   const NOTE_Q=/(fondo\s+cassa|check\s+pulizia|stato\s+negozio|controllo\s+insegna|inventario)/i;
   const NOTE_HDR=/^[A-Z0-9 &'.\-]+\d{2}\s+[A-Z]{3}\s+\d{2}$/;  // "CARPISA - CASAMASSIMA 05 JUL 26"
   const SINO_LINE=/^\s*(SI|SÌ|NO)\s*$/i;
@@ -271,10 +277,14 @@ async function parseAperturaPDF(ab,fname,modifiedTime,fileId){
       while(j<lines.length && j<=i+maxLook && !SINO_LINE.test(lines[j])) j++;
       if(j>=lines.length || !SINO_LINE.test(lines[j])) return null;
       const notes=[];
-      for(let k=j+1;k<lines.length && k<=j+4;k++){
+      for(let k=j+1;k<lines.length && k<=j+25;k++){
         const l=lines[k].trim();
         if(!l) continue;
-        if(NOTE_BOUNDARY.test(l)||NOTE_TS.test(l)||NOTE_Q.test(l)||NOTE_HDR.test(l)||SINO_LINE.test(l)) break;
+        if(NOTE_STOP.test(l)||NOTE_Q.test(l)||SINO_LINE.test(l)) break;
+        if(NOTE_SKIP.test(l)||NOTE_TS.test(l)||NOTE_HDR.test(l)){
+          if(notes.length) break; // nota già iniziata: il rumore la chiude
+          continue;               // nota non ancora trovata: salto il rumore
+        }
         notes.push(l);
       }
       return notes.length?notes.join(' ').slice(0,300):null;
@@ -305,7 +315,8 @@ async function parseAperturaPDF(ab,fname,modifiedTime,fileId){
 
   // pv = versione del parser: syncAperture rilegge i PDF in cache con pv più
   // vecchio, così le nuove estrazioni (es. note) arrivano senza svuotare tutto.
-  return {type:'apertura',pv:2,fileId,fname,modifiedTime,brand,location,dateISO,
+  // pv3 (08/07/2026): note cercate anche oltre il cambio pagina / foto allegate.
+  return {type:'apertura',pv:3,fileId,fname,modifiedTime,brand,location,dateISO,
           fondoCassa,puliziaOk,insegnaOk,inventarioOk,puliziaNote,insegnaNote};
 }
 
@@ -335,7 +346,7 @@ async function syncAperture(backendCache){
       let rec=(backendCache&&backendCache[key])||localCache[key];
       // Cache valida solo se il parser non è cambiato: pv vecchio → rileggo il
       // PDF (una volta sola, poi la cache si aggiorna con la nuova versione).
-      if(rec && rec.type==='apertura' && rec.pv!==2) rec=null;
+      if(rec && rec.type==='apertura' && rec.pv!==3) rec=null;
       if(!rec){
         try{
           const r=await api(`/drive/file/${encodeURIComponent(f.id)}`);
