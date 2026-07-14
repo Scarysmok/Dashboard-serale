@@ -23,7 +23,7 @@ async function syncNow(){
     // overrides per le correzioni manuali, targets per il badge %
     // realizzazione, historical per il confronto anno-su-anno e per la
     // timeline pre-GoAudits del 2026.
-    const [files, backendCache, overrides, targets, historical, historicalKpi, storeFlags, segnalazioni, segnCfg] = await Promise.all([
+    const [files, backendCache, overrides, targets, historical, historicalKpi, storeFlags, segnalazioni, segnCfg, malfResolved] = await Promise.all([
       listFiles(),
       fetchPdfCache(),
       fetchOverrides(),
@@ -33,10 +33,12 @@ async function syncNow(){
       fetchStoreFlags(),
       fetchSegnalazioni(),
       fetchSegnalazioniConfig(),
+      fetchMalfResolved(),
     ]);
     targetsByKey = targets;
     segnalazioniByKey = segnalazioni;
     segnalazioniConfig = segnCfg;
+    malfResolvedByKey = malfResolved;
     historicalByKey = historical;
     historicalKpiByKey = historicalKpi;
     // Applico override dei flag monitored PRIMA di calcolare missing/KPI così
@@ -351,6 +353,15 @@ async function fetchSegnalazioniConfig(){
     const data=await r.json();
     return (data && data.base && Array.isArray(data.tipi)) ? data : null;
   }catch(e){ return null; }
+}
+// Stato "risolto" dei malfunzionamenti. Non-fatale: {} se endpoint assente.
+async function fetchMalfResolved(){
+  try{
+    const r=await api('/malfunzionamenti/resolved');
+    if(!r.ok) return {};
+    const data=await r.json();
+    return (data && typeof data==='object') ? data : {};
+  }catch(e){ return {}; }
 }
 // Segnalazioni guasti già inviate. Non-fatale: se il backend non ha ancora
 // l'endpoint (404 pre-redeploy) o fallisce, torno {} e le icone restano ✉️.

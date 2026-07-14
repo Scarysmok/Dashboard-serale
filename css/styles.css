@@ -709,6 +709,18 @@ body{display:flex;flex-direction:column}
 /* "N mancanti" cliccabile dentro il banner aperture: sottolineato per
    distinguerlo dal resto del banner (che naviga alla vista Aperture). */
 .oggi-banner .ob-missing{text-decoration:underline;text-underline-offset:2px;cursor:pointer;white-space:nowrap}
+/* Recap malfunzionamenti (memoria guasti) */
+.malf-row{display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--bd)}
+.malf-row:last-child{border-bottom:none}
+.malf-row.done{opacity:.6}
+.malf-main{flex:1;min-width:0}
+.malf-title{font-size:13px;font-weight:600;line-height:1.3}
+.malf-sub{font-size:11.5px;color:var(--t3);margin-top:2px}
+.malf-sollecito{font-size:10.5px;font-weight:700;color:var(--warn);white-space:nowrap}
+.malf-btn{flex-shrink:0;font-family:var(--font);font-size:12px;font-weight:600;padding:7px 11px;border-radius:9px;border:1px solid var(--bd2);background:var(--s2);color:var(--t1);cursor:pointer}
+.malf-btn.ok{border-color:#22c55e;color:#16a34a}
+.malf-btn.ok:active{background:#dcfce7}
+.malf-btn.reopen:active{background:var(--s3)}
 .oggi-hero{background:var(--s1);border:1px solid var(--bd);border-radius:16px;padding:16px}
 .oggi-hero-l{font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.6px}
 .oggi-hero-v{font-family:var(--mono);font-size:32px;font-weight:800;margin:4px 0 10px;line-height:1}
@@ -726,7 +738,7 @@ body{display:flex;flex-direction:column}
 .oggi-row:active{background:var(--s2)}
 .oggi-row-icon{font-size:16px;flex-shrink:0;width:22px;text-align:center}
 .oggi-row-name{flex:1;min-width:0;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.oggi-row-name .orn-brand{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--t3);display:block}
+.oggi-row-name .orn-brand,.malf-title .orn-brand{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--t3);display:block}
 .oggi-row-val{font-size:12px;font-family:var(--mono);font-weight:600;flex-shrink:0}
 .oggi-row-val.warn{color:var(--warn)}
 .oggi-row-val.bad{color:var(--red)}

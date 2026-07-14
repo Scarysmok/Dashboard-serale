@@ -61,7 +61,7 @@ function renderOggi(){
     // arriva col primo renderAll. Con allData vuoto il confronto fondo cassa
     // non ha termine di paragone: le eventuali anomalie fondo compaiono dopo.
     const ap=_aperturaSectionHTML();
-    if(ap) el.innerHTML=ap+'<div style="padding:14px 16px;font-size:12.5px;color:var(--t3)">Riepilogo chiusure in caricamento…</div>';
+    if(ap) el.innerHTML=ap+_malfMemoriaSectionHTML()+'<div style="padding:14px 16px;font-size:12.5px;color:var(--t3)">Riepilogo chiusure in caricamento…</div>';
     return;
   }
   const dates=availableDates();
@@ -151,9 +151,11 @@ function renderOggi(){
     : '';
 
   const aperturaSection=_aperturaSectionHTML();
+  const malfSection=_malfMemoriaSectionHTML();
 
   el.innerHTML=`
     ${aperturaSection}
+    ${malfSection}
     <div class="oggi-date-row">
       <div>
         <div class="oggi-date-title">${riepTitle}</div>
@@ -286,6 +288,92 @@ function segnalaGuasto(i){
         +(e.message||e)+'\n\nRiprova al prossimo sync per marcare l\'icona.');
     }
   },400);
+}
+
+// ── MEMORIA MALFUNZIONAMENTI (recap guasti nei vari giorni + stato risolto) ──
+// Derivata da allAperture: raggruppo i guasti (insegnaOk===false) per negozio
+// + tipo riconosciuto. Segnalazioni ripetute in giorni diversi NON creano voci
+// nuove: contano come "solleciti". Un gruppo è APERTO se ha almeno una
+// segnalazione con data > resolved_up_to (o mai risolto); dopo la risoluzione,
+// una segnalazione più recente lo riapre in automatico.
+function malfMemoria(){
+  const byKey=new Map();
+  for(const a of allAperture){
+    if(a.insegnaOk!==false || !a.dateISO) continue;
+    const tipo=detectTipoGuasto(a.insegnaNote);
+    const key=storeKey(a.brand,a.location)+'|'+tipo.id;
+    let g=byKey.get(key);
+    if(!g){ g={key,brand:a.brand,location:a.location,tipoLabel:tipo.label,dates:new Set(),lastNote:'',lastDate:''}; byKey.set(key,g); }
+    g.dates.add(a.dateISO);
+    if(a.dateISO>=g.lastDate){ g.lastDate=a.dateISO; g.lastNote=a.insegnaNote||''; }
+  }
+  const open=[], resolved=[];
+  for(const g of byKey.values()){
+    const dates=[...g.dates].sort();
+    const res=malfResolvedByKey[g.key];
+    const episode=res&&res.resolved_up_to ? dates.filter(d=>d>res.resolved_up_to) : dates;
+    if(episode.length) open.push({...g,dates,firstDate:episode[0],count:episode.length,res});
+    else               resolved.push({...g,dates,firstDate:dates[0],count:dates.length,res});
+  }
+  open.sort((a,b)=>a.firstDate.localeCompare(b.firstDate));           // più vecchi in cima
+  resolved.sort((a,b)=>((b.res&&b.res.at)||'').localeCompare((a.res&&a.res.at)||''));
+  return {open,resolved};
+}
+function _malfMemoriaSectionHTML(){
+  if(!allAperture.length) return '';
+  const {open,resolved}=malfMemoria();
+  if(!open.length && !resolved.length) return '';
+  const dd=iso=>iso?iso.split('-').reverse().slice(0,2).join('/'):'—';
+  const jsq=s=>String(s).replace(/'/g,"\\'");
+  const row=(e,isOpen)=>{
+    const sollec=e.count>1
+      ? `<span class="malf-sollecito" title="Segnalato: ${e.dates.map(dd).join(', ')}">sollecitato ${e.count-1}×</span>` : '';
+    const note=e.lastNote?_escHtml(e.lastNote.length>60?e.lastNote.slice(0,57)+'…':e.lastNote):'';
+    const meta=isOpen
+      ? `dal ${dd(e.firstDate)}${e.count>1?` → ${dd(e.lastDate)}`:''}`
+      : `risolto${e.res&&e.res.by?` da ${_escHtml(e.res.by)}`:''}${e.res&&e.res.at?` il ${fmtDateTime(e.res.at)}`:''}`;
+    const btn=isOpen
+      ? `<button class="malf-btn ok" onclick="malfResolve('${jsq(e.key)}','${e.lastDate}')">✓ Risolto</button>`
+      : `<button class="malf-btn reopen" onclick="malfReopen('${jsq(e.key)}')">↺ Riapri</button>`;
+    return `<div class="malf-row${isOpen?'':' done'}">
+      <div class="malf-main">
+        <div class="malf-title"><span class="orn-brand">${e.brand}</span>${e.location} · ${_escHtml(e.tipoLabel)} ${sollec}</div>
+        <div class="malf-sub">${note?note+' · ':''}${meta}</div>
+      </div>${btn}
+    </div>`;
+  };
+  let h=`<div class="oggi-sec-title">Malfunzionamenti${open.length?` · ${open.length} apert${open.length===1?'o':'i'}`:''}</div>`;
+  h+=open.length
+    ? `<div class="oggi-list">${open.map(e=>row(e,true)).join('')}</div>`
+    : `<div class="oggi-list"><div class="oggi-empty-ok">✓ Nessun malfunzionamento aperto</div></div>`;
+  if(resolved.length){
+    const rOpen=_apIssuesOpen.has('malf-risolti');
+    h+=`<div class="oggi-list"><div class="oggi-row" onclick="toggleApIssue('malf-risolti')">
+        <span class="oggi-row-icon">✅</span>
+        <span class="oggi-row-name"><b>${resolved.length}</b>&nbsp;risolt${resolved.length===1?'o':'i'}</span>
+        <span class="oggi-row-val">${rOpen?'▴':'▾'}</span>
+      </div>${rOpen?resolved.map(e=>row(e,false)).join(''):''}</div>`;
+  }
+  return h;
+}
+async function malfResolve(key,upTo){
+  try{
+    const r=await api('/malfunzionamenti/resolved',{method:'POST',body:JSON.stringify({key,resolved_up_to:upTo,resolved:true})});
+    if(!r.ok) throw new Error('Errore '+r.status);
+    const d=await r.json();
+    malfResolvedByKey[key]={resolved_up_to:upTo,by:d.by,at:d.at};
+    renderOggi();
+    showToast('✓ Malfunzionamento risolto','ok');
+  }catch(e){ console.error('malfResolve',e); alert('Errore: '+(e.message||e)); }
+}
+async function malfReopen(key){
+  try{
+    const r=await api('/malfunzionamenti/resolved',{method:'POST',body:JSON.stringify({key,resolved_up_to:'',resolved:false})});
+    if(!r.ok) throw new Error('Errore '+r.status);
+    delete malfResolvedByKey[key];
+    renderOggi();
+    showToast('↺ Riaperto','ok');
+  }catch(e){ console.error('malfReopen',e); alert('Errore: '+(e.message||e)); }
 }
 
 function _aperturaSectionHTML(){

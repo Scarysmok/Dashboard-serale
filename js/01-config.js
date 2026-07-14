@@ -119,6 +119,9 @@ const SEGNALAZIONI_DEFAULT={
 };
 // Config personalizzata dal backend (GET /segnalazioni/config). null = default.
 let segnalazioniConfig=null;
+// Stato "risolto" dei malfunzionamenti, da GET /malfunzionamenti/resolved.
+// Forma: { "adidas|brindisi city|illuminazione": {resolved_up_to:"2026-07-08", by:"l.colucci", at:"..."} }
+let malfResolvedByKey={};
 // Stato autenticazione: user info + token cache. I token sono anche salvati
 // in localStorage per sopravvivere ai refresh della pagina.
 let auth={user:null, accessToken:null, refreshToken:null};
