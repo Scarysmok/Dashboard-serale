@@ -25,7 +25,6 @@
   --safe-top:env(safe-area-inset-top,0px);
   --safe-bot:env(safe-area-inset-bottom,0px);
   --nav-w:172px;
-  --nav-w-min:56px;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--t1);font-family:var(--font)}
@@ -389,15 +388,15 @@ body{display:flex;flex-direction:column}
 .nav-item:active{background:var(--s2)}
 .nav-item.active{background:#eff3ff;color:var(--acc)}
 .nav-icon{font-size:18px;line-height:1;flex-shrink:0;width:22px;text-align:center}
-#dash-wrap{padding-left:var(--nav-w);transition:padding-left .2s}
-.side-nav{transition:width .2s}
-/* Hamburger nella sidebar: sempre orizzontale, trasla con la sidebar (niente rotazione). */
-.nav-toggle{font-size:18px;margin-bottom:6px}
-/* Sidebar chiusa: si restringe a una barretta con solo l'hamburger visibile. */
-#dash-wrap.nav-hidden{padding-left:var(--nav-w-min)}
-#dash-wrap.nav-hidden .side-nav{width:var(--nav-w-min)}
-#dash-wrap.nav-hidden .side-nav-brand,
-#dash-wrap.nav-hidden .nav-item{display:none}
+/* Contenuto sempre a pagina intera; la sidebar è un overlay a scomparsa. */
+#dash-wrap{padding-left:0}
+.side-nav{transition:transform .2s;box-shadow:2px 0 16px rgba(0,0,0,.12)}
+.app-title-group{display:flex;align-items:center}
+.nav-toggle{margin-left:4px;margin-right:12px;font-size:18px}
+/* Chiusa (default): fuori schermo. Aperta: overlay sopra il contenuto + backdrop. */
+#dash-wrap.nav-hidden .side-nav{transform:translateX(-100%)}
+#nav-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.28);z-index:39}
+#dash-wrap.nav-hidden #nav-backdrop{display:none}
 @media (max-width:520px){
   :root{--nav-w:132px}
   .side-nav-brand{font-size:13px;padding:4px 8px 10px}

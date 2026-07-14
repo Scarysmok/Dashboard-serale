@@ -252,10 +252,9 @@ function showDash(){
   restoreAnalisiFilters();
   // Pull-to-refresh sulle liste principali (registrato una sola volta)
   initPullToRefresh();
-  // La home "Oggi" è la tab di partenza. switchTab richiude la sidebar: al
-  // primo ingresso la lascio aperta così l'utente vede subito il menu.
+  // La home "Oggi" è la tab di partenza. switchTab chiude la sidebar (overlay),
+  // così si parte a pagina intera; l'utente la apre con l'hamburger.
   switchTab('oggi');
-  document.getElementById('dash-wrap').classList.remove('nav-hidden');
   syncNow();
   syncTimer=setInterval(syncNow,5*60*1000);
 }
