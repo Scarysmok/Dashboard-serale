@@ -391,14 +391,13 @@ body{display:flex;flex-direction:column}
 .nav-icon{font-size:18px;line-height:1;flex-shrink:0;width:22px;text-align:center}
 #dash-wrap{padding-left:var(--nav-w);transition:padding-left .2s}
 .side-nav{transition:width .2s}
-/* Hamburger nella sidebar: aperto = righe verticali (ruotato), chiuso = orizzontali. */
-.nav-toggle{font-size:18px;margin-bottom:6px;transform:rotate(90deg);transition:transform .2s}
+/* Hamburger nella sidebar: sempre orizzontale, trasla con la sidebar (niente rotazione). */
+.nav-toggle{font-size:18px;margin-bottom:6px}
 /* Sidebar chiusa: si restringe a una barretta con solo l'hamburger visibile. */
 #dash-wrap.nav-hidden{padding-left:var(--nav-w-min)}
 #dash-wrap.nav-hidden .side-nav{width:var(--nav-w-min)}
 #dash-wrap.nav-hidden .side-nav-brand,
 #dash-wrap.nav-hidden .nav-item{display:none}
-#dash-wrap.nav-hidden .nav-toggle{transform:rotate(0deg);margin-left:auto;margin-right:auto}
 @media (max-width:520px){
   :root{--nav-w:132px}
   .side-nav-brand{font-size:13px;padding:4px 8px 10px}
