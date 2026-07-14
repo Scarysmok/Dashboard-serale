@@ -342,10 +342,19 @@ function _malfMemoriaSectionHTML(){
       </div>${btn}
     </div>`;
   };
-  let h=`<div class="oggi-sec-title">Malfunzionamenti${open.length?` · ${open.length} apert${open.length===1?'o':'i'}`:''}</div>`;
-  h+=open.length
-    ? `<div class="oggi-list">${open.map(e=>row(e,true)).join('')}</div>`
-    : `<div class="oggi-list"><div class="oggi-empty-ok">✓ Nessun malfunzionamento aperto</div></div>`;
+  let h=`<div class="oggi-sec-title">Malfunzionamenti</div>`;
+  if(open.length){
+    // Riga singola prominente: cliccandola si espande l'elenco completo.
+    const oOpen=_apIssuesOpen.has('malf-aperti');
+    h+=`<div class="malf-head${oOpen?' open':''}" onclick="toggleApIssue('malf-aperti')">
+        <span class="malf-head-icon">🛠️</span>
+        <span class="malf-head-txt"><b>${open.length}</b> malfunzionament${open.length===1?'o aperto':'i aperti'}</span>
+        <span class="malf-head-arrow">${oOpen?'▴':'▾'}</span>
+      </div>`;
+    if(oOpen) h+=`<div class="oggi-list">${open.map(e=>row(e,true)).join('')}</div>`;
+  }else{
+    h+=`<div class="oggi-list"><div class="oggi-empty-ok">✓ Nessun malfunzionamento aperto</div></div>`;
+  }
   if(resolved.length){
     const rOpen=_apIssuesOpen.has('malf-risolti');
     h+=`<div class="oggi-list"><div class="oggi-row" onclick="toggleApIssue('malf-risolti')">

@@ -710,6 +710,14 @@ body{display:flex;flex-direction:column}
    distinguerlo dal resto del banner (che naviga alla vista Aperture). */
 .oggi-banner .ob-missing{text-decoration:underline;text-underline-offset:2px;cursor:pointer;white-space:nowrap}
 /* Recap malfunzionamenti (memoria guasti) */
+/* Riga-testata prominente: colpisce l'occhio, cliccabile per espandere. */
+.malf-head{display:flex;align-items:center;gap:11px;padding:15px 16px;cursor:pointer;border-radius:14px;
+  background:#fef3c7;border:1.5px solid var(--warn);color:#92400e}
+.malf-head.open{border-bottom-left-radius:0;border-bottom-right-radius:0}
+.malf-head-icon{font-size:22px;flex-shrink:0}
+.malf-head-txt{flex:1;font-size:15px;font-weight:700}
+.malf-head-txt b{font-weight:800}
+.malf-head-arrow{font-size:16px}
 .malf-row{display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--bd)}
 .malf-row:last-child{border-bottom:none}
 .malf-row.done{opacity:.6}
