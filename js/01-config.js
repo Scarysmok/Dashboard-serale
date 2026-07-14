@@ -241,8 +241,6 @@ function showDash(){
   _hideAllScreens();
   const d=document.getElementById('dash-wrap');
   d.style.display='flex';
-  // Ripristina lo stato sidebar (nascosta/visibile) dall'ultima sessione
-  try{ d.classList.toggle('nav-hidden', !!localStorage.getItem('nav_hidden')); }catch(_){}
   // Aggiorna badge admin / sezioni in base al ruolo
   applyRoleVisibility();
   // Riempi info utente in Config
@@ -254,8 +252,10 @@ function showDash(){
   restoreAnalisiFilters();
   // Pull-to-refresh sulle liste principali (registrato una sola volta)
   initPullToRefresh();
-  // La home "Oggi" è la tab di partenza
+  // La home "Oggi" è la tab di partenza. switchTab richiude la sidebar: al
+  // primo ingresso la lascio aperta così l'utente vede subito il menu.
   switchTab('oggi');
+  document.getElementById('dash-wrap').classList.remove('nav-hidden');
   syncNow();
   syncTimer=setInterval(syncNow,5*60*1000);
 }

@@ -249,12 +249,8 @@ function setChip(el,f){
   });
   el.classList.add('on');renderCards();
 }
-// Mostra/nasconde la sidebar (☰). Lo stato persiste tra le sessioni.
-function toggleNav(){
-  const dw=document.getElementById('dash-wrap');
-  const hidden=dw.classList.toggle('nav-hidden');
-  try{ localStorage.setItem('nav_hidden', hidden?'1':''); }catch(_){}
-}
+// Mostra/nasconde la sidebar (☰). Chiusa = barretta con solo l'hamburger.
+function toggleNav(){ document.getElementById('dash-wrap').classList.toggle('nav-hidden'); }
 function switchTab(t){
   ['oggi','negozi','storecheck','stores','tempo','kpi','settings','account','template','scmail'].forEach(n=>{
     const el=document.getElementById('tab-'+n);
@@ -280,6 +276,8 @@ function switchTab(t){
   if(t==='template')renderTemplateEditor();
   if(t==='storecheck')renderStoreCheck();
   if(t==='scmail')renderScMailEditor();
+  // Scelta una sezione, richiudo la sidebar (torna alla barretta con l'hamburger)
+  document.getElementById('dash-wrap').classList.add('nav-hidden');
 }
 function closeSheet(e){
   if(!e||e.target===document.getElementById('sheet'))
