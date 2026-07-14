@@ -24,6 +24,7 @@
   --mono:'Nunito',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
   --safe-top:env(safe-area-inset-top,0px);
   --safe-bot:env(safe-area-inset-bottom,0px);
+  --nav-w:172px;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--t1);font-family:var(--font)}
@@ -377,14 +378,27 @@ body{display:flex;flex-direction:column}
 .acct-btn.deny{background:#fef2f2;color:var(--red);border-color:#fecaca}
 .acct-btn.promote{background:#ddd6fe;color:#5b21b6;border-color:#c4b5fd}
 
-/* ── BOTTOM NAV ── */
-/* La nav inferiore: oltre alla safe area di iOS aggiungo 8px extra in basso
-   così le icone non sembrano appiccicate al bordo / home indicator. Aumento
-   anche il padding verticale degli item per superficie touch più comoda. */
-.bottom-nav{display:flex;align-items:center;background:rgba(255,255,255,.92);backdrop-filter:blur(20px);border-top:1px solid var(--bd);flex-shrink:0;padding-bottom:calc(var(--safe-bot) + 8px);padding-top:4px}
-.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:12px 4px;cursor:pointer;color:var(--t3);transition:color .15s;font-size:10px;font-weight:500}
-.nav-item.active{color:var(--acc)}
-.nav-icon{font-size:20px;line-height:1}
+/* ── SIDE NAV (sidebar laterale, sempre visibile anche su mobile) ── */
+.side-nav{position:fixed;left:0;top:0;bottom:0;width:var(--nav-w);display:flex;flex-direction:column;gap:2px;
+  background:rgba(255,255,255,.96);backdrop-filter:blur(20px);border-right:1px solid var(--bd);
+  padding:calc(var(--safe-top) + 12px) 8px calc(var(--safe-bot) + 12px);overflow-y:auto;z-index:40}
+.side-nav-brand{font-weight:800;font-size:15px;padding:4px 12px 12px;color:var(--t1)}
+.nav-item{display:flex;flex-direction:row;align-items:center;gap:10px;padding:11px 12px;border-radius:10px;
+  cursor:pointer;color:var(--t2);font-size:13px;font-weight:600;line-height:1.2;transition:background .12s,color .12s}
+.nav-item:active{background:var(--s2)}
+.nav-item.active{background:#eff3ff;color:var(--acc)}
+.nav-icon{font-size:18px;line-height:1;flex-shrink:0;width:22px;text-align:center}
+#dash-wrap{padding-left:var(--nav-w);transition:padding-left .2s}
+.side-nav{transition:transform .2s}
+.nav-toggle{margin-right:10px;font-size:18px}
+/* Sidebar nascosta: scorre via a sinistra e il contenuto riprende lo spazio. */
+#dash-wrap.nav-hidden{padding-left:0}
+#dash-wrap.nav-hidden .side-nav{transform:translateX(-100%)}
+@media (max-width:520px){
+  :root{--nav-w:132px}
+  .side-nav-brand{font-size:13px;padding:4px 8px 10px}
+  .nav-item{font-size:12px;padding:10px 8px;gap:7px}
+}
 
 /* ── SETTINGS TAB ── */
 .settings-inner{padding:16px;display:flex;flex-direction:column;gap:12px;padding-bottom:32px}
@@ -718,6 +732,23 @@ body{display:flex;flex-direction:column}
 .malf-head-txt{flex:1;font-size:15px;font-weight:700}
 .malf-head-txt b{font-weight:800}
 .malf-head-arrow{font-size:16px}
+/* ── STORE CHECK ── */
+.sc-date-h{font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.5px;padding:16px 16px 6px}
+.sc-row{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--bd);cursor:pointer}
+.sc-row:active{background:var(--s2)}
+.sc-main{flex:1;min-width:0}
+.sc-title{font-size:13.5px;font-weight:700;line-height:1.3}
+.sc-sub{font-size:11.5px;color:var(--t3);margin-top:2px}
+.sc-score{flex-shrink:0;font-family:var(--mono);font-weight:800;font-size:13px}
+.sc-badge{flex-shrink:0;font-size:10.5px;font-weight:700;padding:3px 8px;border-radius:999px;background:#fef2f2;color:var(--red);border:1px solid #fecaca}
+.sc-mail-btn{flex-shrink:0;font-size:16px;padding:6px 8px;border-radius:8px;cursor:pointer;line-height:1;border:none;background:none}
+.sc-mail-btn:active{background:var(--s3)}
+/* Overlay PDF a tutta pagina (anteprima Drive) */
+#pdf-overlay{position:fixed;inset:0;z-index:800;display:flex;flex-direction:column;background:var(--bg)}
+.pdf-ov-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:calc(var(--safe-top) + 10px) 14px 10px;border-bottom:1px solid var(--bd);background:var(--s1)}
+.pdf-ov-title{font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pdf-ov-close{flex-shrink:0;font-family:var(--font);font-size:13px;font-weight:600;padding:8px 14px;border-radius:9px;border:1px solid var(--bd2);background:var(--s2);color:var(--t1);cursor:pointer}
+#pdf-ov-frame{flex:1;width:100%;border:none;background:#525659}
 .malf-row{display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--bd)}
 .malf-row:last-child{border-bottom:none}
 .malf-row.done{opacity:.6}
@@ -746,7 +777,7 @@ body{display:flex;flex-direction:column}
 .oggi-row:active{background:var(--s2)}
 .oggi-row-icon{font-size:16px;flex-shrink:0;width:22px;text-align:center}
 .oggi-row-name{flex:1;min-width:0;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.oggi-row-name .orn-brand,.malf-title .orn-brand{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--t3);display:block}
+.oggi-row-name .orn-brand,.malf-title .orn-brand,.sc-title .orn-brand{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--t3);display:block}
 .oggi-row-val{font-size:12px;font-family:var(--mono);font-weight:600;flex-shrink:0}
 .oggi-row-val.warn{color:var(--warn)}
 .oggi-row-val.bad{color:var(--red)}

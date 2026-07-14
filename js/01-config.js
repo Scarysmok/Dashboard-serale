@@ -122,6 +122,17 @@ let segnalazioniConfig=null;
 // Stato "risolto" dei malfunzionamenti, da GET /malfunzionamenti/resolved.
 // Forma: { "adidas|brindisi city|illuminazione": {resolved_up_to:"2026-07-08", by:"l.colucci", at:"..."} }
 let malfResolvedByKey={};
+// Store check parsate dai PDF (una cartella Drive dedicata, come le aperture).
+let allStoreChecks=[];
+// Template email store check (GET /storecheck/mail-config). null = default sotto.
+let storeCheckMailConfig=null;
+// Default del template email store check. to/cc vuoti: li compila l'admin in
+// Altro → Template email store check. Segnaposto: {NEGOZIO} {AM} {DATA} {PUNTEGGIO} {NONCONF}.
+const STORECHECK_MAIL_DEFAULT={
+  to:'', cc:'',
+  subject:'Store check {NEGOZIO} — {DATA}',
+  body:'Ciao,\n\nin allegato/di seguito l\'esito dello store check del {DATA} per {NEGOZIO} (area manager: {AM}).\nPunteggio: {PUNTEGGIO}.\n\nPunti da sistemare:\n{NONCONF}\n\nSaluti',
+};
 // Stato autenticazione: user info + token cache. I token sono anche salvati
 // in localStorage per sopravvivere ai refresh della pagina.
 let auth={user:null, accessToken:null, refreshToken:null};
@@ -230,6 +241,8 @@ function showDash(){
   _hideAllScreens();
   const d=document.getElementById('dash-wrap');
   d.style.display='flex';
+  // Ripristina lo stato sidebar (nascosta/visibile) dall'ultima sessione
+  try{ d.classList.toggle('nav-hidden', !!localStorage.getItem('nav_hidden')); }catch(_){}
   // Aggiorna badge admin / sezioni in base al ruolo
   applyRoleVisibility();
   // Riempi info utente in Config
@@ -255,6 +268,8 @@ function applyRoleVisibility(){
   if(btnAccount) btnAccount.style.display = isAdmin ? 'flex' : 'none';
   const btnTemplate=document.getElementById('btn-template-open');
   if(btnTemplate) btnTemplate.style.display = isAdmin ? 'flex' : 'none';
+  const btnScMail=document.getElementById('btn-scmail-open');
+  if(btnScMail) btnScMail.style.display = isAdmin ? 'flex' : 'none';
   const btnTargets=document.getElementById('btn-targets-upload');
   if(btnTargets) btnTargets.style.display = isAdmin ? '' : 'none';
   const btnHistoricalPY=document.getElementById('btn-historical-py-upload');

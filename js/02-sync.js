@@ -23,7 +23,7 @@ async function syncNow(){
     // overrides per le correzioni manuali, targets per il badge %
     // realizzazione, historical per il confronto anno-su-anno e per la
     // timeline pre-GoAudits del 2026.
-    const [files, backendCache, overrides, targets, historical, historicalKpi, storeFlags, segnalazioni, segnCfg, malfResolved] = await Promise.all([
+    const [files, backendCache, overrides, targets, historical, historicalKpi, storeFlags, segnalazioni, segnCfg, malfResolved, scMailCfg] = await Promise.all([
       listFiles(),
       fetchPdfCache(),
       fetchOverrides(),
@@ -34,11 +34,13 @@ async function syncNow(){
       fetchSegnalazioni(),
       fetchSegnalazioniConfig(),
       fetchMalfResolved(),
+      fetchStoreCheckMailConfig(),
     ]);
     targetsByKey = targets;
     segnalazioniByKey = segnalazioni;
     segnalazioniConfig = segnCfg;
     malfResolvedByKey = malfResolved;
+    storeCheckMailConfig = scMailCfg;
     historicalByKey = historical;
     historicalKpiByKey = historicalKpi;
     // Applico override dei flag monitored PRIMA di calcolare missing/KPI così
@@ -48,6 +50,8 @@ async function syncNow(){
     // Aperture: sync in parallelo SENZA await (non deve rallentare le chiusure).
     // Al termine ridisegna solo la home Oggi, unica vista che le mostra.
     syncAperture(backendCache).then(()=>{ try{ renderOggi(); if(vistaNegozi==='aperture') renderAperture(); }catch(_){} });
+    // Store check: idem, ridisegna la sua sezione se aperta al termine.
+    syncStoreCheck(backendCache).then(()=>{ try{ if(typeof renderStoreCheck==='function' && document.getElementById('tab-storecheck')?.style.display!=='none') renderStoreCheck(); }catch(_){} });
     if(!files.length){setPip('','Nessun PDF');load(false);allData=[];renderAll();return;}
 
     const localCache=loadCache();
@@ -352,6 +356,15 @@ async function fetchSegnalazioniConfig(){
     if(!r.ok) return null;
     const data=await r.json();
     return (data && data.base && Array.isArray(data.tipi)) ? data : null;
+  }catch(e){ return null; }
+}
+// Template email store check. null = endpoint assente/mai salvato → default.
+async function fetchStoreCheckMailConfig(){
+  try{
+    const r=await api('/storecheck/mail-config');
+    if(!r.ok) return null;
+    const data=await r.json();
+    return (data && (data.subject||data.to||data.cc)) ? data : null;
   }catch(e){ return null; }
 }
 // Stato "risolto" dei malfunzionamenti. Non-fatale: {} se endpoint assente.

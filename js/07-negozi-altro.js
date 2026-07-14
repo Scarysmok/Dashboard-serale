@@ -798,6 +798,132 @@ async function saveTemplateConfig(){
   }
 }
 
+// ── STORE CHECK (sezione: highlights + elenco per data + viewer PDF + email) ──
+function _scDD(iso){ return iso?iso.split('-').reverse().slice(0,2).join('/'):'—'; }
+function scMailCfg(){ return storeCheckMailConfig || STORECHECK_MAIL_DEFAULT; }
+
+function renderStoreCheck(){
+  const el=document.getElementById('storecheck-content');
+  if(!el) return;
+  const checks=[...allStoreChecks].filter(c=>c.dateISO);
+  if(!checks.length){
+    el.innerHTML=`<div class="oggi-list" style="margin-top:14px"><div class="oggi-empty-ok" style="color:var(--t3)">Nessuna store check ricevuta. (Configura la cartella Drive dedicata.)</div></div>`;
+    return;
+  }
+  checks.sort((a,b)=>b.dateISO.localeCompare(a.dateISO) || (a.location||'').localeCompare(b.location||''));
+
+  // Highlights: solo le store check con non conformità (risposte NO).
+  const withIssues=checks.filter(c=>c.noCount>0);
+  let hi=`<div class="oggi-sec-title">Highlights · da sistemare</div>`;
+  if(withIssues.length){
+    let rows='';
+    for(const c of withIssues){
+      const idx=allStoreChecks.indexOf(c);
+      for(const it of c.issues){
+        rows+=`<div class="malf-row">
+          <div class="malf-main">
+            <div class="malf-title"><span class="orn-brand">${_escHtml(c.brand)}</span>${_escHtml(c.location)} · ${_escHtml(it.q)}</div>
+            <div class="malf-sub">${_scDD(c.dateISO)}${c.areaManager?' · '+_escHtml(c.areaManager):''}</div>
+          </div>
+          <button class="sc-mail-btn" title="Apri PDF" onclick="openStoreCheckPdf(${idx})">📄</button>
+        </div>`;
+      }
+    }
+    hi+=`<div class="oggi-list">${rows}</div>`;
+  }else{
+    hi+=`<div class="oggi-list"><div class="oggi-empty-ok">✓ Nessuna non conformità nelle store check ricevute</div></div>`;
+  }
+
+  // Elenco completo per data.
+  let list=`<div class="oggi-sec-title">Tutte le store check</div>`;
+  let curDate='';
+  for(const c of checks){
+    const idx=allStoreChecks.indexOf(c);
+    if(c.dateISO!==curDate){ curDate=c.dateISO; list+=`<div class="sc-date-h">${_scDD(curDate)}</div>`; }
+    const badge=c.noCount>0?`<span class="sc-badge">${c.noCount} da sistemare</span>`:'';
+    list+=`<div class="sc-row" onclick="openStoreCheckPdf(${idx})">
+      <div class="sc-main">
+        <div class="sc-title"><span class="orn-brand">${_escHtml(c.brand)}</span>${_escHtml(c.location)}</div>
+        <div class="sc-sub">${c.areaManager?_escHtml(c.areaManager)+' · ':''}${c.qCount||0} punti</div>
+      </div>
+      ${badge}
+      <span class="sc-score">${c.score||''}</span>
+      <button class="sc-mail-btn" title="Invia email" onclick="event.stopPropagation();storeCheckEmail(${idx})">✉️</button>
+    </div>`;
+  }
+  el.innerHTML=hi+list;
+}
+
+// Apre il PDF intero nell'overlay via anteprima nativa Drive (zero rendering).
+function openStoreCheckPdf(idx){
+  const c=allStoreChecks[idx];
+  if(!c||!c.fileId) return;
+  document.getElementById('pdf-ov-title').textContent=`${c.brand} ${c.location} · ${_scDD(c.dateISO)}`;
+  document.getElementById('pdf-ov-frame').src=`https://drive.google.com/file/d/${encodeURIComponent(c.fileId)}/preview`;
+  document.getElementById('pdf-overlay').style.display='flex';
+}
+function closePdfOverlay(){
+  document.getElementById('pdf-overlay').style.display='none';
+  document.getElementById('pdf-ov-frame').src='about:blank';  // ferma il caricamento
+}
+
+// Email store check: TO + CC dal template (Altro → Template email store check).
+function storeCheckEmail(idx){
+  const c=allStoreChecks[idx];
+  if(!c) return;
+  const cfg=scMailCfg();
+  const nonconf=c.issues.length ? c.issues.map(it=>`- ${it.q}`).join('\n') : 'Nessuna (tutto conforme)';
+  const fill=s=>String(s||'')
+    .replace(/{NEGOZIO}/g,`${c.brand} ${c.location}`).replace(/{AM}/g,c.areaManager||'—')
+    .replace(/{DATA}/g,_scDD(c.dateISO)).replace(/{PUNTEGGIO}/g,c.score||'—').replace(/{NONCONF}/g,nonconf);
+  const to=encodeURIComponent(String(cfg.to||'').trim());
+  const cc=encodeURIComponent(String(cfg.cc||'').trim());
+  const q=[cc?`cc=${cc}`:'', `subject=${encodeURIComponent(fill(cfg.subject))}`, `body=${encodeURIComponent(fill(cfg.body))}`]
+    .filter(Boolean).join('&');
+  window.location.href=`mailto:${to}?${q}`;
+}
+
+// Editor template email store check (Altro → admin). TO, CC, oggetto, corpo.
+function renderScMailEditor(){
+  const wrap=document.getElementById('scmail-editor-wrap');
+  if(!wrap) return;
+  const cfg=scMailCfg();
+  const esc=v=>_escHtml(String(v==null?'':v)).replace(/"/g,'&quot;');
+  wrap.innerHTML=`
+    <div class="settings-head">Destinatari</div>
+    <div class="tpl-card">
+      <div class="field-label">Destinatario (A)</div>
+      <input class="field" type="email" id="scm-to" placeholder="es. areamanager@rinopetino.it" value="${esc(cfg.to)}"/>
+      <div class="field-label" style="margin-top:12px">In copia (CC) — separa con virgola</div>
+      <input class="field" id="scm-cc" placeholder="uno@x.it, due@x.it" value="${esc(cfg.cc)}"/>
+    </div>
+    <div class="settings-head">Email</div>
+    <div class="tpl-card">
+      <div class="field-label">Oggetto</div>
+      <input class="field" id="scm-subject" value="${esc(cfg.subject)}"/>
+      <div class="field-label" style="margin-top:12px">Corpo</div>
+      <textarea class="field tpl-body" id="scm-body" rows="8">${_escHtml(cfg.body)}</textarea>
+      <div class="tpl-hint">Segnaposto: <b>{NEGOZIO}</b> <b>{AM}</b> (area manager) <b>{DATA}</b> <b>{PUNTEGGIO}</b> <b>{NONCONF}</b> (elenco non conformità)</div>
+    </div>
+    <button class="settings-btn" onclick="saveScMailConfig()">💾 Salva template</button>`;
+}
+async function saveScMailConfig(){
+  const val=id=>{const e=document.getElementById(id);return e?e.value:'';};
+  const cfg={to:val('scm-to').trim(), cc:val('scm-cc').trim(),
+             subject:val('scm-subject').trim(), body:val('scm-body')};
+  if(!cfg.subject||!cfg.body.trim()){alert('Oggetto e corpo non possono essere vuoti.');return;}
+  try{
+    const r=await api('/storecheck/mail-config',{method:'POST',body:JSON.stringify({config:cfg})});
+    if(!r.ok){
+      let d='Errore '+r.status;
+      try{const e=await r.json(); if(e.detail)d=typeof e.detail==='string'?e.detail:JSON.stringify(e.detail);}catch(_){}
+      throw new Error(d);
+    }
+    storeCheckMailConfig=cfg;
+    showToast('✓ Template salvato','ok');
+  }catch(e){ console.error('saveScMailConfig',e); alert('Salvataggio non riuscito:\n'+(e.message||e)); }
+}
+
 // ── EXPORT CSV ──
 // Formato "wide": una riga per negozio+data, una colonna per ogni domanda
 // della checklist (28 in totale). Le colonne Q&A vengono ricavate dall'unione

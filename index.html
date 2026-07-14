@@ -149,7 +149,7 @@
 <div id="dash-wrap" style="display:none;flex-direction:column;height:calc(100% - var(--safe-top))">
 
   <div class="app-header">
-    <div><span class="app-title" id="app-title">Chiusure giornaliere</span><span class="app-badge">live</span></div>
+    <div><button class="icon-btn nav-toggle" onclick="toggleNav()" aria-label="Mostra/nascondi menu">☰</button><span class="app-title" id="app-title">Chiusure giornaliere</span><span class="app-badge">live</span></div>
     <div class="header-actions">
       <div class="sync-pill"><div class="pip" id="pip"></div><span id="sync-txt">—</span></div>
       <div class="icon-btn" onclick="syncNow()">↺</div>
@@ -422,6 +422,7 @@
       <div class="settings-head" id="head-admin" style="display:none">Amministrazione</div>
       <button class="settings-btn nav-like" id="btn-account-open" style="display:none" onclick="switchTab('account')"><span>👥 Gestione utenti</span><span class="sbn-arrow">›</span></button>
       <button class="settings-btn nav-like" id="btn-template-open" style="display:none" onclick="switchTab('template')"><span>✉️ Template segnalazioni</span><span class="sbn-arrow">›</span></button>
+      <button class="settings-btn nav-like" id="btn-scmail-open" style="display:none" onclick="switchTab('scmail')"><span>✉️ Template email store check</span><span class="sbn-arrow">›</span></button>
 
       <div class="settings-head">Sessione</div>
       <button class="settings-btn danger" onclick="doLogout()">⎋ Disconnetti</button>
@@ -444,10 +445,25 @@
     </div>
   </div>
 
-  <!-- BOTTOM NAV (5 voci: Oggi · Chiusure · Analisi · Negozi · Altro) -->
-  <div class="bottom-nav">
+  <!-- TAB STORE CHECK (checklist area manager) -->
+  <div class="scroll-area" id="tab-storecheck" style="display:none">
+    <div id="storecheck-content"></div>
+  </div>
+
+  <!-- TAB TEMPLATE EMAIL STORE CHECK (admin only, da Altro) -->
+  <div class="scroll-area" id="tab-scmail" style="display:none">
+    <div class="settings-inner">
+      <button class="settings-btn nav-like" onclick="switchTab('settings')"><span>‹ Torna a Altro</span></button>
+      <div id="scmail-editor-wrap"></div>
+    </div>
+  </div>
+
+  <!-- SIDE NAV (sidebar laterale) -->
+  <div class="side-nav">
+    <div class="side-nav-brand">Rino Petino</div>
     <div class="nav-item active" id="nav-oggi" onclick="switchTab('oggi')"><div class="nav-icon">🏠</div><span>Dashboard</span></div>
     <div class="nav-item" id="nav-negozi" onclick="switchTab('negozi')"><div class="nav-icon">📋</div><span>Aperture / Chiusure</span></div>
+    <div class="nav-item" id="nav-storecheck" onclick="switchTab('storecheck')"><div class="nav-icon">🔎</div><span>Store Check</span></div>
     <div class="nav-item" id="nav-analisi" onclick="switchTab('tempo')"><div class="nav-icon">📈</div><span>Analisi</span></div>
     <div class="nav-item" id="nav-stores" onclick="switchTab('stores')"><div class="nav-icon">🏪</div><span>Negozi</span></div>
     <div class="nav-item" id="nav-settings" onclick="switchTab('settings')"><div class="nav-icon">⚙️</div><span>Altro</span></div>
@@ -455,6 +471,15 @@
 
   <!-- TOAST DI CONFERMA -->
   <div id="toast-wrap"></div>
+
+  <!-- OVERLAY VISUALIZZATORE PDF (store check: anteprima Drive intera) -->
+  <div id="pdf-overlay" style="display:none">
+    <div class="pdf-ov-bar">
+      <span class="pdf-ov-title" id="pdf-ov-title">PDF</span>
+      <button class="pdf-ov-close" onclick="closePdfOverlay()">✕ Chiudi</button>
+    </div>
+    <iframe id="pdf-ov-frame" title="PDF" allow="autoplay"></iframe>
+  </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>

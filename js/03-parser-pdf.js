@@ -385,6 +385,135 @@ async function syncAperture(backendCache){
   }catch(e){ console.warn('syncAperture', e); }
 }
 
+// ── STORE CHECK (checklist area manager, stesso impianto GoAudits) ──
+// Estrae il testo del PDF come righe (stessa tecnica del parser aperture).
+async function _pdfToText(ab){
+  const loadingTask=pdfjsLib.getDocument({data:ab});
+  const pdf=await loadingTask.promise;
+  let txt='';
+  try{
+    for(let i=1;i<=pdf.numPages;i++){
+      const pg=await pdf.getPage(i);
+      const items=(await pg.getTextContent()).items;
+      const lineMap={};
+      for(const it of items){
+        if(!it.str.trim())continue;
+        const y=Math.round(it.transform[5]/2)*2;
+        (lineMap[y]=lineMap[y]||[]).push({x:it.transform[4],str:it.str});
+      }
+      for(const y of Object.keys(lineMap).map(Number).sort((a,b)=>b-a)){
+        const line=lineMap[y].sort((a,b)=>a.x-b.x).map(i=>i.str).join(' ').trim();
+        if(line) txt+=line+'\n';
+      }
+      try{ pg.cleanup(); }catch(_){}
+    }
+  } finally {
+    try{ await pdf.cleanup(); }catch(_){}
+    try{ await pdf.destroy(); }catch(_){}
+    try{ await loadingTask.destroy(); }catch(_){}
+  }
+  return txt;
+}
+async function parseStoreCheckPDF(ab,fname,modifiedTime,fileId){
+  const txt=await _pdfToText(ab);
+  ab=null;
+  const lines=txt.split('\n');
+
+  const sm=txt.match(/([A-Za-z0-9 &']+?)\s*[-–]\s*([^\|]+)\|/);
+  const brand=sm?sm[1].trim():'Sconosciuto';
+  const location=sm?sm[2].trim().replace(/\s+/g,' '):'—';
+
+  const monthMapEn={january:1,february:2,march:3,april:4,may:5,june:6,
+    july:7,august:8,september:9,october:10,november:11,december:12};
+  let dateISO='';
+  const rm=txt.match(/Ref:\s*\d+\s*:\s*(\d{1,2})\s*,\s*([A-Za-z]+)\s+(\d{4})/i);
+  if(rm && monthMapEn[rm[2].toLowerCase()])
+    dateISO=`${rm[3]}-${String(monthMapEn[rm[2].toLowerCase()]).padStart(2,'0')}-${rm[1].padStart(2,'0')}`;
+  if(!dateISO && modifiedTime) dateISO=String(modifiedTime).slice(0,10);
+
+  // Punteggio complessivo: preferisco "(24.0/24.0) 100.00 %", fallback primo "N %".
+  let score='';
+  const scm=txt.match(/\(\s*[\d.,]+\s*\/\s*[\d.,]+\s*\)\s*([\d.,]+)\s*%/);
+  if(scm) score=scm[1].replace(',','.').replace(/\.0+$/,'')+'%';
+  else { const p=txt.match(/(\d{1,3}(?:[.,]\d+)?)\s*%/); if(p) score=p[1]+'%'; }
+
+  // Area manager: nel blocco DECLARATION. Prendo il nome fra parentesi (account
+  // GoAudits) se c'è, altrimenti la prima riga-nome dopo DECLARATION.
+  let areaManager='';
+  const di=lines.findIndex(l=>/^D\s*E\s*C\s*L|^DECLARATION/i.test(l.trim()));
+  if(di>=0){
+    for(let j=di+1;j<lines.length && j<=di+6;j++){
+      const l=lines[j].trim();
+      if(!l || /^(Page\s+\d+\s+of|Ref\s*:|Powered By|Map data|Google)/i.test(l)) continue;
+      const par=l.match(/^\(([^)]+)\)$/);
+      if(par){ areaManager=par[1].trim(); break; }
+      if(!areaManager) areaManager=l;  // firma: tengo come fallback, continuo a cercare l'account
+    }
+  }
+
+  // Domande: la risposta CORRENTE è il token MAIUSCOLO (YES/NO/N/A) subito dopo
+  // il punteggio "(x/y)". Le colonne 23.Jun/01.Jul (title-case) sono lo storico
+  // e vanno ignorate. issues = risposte NO (non conformità).
+  const RESP=/\(\s*[\d.]+\s*\/\s*[\d.]+\s*\)\s*(YES|NO|N\/A)\b/;
+  const NOISE=/^(Page\s+\d+\s+of|Ref\s*:|Powered By|RINO PETINO|STORE CHECK|Q#|UNTITLED|Verificare ciascun|\d{1,2}\s+[A-Za-z]{3}\s+\d{2}\s+\d{1,2}:\d{2})/i;
+  const issues=[]; let qCount=0;
+  for(let i=0;i<lines.length;i++){
+    const m=lines[i].match(RESP);
+    if(!m) continue;
+    qCount++;
+    if(m[1].toUpperCase()!=='NO') continue;
+    // testo domanda: sulla stessa riga fra "N." e "(x/y)", o riga precedente utile
+    let q='', nn='';
+    const same=lines[i].match(/^(\d{1,2})\.\s*(.*?)\s*\(\s*[\d.]+\s*\//);
+    if(same){ nn=same[1]; q=same[2].trim(); }
+    if(!q){
+      for(let k=i-1;k>=0 && k>=i-3;k--){
+        const l=lines[k].trim();
+        if(!l||NOISE.test(l)) continue;
+        q=l.replace(/^\d{1,2}\.\s*/,''); break;
+      }
+    }
+    issues.push({n:nn, q:q||'(domanda)'});
+  }
+
+  return {type:'storecheck',pv:1,fileId,fname,modifiedTime,brand,location,dateISO,
+          score,areaManager,issues,noCount:issues.length,qCount};
+}
+async function fetchStoreCheckList(){
+  try{
+    const r=await api('/drive/list-storecheck');
+    if(!r.ok) return [];
+    const d=await r.json();
+    return Array.isArray(d)?d:[];
+  }catch(e){return [];}
+}
+// Sync store check: gemello di syncAperture (stessa cache PDF condivisa).
+async function syncStoreCheck(backendCache){
+  try{
+    const files=await fetchStoreCheckList();
+    if(!files.length){ allStoreChecks=[]; return; }
+    const localCache=loadCache();
+    const out=[]; let dirty=false;
+    for(const f of files){
+      const key=f.id+'_'+f.modifiedTime;
+      let rec=(backendCache&&backendCache[key])||localCache[key];
+      if(rec && rec.type==='storecheck' && rec.pv!==1) rec=null;
+      if(!rec){
+        try{
+          const r=await api(`/drive/file/${encodeURIComponent(f.id)}`);
+          if(!r.ok) continue;
+          rec=await parseStoreCheckPDF(await r.arrayBuffer(), f.name, f.modifiedTime, f.id);
+          localCache[key]=rec; dirty=true;
+          pushPdfCache(key, rec);
+        }catch(e){ console.warn('parseStoreCheckPDF', f.name, e); continue; }
+      }
+      if(rec && rec.type==='storecheck') out.push(rec);
+    }
+    if(dirty) saveCache(localCache);
+    allStoreChecks=out;
+  }catch(e){ console.warn('syncStoreCheck', e); }
+}
+
 // ── VERIFICA CASSA ──
 // Formula standard:
 //   corrispettivo == (contanti + POS) - cambi - giftcard - annull
