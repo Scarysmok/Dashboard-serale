@@ -856,8 +856,9 @@ body{display:flex;flex-direction:column}
 @keyframes skShimmer{to{background-position:-200% 0}}
 
 /* ── BANNER COLD START SERVER ── */
-.coldstart-note{margin-top:6px;font-size:11px;color:var(--warn);max-width:260px;text-align:center;line-height:1.5;display:none}
+.coldstart-note{margin-top:14px;text-align:center;display:none}
 .coldstart-note.show{display:block}
+.coldstart-logo{width:200px;max-width:70vw;height:auto}
 
 /* ── PULL TO REFRESH ── */
 .ptr-indicator{display:flex;align-items:center;justify-content:center;gap:8px;height:0;overflow:hidden;color:var(--t3);font-size:12px;transition:height .2s ease}
