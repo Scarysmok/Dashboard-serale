@@ -36,6 +36,7 @@ async function syncNow(){
       fetchMalfResolved(),
       fetchStoreCheckMailConfig(),
     ]);
+    _coldRetry=false;   // Promise.all riuscito → rete ok, riarmo il retry cold-start
     targetsByKey = targets;
     segnalazioniByKey = segnalazioni;
     segnalazioniConfig = segnCfg;
@@ -136,11 +137,23 @@ async function syncNow(){
     setPip('live',`${allData.length} pdf${lastErrors.length?` · ${lastErrors.length} errori`:''}`);
     renderAll();
   }catch(e){
-    console.error(e);setPip('','Errore');
-    alert('Errore Google Drive:\n'+e.message);
+    console.error(e);
+    // "Failed to fetch" = errore di rete (tipico cold start di Render, che dorme
+    // dopo 15 min di inattività). Non è un guasto: niente popup, mostro solo lo
+    // stato nel pill e ritento UNA volta in silenzio; il resto lo copre l'auto-sync.
+    const netErr=/failed to fetch|networkerror|load failed/i.test(e.message||'');
+    if(netErr){
+      if(!_coldRetry){ _coldRetry=true; setPip('spin','Riconnessione…'); setTimeout(syncNow, 7000); }
+      else setPip('','Offline');
+    }else{
+      setPip('','Errore');
+      alert('Errore Google Drive:\n'+e.message);
+    }
   }
   load(false);
 }
+// Guard: un solo retry silenzioso per fallimento di rete (evita loop).
+let _coldRetry=false;
 
 async function listFiles(){
   // Il backend conosce folder ID e API key Google (env vars), il browser no
