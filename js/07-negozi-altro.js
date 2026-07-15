@@ -822,8 +822,8 @@ function renderStoreCheck(){
       for(const it of c.issues){
         rows+=`<div class="malf-row">
           <div class="malf-main">
-            <div class="malf-title"><span class="orn-brand">${_escHtml(c.brand)}</span>${_escHtml(c.location)} · ${_escHtml(it.q)}</div>
-            <div class="malf-sub">${_scDD(c.dateISO)}${c.areaManager?' · '+_escHtml(c.areaManager):''}</div>
+            <div class="malf-title"><span class="orn-brand">${_escHtml(c.brand)}</span>${_escHtml(c.location)} · ${_escHtml(it.q)} <span class="malf-sollecito">${_escHtml(it.resp||'')}</span></div>
+            <div class="malf-sub">${it.note?'“'+_escHtml(it.note)+'” · ':''}${_scDD(c.dateISO)}${c.areaManager?' · '+_escHtml(c.areaManager):''}</div>
           </div>
           <button class="sc-mail-btn" title="Apri PDF" onclick="openStoreCheckPdf(${idx})">📄</button>
         </div>`;
@@ -872,7 +872,7 @@ function storeCheckEmail(idx){
   const c=allStoreChecks[idx];
   if(!c) return;
   const cfg=scMailCfg();
-  const nonconf=c.issues.length ? c.issues.map(it=>`- ${it.q}`).join('\n') : 'Nessuna (tutto conforme)';
+  const nonconf=c.issues.length ? c.issues.map(it=>`- [${it.resp||'—'}] ${it.q}${it.note?` — "${it.note}"`:''}`).join('\n') : 'Nessuna (tutto conforme)';
   const fill=s=>String(s||'')
     .replace(/{NEGOZIO}/g,`${c.brand} ${c.location}`).replace(/{AM}/g,c.areaManager||'—')
     .replace(/{DATA}/g,_scDD(c.dateISO)).replace(/{PUNTEGGIO}/g,c.score||'—').replace(/{NONCONF}/g,nonconf);

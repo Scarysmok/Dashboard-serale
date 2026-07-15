@@ -451,20 +451,29 @@ async function parseStoreCheckPDF(ab,fname,modifiedTime,fileId){
     }
   }
 
-  // Domande: la risposta CORRENTE è il token MAIUSCOLO (YES/NO/N/A) subito dopo
-  // il punteggio "(x/y)". Le colonne 23.Jun/01.Jul (title-case) sono lo storico
-  // e vanno ignorate. issues = risposte NO (non conformità).
-  const RESP=/\(\s*[\d.]+\s*\/\s*[\d.]+\s*\)\s*(YES|NO|N\/A)\b/;
-  const NOISE=/^(Page\s+\d+\s+of|Ref\s*:|Powered By|RINO PETINO|STORE CHECK|Q#|UNTITLED|Verificare ciascun|\d{1,2}\s+[A-Za-z]{3}\s+\d{2}\s+\d{1,2}:\d{2})/i;
+  // Risposta CORRENTE: token MAIUSCOLO YES/NO/N/A. Le domande YES/NO hanno il
+  // punteggio "(x/y)" prima della risposta; le N/A NO (GoAudits non le valuta),
+  // quindi la risposta è a fine riga della domanda senza "(x/y)". Le colonne
+  // 23.Jun/01.Jul sono lo storico e vanno ignorate. issues = NO e N/A.
+  const RESP_SCORED=/\(\s*[\d.]+\s*\/\s*[\d.]+\s*\)\s*(YES|NO|N\/A)\b/;
+  const RESP_NA=/^\d{1,2}\.\s+(?:.*\s)?(YES|NO|N\/A)\s*$/;  // risposta senza punteggio (tipico N/A); testo domanda opzionale (a volte è sulla riga sopra)
+  // Rumore da saltare nelle note: piè/testata pagina, timestamp foto, e la
+  // riga-data d'intestazione "15 JUL 26" (giorno MES aa, senza orario).
+  const NOISE=/^(Page\s+\d+\s+of|Ref\s*:|Powered By|RINO PETINO|STORE CHECK|Q#|UNTITLED|Verificare ciascun|Summary|\d{1,2}\s+[A-Za-z]{3}\s+\d{2}(\s+\d{1,2}:\d{2})?\s*(AM|PM)?\s*$|\d{1,2}\s+[A-Za-z]{3}\s+\d{2}\s+\d{1,2}:\d{2})/i;
+  const storeHdr=(brand+' - '+location).toUpperCase();  // testata "BRAND - LOCATION" di ogni pagina
+  const newQ=l=>/^\d{1,2}\.\s/.test(l);            // inizia una nuova domanda
   const issues=[]; let qCount=0;
   for(let i=0;i<lines.length;i++){
-    const m=lines[i].match(RESP);
-    if(!m) continue;
+    let resp=null;
+    const ms=lines[i].match(RESP_SCORED);
+    if(ms) resp=ms[1].toUpperCase();
+    else { const mn=lines[i].match(RESP_NA); if(mn) resp=mn[1].toUpperCase(); }
+    if(!resp) continue;
     qCount++;
-    if(m[1].toUpperCase()!=='NO') continue;
-    // testo domanda: sulla stessa riga fra "N." e "(x/y)", o riga precedente utile
+    if(resp==='YES') continue;               // solo NO e N/A sono "problemi"
+    // testo domanda: sulla stessa riga (scored o no), o riga precedente utile
     let q='', nn='';
-    const same=lines[i].match(/^(\d{1,2})\.\s*(.*?)\s*\(\s*[\d.]+\s*\//);
+    const same=lines[i].match(/^(\d{1,2})\.\s*(.*?)\s*(?:\(\s*[\d.]+\s*\/|(?:YES|NO|N\/A)\s*$)/);
     if(same){ nn=same[1]; q=same[2].trim(); }
     if(!q){
       for(let k=i-1;k>=0 && k>=i-3;k--){
@@ -473,10 +482,25 @@ async function parseStoreCheckPDF(ab,fname,modifiedTime,fileId){
         q=l.replace(/^\d{1,2}\.\s*/,''); break;
       }
     }
-    issues.push({n:nn, q:q||'(domanda)'});
+    // commento dell'auditor: righe di testo libero DOPO la risposta. Look-ahead:
+    // se la riga utile successiva inizia una nuova domanda, la riga corrente è il
+    // testo (a capo) di quella domanda → stop. ponytail: euristica, su note su
+    // più righe a ridosso della domanda dopo può perderne l'ultima riga; il PDF
+    // completo resta la verità (un click sull'anteprima).
+    const noteLines=[];
+    for(let k=i+1;k<lines.length && k<=i+6;k++){
+      const l=lines[k].trim();
+      if(!l) continue;
+      if(RESP_SCORED.test(l) || newQ(l) || /^D\s*E\s*C\s*L|^DECLARATION/i.test(l)) break;
+      if(NOISE.test(l) || l.toUpperCase()===storeHdr) continue;
+      let nxt=''; for(let j=k+1;j<lines.length && j<=k+2;j++){ const lj=lines[j].trim(); if(lj){ nxt=lj; break; } }
+      if(newQ(nxt) || RESP_SCORED.test(nxt)) break;
+      noteLines.push(l);
+    }
+    issues.push({n:nn, q:q||'(domanda)', resp, note:noteLines.join(' ').slice(0,300)});
   }
 
-  return {type:'storecheck',pv:1,fileId,fname,modifiedTime,brand,location,dateISO,
+  return {type:'storecheck',pv:2,fileId,fname,modifiedTime,brand,location,dateISO,
           score,areaManager,issues,noCount:issues.length,qCount};
 }
 async function fetchStoreCheckList(){
@@ -497,7 +521,7 @@ async function syncStoreCheck(backendCache){
     for(const f of files){
       const key=f.id+'_'+f.modifiedTime;
       let rec=(backendCache&&backendCache[key])||localCache[key];
-      if(rec && rec.type==='storecheck' && rec.pv!==1) rec=null;
+      if(rec && rec.type==='storecheck' && rec.pv!==2) rec=null;
       if(!rec){
         try{
           const r=await api(`/drive/file/${encodeURIComponent(f.id)}`);
