@@ -415,8 +415,11 @@ body{display:flex;flex-direction:column}
 .settings-btn.danger{border-color:#fecaca;color:var(--red);background:#fef2f2}
 
 /* ── LOADING + SHEET ── */
-#loading{position:fixed;inset:0;background:rgba(250,251,252,.88);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center;z-index:300;flex-direction:column;gap:14px}
+/* Loading: solo il logo, sfondo bianco uniforme (= sfondo dell'SVG, così il
+   quadrato non si vede), niente spinner né testo. */
+#loading{position:fixed;inset:0;background:#fff;display:none;align-items:center;justify-content:center;z-index:300;flex-direction:column}
 #loading.show{display:flex}
+#loading .spinner,#loading .loading-msg{display:none}
 .spinner{width:28px;height:28px;border:2px solid var(--bd2);border-top-color:var(--acc);border-radius:50%;animation:spin .7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 .loading-msg{font-family:var(--mono);font-size:12px;color:var(--t2);max-width:220px;text-align:center}
@@ -856,9 +859,8 @@ body{display:flex;flex-direction:column}
 @keyframes skShimmer{to{background-position:-200% 0}}
 
 /* ── BANNER COLD START SERVER ── */
-.coldstart-note{margin-top:14px;text-align:center;display:none}
-.coldstart-note.show{display:block}
-.coldstart-logo{width:200px;max-width:70vw;height:auto}
+.coldstart-note{text-align:center;display:block}
+.coldstart-logo{width:520px;max-width:88vw;height:auto}
 
 /* ── PULL TO REFRESH ── */
 .ptr-indicator{display:flex;align-items:center;justify-content:center;gap:8px;height:0;overflow:hidden;color:var(--t3);font-size:12px;transition:height .2s ease}
