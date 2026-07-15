@@ -133,7 +133,7 @@ async function syncNow(){
     document.getElementById('pdf-count-disp').textContent=allData.length+' file';
     const errEl=document.getElementById('err-count-disp');
     if(errEl)errEl.textContent=lastErrors.length;
-    setPip('live',`${allData.length} negozi${lastErrors.length?` · ${lastErrors.length} errori`:''}`);
+    setPip('live',`${allData.length} pdf${lastErrors.length?` · ${lastErrors.length} errori`:''}`);
     renderAll();
   }catch(e){
     console.error(e);setPip('','Errore');
