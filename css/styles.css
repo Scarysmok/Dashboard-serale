@@ -617,8 +617,17 @@ body{display:flex;flex-direction:column}
 .srt.on:active{filter:brightness(.95)}
 .srt.off{background:#fef3c7;color:#92400e;border-color:#fde68a;cursor:pointer}
 .srt.off:active{filter:brightness(.95)}
+.srt.sched{background:#ffedd5;color:#c2410c;border-color:#fed7aa;cursor:pointer}
+.srt.sched:active{filter:brightness(.95)}
 .srt.readonly{cursor:default}
 .srt.readonly:active{filter:none}
+/* Mini-dialogo scelta data attivazione negozio */
+.date-dialog-ov{position:fixed;inset:0;z-index:820;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;padding:20px}
+.date-dialog{background:var(--s1);border-radius:16px;padding:18px;width:100%;max-width:340px;box-shadow:0 12px 40px rgba(0,0,0,.2)}
+.date-dialog-t{font-size:15px;font-weight:700;margin-bottom:6px}
+.date-dialog-sub{font-size:12px;color:var(--t3);line-height:1.5;margin-bottom:12px}
+.date-dialog-btns{display:flex;gap:8px;margin-top:14px}
+.date-dialog-btns .settings-btn{margin:0}
 
 /* ── DATE RANGE BAR (tab Negozi) ── */
 .stores-date-bar{padding:12px 16px 4px;display:flex;align-items:center;gap:10px}

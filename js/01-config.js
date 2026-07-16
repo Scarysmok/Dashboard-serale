@@ -548,6 +548,15 @@ function isStoreMonitoredOn(brand, location, dateISO){
 function isStoreMonitored(brand, location){
   return isStoreMonitoredOn(brand, location);
 }
+// Data di attivazione effettiva (override backend o default ALL_STORES). null se
+// nessuna. Usata per distinguere un negozio "programmato" (activeFrom futuro).
+function storeActiveFrom(brand, location){
+  const k = storeKey(brand, location);
+  const flag = storeFlagsByKey[k];
+  if(flag && typeof flag === 'object') return flag.activeFrom || null;
+  const def = ALL_STORES.find(s => storeKey(s.brand, s.location) === k);
+  return (def && def.activeFrom) || null;
+}
 // Ricalcola la lista EXPECTED_STORES applicando gli override caricati dal
 // backend ai default di ALL_STORES. Da chiamare DOPO ogni mutazione di
 // storeFlagsByKey (login, sync, toggle manuale).

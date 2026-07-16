@@ -30,9 +30,12 @@ function renderStores(){
       const monitored=isStoreMonitored(s.brand,s.location);
       const tLoc=s.location.replace(/'/g,"\\'");
 
+      // Tre stati: attivo oggi · programmato (monitored ma activeFrom futuro) · non attivo
+      const af=storeActiveFrom(s.brand,s.location);
+      const scheduled=monitored && af && af>_isoToday();
       // Badge toggle: cliccabile solo dagli admin
-      const toggleCls=`srt ${monitored?'on':'off'}${isAdmin?'':' readonly'}`;
-      const toggleLabel=monitored?'Attivo':'Non attivo';
+      const toggleCls=`srt ${scheduled?'sched':(monitored?'on':'off')}${isAdmin?'':' readonly'}`;
+      const toggleLabel=scheduled?`Dal ${af.slice(8,10)}/${af.slice(5,7)}`:(monitored?'Attivo':'Non attivo');
       const toggleOnClick=isAdmin
         ?`onclick="event.stopPropagation();toggleStoreActive('${tBrand}','${tLoc}')"`
         :`title="Solo admin"`;
@@ -69,6 +72,28 @@ function renderStores(){
 //      dal backend (incluso il nuovo activeFrom alla prima attivazione)
 //   4. recomputeExpected() + renderAll() — KPI / chip Mancanti / Chiusure
 //      attese rispecchiano subito il nuovo stato senza bisogno di reload.
+// Mini-dialogo con calendario nativo per scegliere la data di attivazione.
+// Ritorna la data ISO scelta, o null se annullato. Default: oggi.
+function pickActivationDate(brand, location){
+  return new Promise(resolve=>{
+    const ov=document.createElement('div');
+    ov.className='date-dialog-ov';
+    ov.innerHTML=`<div class="date-dialog">
+      <div class="date-dialog-t">Attiva ${_escHtml(brand)} ${_escHtml(location)}</div>
+      <div class="date-dialog-sub">Scegli la data di attivazione (oggi = subito, una data futura = programmata). Il negozio conta tra le attese/mancanti solo da quel giorno.</div>
+      <input type="date" class="field" id="date-dialog-input" value="${_isoToday()}"/>
+      <div class="date-dialog-btns">
+        <button class="settings-btn" id="date-dialog-cancel">Annulla</button>
+        <button class="settings-btn" id="date-dialog-ok" style="border-color:#22c55e;color:#16a34a">Attiva</button>
+      </div>
+    </div>`;
+    document.body.appendChild(ov);
+    const close=v=>{ ov.remove(); resolve(v); };
+    ov.querySelector('#date-dialog-cancel').onclick=()=>close(null);
+    ov.querySelector('#date-dialog-ok').onclick=()=>close(ov.querySelector('#date-dialog-input').value||null);
+    ov.onclick=e=>{ if(e.target===ov) close(null); };
+  });
+}
 async function toggleStoreActive(brand, location){
   if(!auth || !auth.user || auth.user.role !== 'admin'){
     alert('Solo gli admin possono attivare o disattivare un negozio.');
@@ -76,16 +101,18 @@ async function toggleStoreActive(brand, location){
   }
   const current = isStoreMonitored(brand, location);
   const next    = !current;
-  const action  = next ? 'ATTIVARE' : 'DISATTIVARE';
-  const desc    = next
-    ? `Il negozio ${brand} ${location} sarà considerato attivo a partire DA OGGI: comparirà tra le chiusure attese e nei mancanti solo per le date a partire da oggi (le date precedenti restano invariate).`
-    : `Il negozio ${brand} ${location} non comparirà più tra le chiusure attese giornaliere e non comparirà più tra i mancanti.`;
-  if(!confirm(`Vuoi ${action} il negozio ${brand} — ${location}?\n\n${desc}`)) return;
+  let activeFrom=null;
+  if(next){
+    activeFrom = await pickActivationDate(brand, location);
+    if(!activeFrom) return;   // annullato
+  }else{
+    if(!confirm(`Vuoi DISATTIVARE il negozio ${brand} — ${location}?\n\nNon comparirà più tra le chiusure attese giornaliere né tra i mancanti.`)) return;
+  }
 
   try{
     const r = await api('/stores/flags', {
       method:'POST',
-      body: JSON.stringify({ brand, location, monitored: next }),
+      body: JSON.stringify({ brand, location, monitored: next, active_from: activeFrom }),
     });
     if(!r.ok){
       const err = await r.text();
@@ -103,7 +130,10 @@ async function toggleStoreActive(brand, location){
     };
     recomputeExpected();
     renderAll();
-    showToast(`✓ ${brand} ${location} ${data.monitored?'attivato':'disattivato'}`,'ok');
+    const af=data.active_from;
+    const msg = !data.monitored ? 'disattivato'
+      : (af && af>_isoToday() ? `programmato dal ${af.slice(8,10)}/${af.slice(5,7)}` : 'attivato');
+    showToast(`✓ ${brand} ${location} ${msg}`,'ok');
   }catch(e){
     console.error('toggleStoreActive', e);
     alert('Errore aggiornamento stato negozio: ' + (e.message||'sconosciuto'));
