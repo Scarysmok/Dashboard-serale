@@ -754,7 +754,8 @@ body{display:flex;flex-direction:column}
 .sc-row{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--bd);cursor:pointer}
 .sc-row:active{background:var(--s2)}
 /* Highlights: un riquadro per negozio con dentro i suoi punti da sistemare */
-.sc-hi-card{background:var(--s1);border:1px solid var(--bd);border-radius:14px;margin:0 0 10px;overflow:hidden}
+.sc-hi-card{background:var(--s1);border:1px solid var(--bd);border-radius:14px;margin:0 16px 10px;overflow:hidden}
+.seg-count{display:inline-block;min-width:18px;padding:0 5px;border-radius:999px;background:var(--red);color:#fff;font-size:10px;font-weight:800;line-height:16px;vertical-align:middle}
 .sc-hi-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 14px;cursor:pointer;background:var(--s2);border-bottom:1px solid var(--bd)}
 .sc-hi-head:active{filter:brightness(.97)}
 .sc-hi-name{font-size:13.5px;font-weight:700;line-height:1.2}

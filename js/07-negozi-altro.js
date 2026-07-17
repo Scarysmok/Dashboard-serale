@@ -840,6 +840,10 @@ function toggleScDate(iso){
   _scDatesOpen.has(iso)?_scDatesOpen.delete(iso):_scDatesOpen.add(iso);
   renderStoreCheck();
 }
+// Vista attiva della sezione Store Check: 'highlights' | 'tutte' (come il
+// toggle Chiusure/Aperture).
+let scVista='highlights';
+function setScVista(v){ scVista=v; renderStoreCheck(); }
 function renderStoreCheck(){
   const el=document.getElementById('storecheck-content');
   if(!el) return;
@@ -861,7 +865,7 @@ function renderStoreCheck(){
   }
   const problem=[...latestByStore.values()].filter(c=>c.noCount>0);
 
-  let hi=`<div class="oggi-sec-title">Highlights · da sistemare</div>`;
+  let hi='';
   if(problem.length){
     hi+=problem.map(c=>{
       const idx=allStoreChecks.indexOf(c);
@@ -886,7 +890,7 @@ function renderStoreCheck(){
   const dates=[...byDate.keys()].sort((a,b)=>b.localeCompare(a));
   if(_scDatesOpen===null) _scDatesOpen=new Set(dates.slice(0,1));  // solo la più recente
 
-  let list=`<div class="oggi-sec-title">Tutte le store check</div>`;
+  let list='';
   for(const iso of dates){
     const rows=byDate.get(iso);
     const open=_scDatesOpen.has(iso);
@@ -908,7 +912,13 @@ function renderStoreCheck(){
       </div>`;
     }
   }
-  el.innerHTML=hi+list;
+  // Toggle vista (come Chiusure/Aperture): "Da sistemare" (highlights) · "Tutte".
+  const badge=problem.length?` <span class="seg-count">${problem.length}</span>`:'';
+  const seg=`<div class="seg-wrap" style="margin:10px 16px 6px">
+    <button class="seg-btn${scVista==='highlights'?' on':''}" onclick="setScVista('highlights')">⚠️ Da sistemare${badge}</button>
+    <button class="seg-btn${scVista==='tutte'?' on':''}" onclick="setScVista('tutte')">📋 Tutte</button>
+  </div>`;
+  el.innerHTML=seg+(scVista==='tutte'?list:hi);
 }
 
 // Apre il PDF intero nell'overlay via anteprima nativa Drive (zero rendering).
