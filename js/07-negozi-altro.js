@@ -832,6 +832,14 @@ async function saveTemplateConfig(){
 function _scDD(iso){ return iso?iso.split('-').reverse().slice(0,2).join('/'):'—'; }
 function scMailCfg(){ return storeCheckMailConfig || STORECHECK_MAIL_DEFAULT; }
 
+// Quali date dell'elenco sono espanse. Inizializzato pigramente con la più
+// recente (le altre partono chiuse); le scelte dell'utente persistono.
+let _scDatesOpen=null;
+function toggleScDate(iso){
+  if(!_scDatesOpen) _scDatesOpen=new Set();
+  _scDatesOpen.has(iso)?_scDatesOpen.delete(iso):_scDatesOpen.add(iso);
+  renderStoreCheck();
+}
 function renderStoreCheck(){
   const el=document.getElementById('storecheck-content');
   if(!el) return;
@@ -842,44 +850,63 @@ function renderStoreCheck(){
   }
   checks.sort((a,b)=>b.dateISO.localeCompare(a.dateISO) || (a.location||'').localeCompare(b.location||''));
 
-  // Highlights: solo le store check con non conformità (risposte NO).
-  const withIssues=checks.filter(c=>c.noCount>0);
+  // Highlights = SOLO l'ultima store check di ogni negozio (la più recente
+  // sostituisce la fotografia precedente): niente duplicati storici, e se il
+  // problema è rientrato la voce sparisce da sola. `checks` è già ordinato per
+  // data desc → il primo per negozio è il più recente.
+  const latestByStore=new Map();
+  for(const c of checks){
+    const k=storeKey(c.brand,c.location);
+    if(!latestByStore.has(k)) latestByStore.set(k,c);
+  }
+  const problem=[...latestByStore.values()].filter(c=>c.noCount>0);
+
   let hi=`<div class="oggi-sec-title">Highlights · da sistemare</div>`;
-  if(withIssues.length){
-    let rows='';
-    for(const c of withIssues){
+  if(problem.length){
+    hi+=problem.map(c=>{
       const idx=allStoreChecks.indexOf(c);
-      for(const it of c.issues){
-        rows+=`<div class="malf-row">
-          <div class="malf-main">
-            <div class="malf-title"><span class="orn-brand">${_escHtml(c.brand)}</span>${_escHtml(c.location)} · ${_escHtml(it.q)} <span class="malf-sollecito">${_escHtml(it.resp||'')}</span></div>
-            <div class="malf-sub">${it.note?'“'+_escHtml(it.note)+'” · ':''}${_scDD(c.dateISO)}${c.areaManager?' · '+_escHtml(c.areaManager):''}</div>
-          </div>
-          <button class="sc-mail-btn" title="Apri PDF" onclick="openStoreCheckPdf(${idx})">📄</button>
-        </div>`;
-      }
-    }
-    hi+=`<div class="oggi-list">${rows}</div>`;
+      const issues=c.issues.map(it=>`<div class="sc-hi-issue">
+          <span class="malf-sollecito">${_escHtml(it.resp||'')}</span> ${_escHtml(it.q)}${it.note?` <span class="sc-hi-note">“${_escHtml(it.note)}”</span>`:''}
+        </div>`).join('');
+      return `<div class="sc-hi-card">
+        <div class="sc-hi-head" onclick="openStoreCheckPdf(${idx})">
+          <div class="sc-hi-name"><span class="orn-brand">${_escHtml(c.brand)}</span>${_escHtml(c.location)}</div>
+          <div class="sc-hi-meta">${_scDD(c.dateISO)}${c.areaManager?' · '+_escHtml(c.areaManager):''} 📄</div>
+        </div>
+        <div class="sc-hi-issues">${issues}</div>
+      </div>`;
+    }).join('');
   }else{
-    hi+=`<div class="oggi-list"><div class="oggi-empty-ok">✓ Nessuna non conformità nelle store check ricevute</div></div>`;
+    hi+=`<div class="oggi-list"><div class="oggi-empty-ok">✓ Nessuna non conformità nell'ultima store check dei negozi</div></div>`;
   }
 
-  // Elenco completo per data.
+  // Elenco per data, collassabile. La data più recente è aperta di default.
+  const byDate=new Map();
+  for(const c of checks){ (byDate.get(c.dateISO)||byDate.set(c.dateISO,[]).get(c.dateISO)).push(c); }
+  const dates=[...byDate.keys()].sort((a,b)=>b.localeCompare(a));
+  if(_scDatesOpen===null) _scDatesOpen=new Set(dates.slice(0,1));  // solo la più recente
+
   let list=`<div class="oggi-sec-title">Tutte le store check</div>`;
-  let curDate='';
-  for(const c of checks){
-    const idx=allStoreChecks.indexOf(c);
-    if(c.dateISO!==curDate){ curDate=c.dateISO; list+=`<div class="sc-date-h">${_scDD(curDate)}</div>`; }
-    const badge=c.noCount>0?`<span class="sc-badge">${c.noCount} da sistemare</span>`:'';
-    list+=`<div class="sc-row" onclick="openStoreCheckPdf(${idx})">
-      <div class="sc-main">
-        <div class="sc-title"><span class="orn-brand">${_escHtml(c.brand)}</span>${_escHtml(c.location)}</div>
-        <div class="sc-sub">${c.areaManager?_escHtml(c.areaManager)+' · ':''}${c.qCount||0} punti</div>
-      </div>
-      ${badge}
-      <span class="sc-score">${c.score||''}</span>
-      <button class="sc-mail-btn" title="Invia email" onclick="event.stopPropagation();storeCheckEmail(${idx})">✉️</button>
+  for(const iso of dates){
+    const rows=byDate.get(iso);
+    const open=_scDatesOpen.has(iso);
+    list+=`<div class="sc-date-h clickable" onclick="toggleScDate('${iso}')">
+      <span>📅 ${_scDD(iso)} · ${rows.length} store check</span><span>${open?'▴':'▾'}</span>
     </div>`;
+    if(!open) continue;
+    for(const c of rows){
+      const idx=allStoreChecks.indexOf(c);
+      const badge=c.noCount>0?`<span class="sc-badge">${c.noCount} da sistemare</span>`:'';
+      list+=`<div class="sc-row" onclick="openStoreCheckPdf(${idx})">
+        <div class="sc-main">
+          <div class="sc-title"><span class="orn-brand">${_escHtml(c.brand)}</span>${_escHtml(c.location)}</div>
+          <div class="sc-sub">${c.areaManager?_escHtml(c.areaManager)+' · ':''}${c.qCount||0} punti</div>
+        </div>
+        ${badge}
+        <span class="sc-score">${c.score||''}</span>
+        <button class="sc-mail-btn" title="Invia email" onclick="event.stopPropagation();storeCheckEmail(${idx})">✉️</button>
+      </div>`;
+    }
   }
   el.innerHTML=hi+list;
 }
