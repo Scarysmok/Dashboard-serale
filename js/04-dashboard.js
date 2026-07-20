@@ -71,6 +71,9 @@ function renderOggi(){
   const recs=allData.filter(r=>r.dateISO===refDate);
   const missing=getMissingStores(refDate);
   const expectedCount=recs.length+missing.length;
+  // Chiusure arrivate da negozi NON attivi in quella data (non attesi): sono
+  // quelle che gonfiano "N su M". Le elenco così l'utente vede quali sono.
+  const unexpected=recs.filter(r=>!isStoreMonitoredOn(r.brand,r.location,refDate));
   const totCorr=recs.reduce((a,r)=>a+r.corrispettivo,0);
   const totNet=totCorr/1.22;
   const totCash=recs.reduce((a,r)=>a+r.contanti,0);
@@ -109,6 +112,22 @@ function renderOggi(){
         <span class="ob-text">Tutte le ${recs.length} chiusure ricevute</span>
         <span class="ob-arrow">›</span>
       </div>`;
+
+  // Riga "chiusure da negozi non attesi" (non attivi in quella data): cliccabile,
+  // espande l'elenco. Ogni riga apre la chiusura del negozio.
+  const unexpOpen=_apIssuesOpen.has('chiusure-inattese');
+  const unexpectedLine = unexpected.length ? `<div class="oggi-list">
+    <div class="oggi-row" onclick="toggleApIssue('chiusure-inattese')">
+      <span class="oggi-row-icon">❓</span>
+      <span class="oggi-row-name"><b>${unexpected.length}</b>&nbsp;da negozi non attesi</span>
+      <span class="oggi-row-val warn">${unexpOpen?'▴':'▾'}</span>
+    </div>
+    ${unexpOpen ? unexpected.map(r=>{const idx=allData.indexOf(r);return `<div class="oggi-row" onclick="openSheet(${idx})" style="padding-left:34px">
+      <span class="oggi-row-icon">›</span>
+      <span class="oggi-row-name"><span class="orn-brand">${r.brand}</span>${r.location}</span>
+      <span class="oggi-row-val">${fmt(r.corrispettivo)}</span>
+    </div>`}).join('') : ''}
+  </div>` : '';
 
   // "Da controllare": anomalie di cassa + chiusure mancanti, cliccabili
   let checkRows='';
@@ -163,6 +182,7 @@ function renderOggi(){
       </div>
     </div>
     ${banner}
+    ${unexpectedLine}
     <div class="oggi-hero">
       <div class="oggi-hero-l">Corrispettivo della giornata</div>
       <div class="oggi-hero-v">${fmt(totCorr)}</div>
