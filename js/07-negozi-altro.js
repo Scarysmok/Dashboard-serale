@@ -84,7 +84,7 @@ function pickActivationDate(brand, location){
       <input type="date" class="field" id="date-dialog-input" value="${_isoToday()}"/>
       <div class="date-dialog-btns">
         <button class="settings-btn" id="date-dialog-cancel">Annulla</button>
-        <button class="settings-btn" id="date-dialog-ok" style="border-color:#22c55e;color:#16a34a">Attiva</button>
+        <button class="settings-btn" id="date-dialog-ok" style="border-color:#1f9d55;color:#127a41">Attiva</button>
       </div>
     </div>`;
     document.body.appendChild(ov);
@@ -398,13 +398,13 @@ function _renderS360Chart(k){
   if(!data.some(v=>v!=null)){ noChartMsg('Nessun dato negli ultimi 30 giorni'); return; }
   _s360Chart=new Chart(cv.getContext('2d'),{
     type:'bar',
-    data:{labels,datasets:[{data,backgroundColor:'#2563eb',borderRadius:3}]},
+    data:{labels,datasets:[{data,backgroundColor:'#4f5bd5',borderRadius:3}]},
     options:{
       responsive:true,maintainAspectRatio:false,
       plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>fmt(c.parsed.y)}}},
       scales:{
         x:{ticks:{font:{family:'Nunito',size:8},maxTicksLimit:8},grid:{display:false}},
-        y:{ticks:{font:{family:'Nunito',size:9},callback:v=>v>=1000?'€'+(v/1000).toFixed(0)+'k':'€'+v},grid:{color:'#eaecef'}}
+        y:{ticks:{font:{family:'Nunito',size:9},callback:v=>v>=1000?'€'+(v/1000).toFixed(0)+'k':'€'+v},grid:{color:'#eef1f4'}}
       }
     }
   });
@@ -614,7 +614,7 @@ function _updateDatePill(){
       :`${f[2]}/${f[1]} → ${t[2]}/${t[1]}`;
     pill.classList.add('rng-active');
     rst.classList.add('show');
-    document.getElementById('drp-reset').style.color='#e2231a';
+    document.getElementById('drp-reset').style.color='#4f5bd5';
   }
 }
 

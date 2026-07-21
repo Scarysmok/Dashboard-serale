@@ -1074,8 +1074,8 @@ function kpiRenderChart(){
   const datasets = [{
     label: kpiLabel(kpi),
     data: values,
-    backgroundColor: '#2563eb',
-    borderColor: '#2563eb',
+    backgroundColor: '#4f5bd5',
+    borderColor: '#4f5bd5',
     borderWidth: 2,
     tension: 0.3,
     fill: false,
@@ -1097,8 +1097,8 @@ function kpiRenderChart(){
       label: 'Anno scorso',
       data: pyData,
       type: 'line',
-      borderColor: '#8c959f',
-      backgroundColor: '#8c959f',
+      borderColor: '#8b93a1',
+      backgroundColor: '#8b93a1',
       borderDash: [4,4],
       borderWidth: 2,
       tension: 0.3,
@@ -1153,8 +1153,8 @@ function kpiRenderChart(){
       label: 'Media brand',
       data: brandData,
       type: 'line',
-      borderColor: '#16a34a',
-      backgroundColor: '#16a34a',
+      borderColor: '#1f9d55',
+      backgroundColor: '#1f9d55',
       borderDash: [2,3],
       borderWidth: 2,
       tension: 0.3,
@@ -1185,8 +1185,8 @@ function kpiRenderChart(){
       label: 'Periodo prec.',
       data: prevData,
       type: 'line',
-      borderColor: '#ea580c',
-      backgroundColor: '#ea580c',
+      borderColor: '#c26a1c',
+      backgroundColor: '#c26a1c',
       borderDash: [6,3],
       borderWidth: 2,
       tension: 0.3,
@@ -1238,7 +1238,7 @@ function kpiRenderChart(){
         },
         scales: {
           x: {ticks:{font:{family:'Nunito',size:10}}, grid:{display:false}},
-          y: {ticks:{font:{family:'Nunito',size:10}, callback:v => kpiFmt(v, kpi)}, grid:{color:'#eaecef'}}
+          y: {ticks:{font:{family:'Nunito',size:10}, callback:v => kpiFmt(v, kpi)}, grid:{color:'#eef1f4'}}
         }
       }
     });
@@ -1296,7 +1296,7 @@ function kpiSparkline(vals, w, h){
   const range = max - min || 1;
   const step = w / (clean.length - 1);
   const pts = clean.map((v,i) => `${(i*step).toFixed(1)},${(h - (v-min)/range*h).toFixed(1)}`).join(' ');
-  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><polyline points="${pts}" fill="none" stroke="#2563eb" stroke-width="1.5"/></svg>`;
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><polyline points="${pts}" fill="none" stroke="#4f5bd5" stroke-width="1.5"/></svg>`;
 }
 
 function kpiRenderHeatmap(){
@@ -1415,7 +1415,7 @@ function openKpiDrill(payload){
       type: 'line',
       data: {labels:series.map(s=>kpiBucketLabel(s.key,kpiState.gran)), datasets:[{
         data: series.map(s => +s.value.toFixed(2)),
-        borderColor:'#2563eb', backgroundColor:'#2563eb20',
+        borderColor:'#4f5bd5', backgroundColor:'#4f5bd520',
         borderWidth:2, tension:0.3, fill:true, pointRadius:0
       }]},
       options: {

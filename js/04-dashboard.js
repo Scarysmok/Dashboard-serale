@@ -101,22 +101,10 @@ function renderOggi(){
   const riepTitle=refDate===todayISO?'Riepilogo di oggi'
     :(refDate===yestISO?'Riepilogo di ieri':'Riepilogo ultima giornata');
 
-  const banner = missing.length
-    ? `<div class="oggi-banner warn" onclick="oggiGoChiusure(true)">
-        <span class="ob-icon">📭</span>
-        <span class="ob-text">${recs.length} su ${expectedCount} chiusure ricevute · ${missing.length} mancant${missing.length===1?'e':'i'}</span>
-        <span class="ob-arrow">›</span>
-      </div>`
-    : `<div class="oggi-banner ok" onclick="oggiGoChiusure(false)">
-        <span class="ob-icon">✅</span>
-        <span class="ob-text">Tutte le ${recs.length} chiusure ricevute</span>
-        <span class="ob-arrow">›</span>
-      </div>`;
-
   // Riga "chiusure da negozi non attesi" (non attivi in quella data): cliccabile,
   // espande l'elenco. Ogni riga apre la chiusura del negozio.
   const unexpOpen=_apIssuesOpen.has('chiusure-inattese');
-  const unexpectedLine = unexpected.length ? `<div class="oggi-list">
+  const unexpectedLine = unexpected.length ? `<div class="oggi-unexpected">
     <div class="oggi-row" onclick="toggleApIssue('chiusure-inattese')">
       <span class="oggi-row-icon">❓</span>
       <span class="oggi-row-name"><b>${unexpected.length}</b>&nbsp;da negozi non attesi</span>
@@ -169,30 +157,50 @@ function renderOggi(){
     ? `<div class="oggi-sec-title">Per brand</div><div class="oggi-hero oggi-brandbar" style="padding:14px 16px">${brandBars}</div>`
     : '';
 
-  const aperturaSection=_aperturaSectionHTML();
   const malfSection=_malfMemoriaSectionHTML();
+  const apD=_aperturaData();
+
+  // Hero incasso (mockup 1a): numero grande + chip delta vs target, poi split
+  // "vs target | vs anno scorso" sotto un divisore.
+  const pctStr=p=>`${p>=0?'+':''}${p.toLocaleString('it-IT',{minimumFractionDigits:1,maximumFractionDigits:1})}%`;
+  const heroDelta = tgtD ? `<span class="oggi-hero-delta ${tgtD.pct-100>=0?'up':'down'}">${pctStr(tgtD.pct-100)}</span>` : '';
+  const splitCell=(d,label)=> d
+    ? `<div class="ohs-cell"><div class="ohs-l">${label}</div><div class="ohs-v ${d.pct-100>=0?'up':'down'}">${pctStr(d.pct-100)}</div></div>`
+    : `<div class="ohs-cell"><div class="ohs-l">${label}</div><div class="ohs-v muted">—</div></div>`;
+  const hero = `<div class="oggi-hero">
+    <div class="oggi-hero-l">${riepTitle} · 🌙 ${dateLabel}</div>
+    <div class="oggi-hero-top"><span class="oggi-hero-v">${fmt(totCorr)}</span>${heroDelta}</div>
+    <div class="oggi-hero-split">${splitCell(tgtD,'vs target')}${splitCell(pyD,'vs anno scorso')}</div>
+  </div>`;
+
+  // Due card affiancate: Aperture (barra verde) · Chiusure (barra indaco).
+  const pct=(n,d)=>d?Math.round(n/d*100):0;
+  const apCard = apD ? `<div class="oggi-duo-card">
+      <div class="odc-l">Aperture</div>
+      <div class="odc-v">${apD.received}<span class="odc-tot"> / ${apD.expected}</span></div>
+      <div class="oggi-prog"><div class="oggi-prog-fill green" style="width:${pct(apD.received,apD.expected)}%"></div></div>
+      ${apD.missing.length?`<div class="odc-miss" onclick="toggleApIssue('mancanti')">${apD.missing.length} mancant${apD.missing.length===1?'e':'i'} ${apD.missOpen?'▴':'›'}</div>`:`<div class="odc-ok">✓ tutte ricevute</div>`}
+    </div>` : '';
+  const chCard = `<div class="oggi-duo-card">
+      <div class="odc-l">Chiusure</div>
+      <div class="odc-v">${recs.length}<span class="odc-tot"> / ${expectedCount}</span></div>
+      <div class="oggi-prog"><div class="oggi-prog-fill acc" style="width:${pct(recs.length,expectedCount)}%"></div></div>
+      ${missing.length?`<div class="odc-miss" onclick="oggiGoChiusure(true)">${missing.length} mancant${missing.length===1?'e':'i'} ›</div>`:`<div class="odc-ok">✓ tutte ricevute</div>`}
+    </div>`;
+  const duo = `<div class="oggi-duo">${apCard}${chCard}</div>`;
 
   el.innerHTML=`
-    ${aperturaSection}
-    ${malfSection}
-    <div class="oggi-date-row">
-      <div>
-        <div class="oggi-date-title">${riepTitle}</div>
-        <div class="oggi-date-sub">🌙 ${dateLabel}</div>
-      </div>
-    </div>
-    ${banner}
-    ${unexpectedLine}
-    <div class="oggi-hero">
-      <div class="oggi-hero-l">Corrispettivo della giornata</div>
-      <div class="oggi-hero-v">${fmt(totCorr)}</div>
-      <div class="oggi-hero-badges">${badges}</div>
-    </div>
+    ${hero}
     <div class="oggi-grid">
       <div class="oggi-mini"><div class="oggi-mini-l">Net sales</div><div class="oggi-mini-v">${fmt(totNet)}</div></div>
       <div class="oggi-mini"><div class="oggi-mini-l">Contanti</div><div class="oggi-mini-v">${fmt(totCash)}</div></div>
       <div class="oggi-mini${anomalie.length?' alert':''}"><div class="oggi-mini-l">Anomalie</div><div class="oggi-mini-v">${anomalie.length}</div></div>
     </div>
+    ${duo}
+    ${apD?apD.missingListHTML:''}
+    ${apD?apD.countersListHTML:''}
+    ${malfSection}
+    ${unexpectedLine}
     ${checkList}
     ${brandSection}
   `;
@@ -405,10 +413,13 @@ async function malfReopen(key){
   }catch(e){ console.error('malfReopen',e); alert('Errore: '+(e.message||e)); }
 }
 
-function _aperturaSectionHTML(){
-  if(!allAperture.length) return '';
+// Dati aperture del giorno più recente: numeri (ricevute/attese/mancanti) +
+// HTML dei contatori (fondo/pulizia/guasti) e della lista mancanti. Usato sia
+// dal wrapper _aperturaSectionHTML (ramo cold-start) sia dalle 2 card della home.
+function _aperturaData(){
+  if(!allAperture.length) return null;
   const days=[...new Set(allAperture.map(a=>a.dateISO).filter(Boolean))].sort();
-  if(!days.length) return '';
+  if(!days.length) return null;
   const day=days[days.length-1];
   // Un record per NEGOZIO, non per PDF: se lo stesso negozio ha più checklist
   // nello stesso giorno (es. PDF corretto e ricaricato, l'originale resta su
@@ -473,28 +484,31 @@ function _aperturaSectionHTML(){
     guasti,({a,i})=>storeRow(a,i,noteVal(a.insegnaNote,'guasto')+_segnalaIconHTML(a,i)));
 
   const dayLabel=`${day.slice(8,10)}/${day.slice(5,7)}`;
-  // Ricevute = attesi - mancanti: così i due numeri del banner tornano sempre,
-  // anche se un negozio non monitorato invia comunque la checklist.
+  // Ricevute = attesi - mancanti: così i due numeri tornano sempre, anche se un
+  // negozio non monitorato invia comunque la checklist.
   const receivedCount=expected.length-missing.length;
-  // "N mancanti" è cliccabile a sé: espande l'elenco dei negozi senza checklist
-  // QUI in home (stopPropagation: il resto del banner continua a portare alla
-  // vista Aperture). Stesso Set dei contatori: lo stato sopravvive ai re-render.
   const missOpen=_apIssuesOpen.has('mancanti');
-  const missLabel=`${missing.length} mancant${missing.length===1?'e':'i'} ${missOpen?'▴':'▾'}`;
-  const banner = missing.length
-    ? `<div class="oggi-banner warn" onclick="oggiGoAperture()"><span class="ob-icon">☀️</span><span class="ob-text">${receivedCount} su ${expected.length} aperture ricevute · <span class="ob-missing" onclick="event.stopPropagation();toggleApIssue('mancanti')">${missLabel}</span></span><span class="ob-arrow">›</span></div>`
-    : `<div class="oggi-banner ok" onclick="oggiGoAperture()"><span class="ob-icon">☀️</span><span class="ob-text">Tutte le ${expected.length} aperture ricevute</span><span class="ob-arrow">›</span></div>`;
-  const missingList = (missing.length && missOpen)
+  const missingListHTML = (missing.length && missOpen)
     ? `<div class="oggi-list">${missing.map(s=>`<div class="oggi-row" style="cursor:default">
         <span class="oggi-row-icon">📭</span>
         <span class="oggi-row-name"><span class="orn-brand">${s.brand}</span>${s.location}</span>
         <span class="oggi-row-val warn">mancante</span>
       </div>`).join('')}</div>`
     : '';
-  const list = counters
+  const countersListHTML = counters
     ? `<div class="oggi-list">${counters}</div>`
     : `<div class="oggi-list"><div class="oggi-empty-ok">✓ Fondi cassa allineati, nessuna segnalazione pulizia o guasti</div></div>`;
-  return `<div class="oggi-sec-title">Aperture · ${dayLabel}</div>${banner}${missingList}${list}`;
+  return {day,dayLabel,received:receivedCount,expected:expected.length,missing,missOpen,missingListHTML,countersListHTML};
+}
+// Wrapper legacy (ramo cold-start di renderOggi): banner classico full-width.
+function _aperturaSectionHTML(){
+  const d=_aperturaData();
+  if(!d) return '';
+  const missLabel=`${d.missing.length} mancant${d.missing.length===1?'e':'i'} ${d.missOpen?'▴':'▾'}`;
+  const banner = d.missing.length
+    ? `<div class="oggi-banner warn" onclick="oggiGoAperture()"><span class="ob-icon">☀️</span><span class="ob-text">${d.received} su ${d.expected} aperture ricevute · <span class="ob-missing" onclick="event.stopPropagation();toggleApIssue('mancanti')">${missLabel}</span></span><span class="ob-arrow">›</span></div>`
+    : `<div class="oggi-banner ok" onclick="oggiGoAperture()"><span class="ob-icon">☀️</span><span class="ob-text">Tutte le ${d.expected} aperture ricevute</span><span class="ob-arrow">›</span></div>`;
+  return `<div class="oggi-sec-title">Aperture · ${d.dayLabel}</div>${banner}${d.missingListHTML}${d.countersListHTML}`;
 }
 // Dal riepilogo alla tab Chiusure, con la stessa giornata già filtrata.
 // showMissing=true → attiva anche il chip "Mancanti".

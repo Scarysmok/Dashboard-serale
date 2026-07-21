@@ -643,7 +643,7 @@ function openSheet(idx){
     // automaticamente ogni volta che l'utente modifica un valore editabile.
     // Mango usa una formula semplificata (no cambi/giftcard/annull): segnaliamo
     // con un piccolo badge a fianco del label così è chiaro perché non sottrae.
-    `<div id="cash-result" class="row-cash-result ${r.anomaly?'ko':'ok'}"><span>Verifica cassa${isMangoBrand(r.brand)?' <span class="ovr-badge" style="background:#ffedd5;border-color:#f97316;color:#c2410c" title="In Mango cambi, giftcard e annullamenti sono già nel corrispettivo: la formula è (contanti+POS) − buoni emessi + buoni ritirati">formula Mango</span>':''}</span><span class="delta">${r.anomaly?`⚠ Δ ${fmt(r.diff)}`:'✓ Quadra'}</span></div>`,
+    `<div id="cash-result" class="row-cash-result ${r.anomaly?'ko':'ok'}"><span>Verifica cassa${isMangoBrand(r.brand)?' <span class="ovr-badge" style="background:#fdf1e2;border-color:#c26a1c;color:#c26a1c" title="In Mango cambi, giftcard e annullamenti sono già nel corrispettivo: la formula è (contanti+POS) − buoni emessi + buoni ritirati">formula Mango</span>':''}</span><span class="delta">${r.anomaly?`⚠ Δ ${fmt(r.diff)}`:'✓ Quadra'}</span></div>`,
   ];
 
   const attachBtn=r.fileId
@@ -925,7 +925,7 @@ function renderLinkGallery(links,idx,r,src){
   container.style.cssText='padding:14px 14px 20px';
 
   const banner=document.createElement('div');
-  banner.style.cssText='padding:10px 12px;margin-bottom:14px;background:#4ade8012;border:1px solid #4ade8030;border-radius:8px;font-size:11px;color:var(--green);line-height:1.5';
+  banner.style.cssText='padding:10px 12px;margin-bottom:14px;background:#1f9d5512;border:1px solid #1f9d5530;border-radius:8px;font-size:11px;color:var(--green);line-height:1.5';
   banner.innerHTML=`✓ <strong>${links.length}</strong> foto originali ad alta risoluzione`;
   container.appendChild(banner);
 
