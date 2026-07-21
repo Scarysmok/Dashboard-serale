@@ -89,7 +89,7 @@ async function syncNow(){
       const now=Date.now();
       if(!force && now-lastRender<400) return;
       lastRender=now;
-      allData=results.filter(Boolean);
+      allData=dedupClosures(results.filter(Boolean));
       // Applico le correzioni manuali ANCHE durante il caricamento incrementale,
       // altrimenti il render mostrerebbe i valori parsati senza override.
       applyOverrides(allData, overrides);
@@ -127,7 +127,7 @@ async function syncNow(){
     saveCache(localCache);
 
     // Render finale forzato (ignora throttle) per garantire stato coerente
-    allData=results.filter(Boolean);
+    allData=dedupClosures(results.filter(Boolean));
     applyOverrides(allData, overrides);
     const t=new Date().toLocaleTimeString('it-IT');
     document.getElementById('last-sync-disp').textContent=t;
@@ -214,6 +214,32 @@ async function fetchOverrides(){
     if(!r.ok) return [];
     return await r.json();
   }catch(e){console.warn('fetchOverrides',e);return[];}
+}
+
+// Dedup chiusure: un negozio chiude una sola volta al giorno. Se lo stesso
+// negozio ha più PDF per la stessa data (PDF ricaricato/corretto mentre
+// l'originale resta su Drive), tengo solo quello con modifiedTime più recente.
+// Le aperture lo fanno già; senza questo, il doppione gonfiava sia i CONTEGGI
+// sia i TOTALI (incasso, contanti, saldo cumulato) in home, tab Chiusure,
+// Analisi e Negozi. Chiave: storeKey|dateISO. Record senza brand/location/data
+// (parse parziale) restano intatti — non deduplicabili in sicurezza.
+function dedupClosures(records){
+  const byKey=new Map();
+  const out=[];
+  for(const r of records){
+    if(!r) continue;
+    if(!r.brand || !r.location || !r.dateISO){ out.push(r); continue; }
+    const k=storeKey(r.brand,r.location)+'|'+r.dateISO;
+    const prev=byKey.get(k);
+    if(!prev){ byKey.set(k,r); out.push(r); }
+    else if(String(r.modifiedTime||'')>String(prev.modifiedTime||'')){
+      const idx=out.indexOf(prev);
+      if(idx>=0) out[idx]=r;      // sostituisco il vecchio con questo più recente
+      byKey.set(k,r);
+    }
+    // else: r è più vecchio del già tenuto → scarto il doppione
+  }
+  return out;
 }
 
 function applyOverrides(records, overrides){
