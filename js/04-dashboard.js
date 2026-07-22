@@ -189,8 +189,19 @@ function renderOggi(){
     </div>`;
   const duo = `<div class="oggi-duo">${apCard}${chCard}</div>`;
 
+  // Recap giornata (testo a regole) + tasto voce. Salvo il testo in globale così
+  // speakRecap() lo legge senza ricalcolare.
+  _dailyRecapText=_composeRecap({refDate,recs,missing,expectedCount,totNet,tgtD,pyD,anomalie,dateLabel,apD});
+  const recapCard=`<div class="recap-card${_recapOpen?' open':''}" onclick="toggleRecap()">
+    <div class="recap-head">
+      <span class="recap-title">🗒️ Recap giornata <span class="recap-caret">${_recapOpen?'▴':'▾'}</span></span>
+      <button class="recap-btn" id="recap-btn" onclick="event.stopPropagation();speakRecap()">🔊 Ascolta</button>
+    </div>
+    ${_recapOpen?`<div class="recap-text">${_escHtml(_dailyRecapText)}</div>`:''}
+  </div>`;
+
   el.innerHTML=`
-    ${hero}
+    <div class="oggi-top-row">${hero}${recapCard}</div>
     <div class="oggi-grid">
       <div class="oggi-mini"><div class="oggi-mini-l">Net sales</div><div class="oggi-mini-v">${fmt(totNet)}</div></div>
       <div class="oggi-mini"><div class="oggi-mini-l">Contanti</div><div class="oggi-mini-v">${fmt(totCash)}</div></div>
@@ -205,6 +216,69 @@ function renderOggi(){
     ${brandSection}
   `;
 }
+// ── RECAP GIORNATA (testo a regole + lettura vocale nativa) ──
+let _dailyRecapText='', _recapSpeaking=false, _recapOpen=false;
+// Apre/chiude la card recap (chiusa = solo titolo + tasto Ascolta).
+function toggleRecap(){ _recapOpen=!_recapOpen; renderOggi(); }
+// Compone il racconto della giornata dai dati già calcolati in renderOggi +
+// malfMemoria()/allStoreChecks. Frasi in italiano naturale, pronte anche per
+// la sintesi vocale (importi in "euro", scostamenti come "sopra/sotto").
+function _composeRecap(o){
+  const {refDate,recs,missing,expectedCount,totNet,tgtD,pyD,anomalie,dateLabel,apD}=o;
+  const P=[];
+  const eur=n=>Math.round(n).toLocaleString('it-IT')+' euro';
+  const names=(arr,max=3)=>arr.slice(0,max).map(s=>`${s.brand} ${s.location}`).join(', ')+(arr.length>max?` e altri ${arr.length-max}`:'');
+  const scost=(d,label)=>`${Math.abs(d).toFixed(1).replace('.',',')}% ${d>=0?'sopra':'sotto'} ${label}`;
+  // Aperture
+  if(apD){
+    if(!apD.missing.length) P.push(`Oggi sono arrivate tutte le ${apD.expected} aperture.`);
+    else P.push(`Aperture: ${apD.received} su ${apD.expected}, manca${apD.missing.length>1?'no':''} ${names(apD.missing)}.`);
+  }
+  // Chiusure della giornata di riferimento
+  if(!missing.length) P.push(`Le chiusure di ${dateLabel} sono arrivate da tutti i ${expectedCount} negozi.`);
+  else P.push(`Le chiusure di ${dateLabel} sono arrivate da ${recs.length} negozi su ${expectedCount}: manca${missing.length>1?'no':''} ${names(missing)}.`);
+  // Corrispettivo netto + scostamenti
+  let c=`Il corrispettivo netto di giornata è ${eur(totNet)}`;
+  const b=[];
+  if(tgtD) b.push(scost(tgtD.pct-100,'il target'));
+  if(pyD)  b.push(scost(pyD.pct-100,"l'anno scorso"));
+  if(b.length) c+=`, ${b.join(' e ')}`;
+  P.push(c+'.');
+  // Anomalie cassa + malfunzionamenti aperti
+  const an=anomalie.length;
+  if(an) P.push(`${an>1?'Ci sono':"C'è"} ${an} anomali${an>1?'e':'a'} di cassa da verificare.`);
+  const mo=(typeof malfMemoria==='function')?malfMemoria().open.length:0;
+  if(mo) P.push(`Malfunzionamenti aperti da risolvere: ${mo}.`);
+  // Store check: criticità sull'ultima check di ogni negozio
+  if(typeof allStoreChecks!=='undefined' && allStoreChecks.length){
+    const sorted=[...allStoreChecks].filter(x=>x.dateISO).sort((a,b)=>b.dateISO.localeCompare(a.dateISO));
+    const latest=new Map(); for(const x of sorted){const k=storeKey(x.brand,x.location); if(!latest.has(k))latest.set(k,x);}
+    const prob=[...latest.values()].filter(x=>x.noCount>0);
+    if(prob.length){
+      const t=prob.slice(0,3).map(x=>`${x.brand} ${x.location}`).join(', ');
+      P.push(`Store check con criticità: ${t}${prob.length>3?` e altri ${prob.length-3}`:''}.`);
+    }else P.push(`Le store check ricevute non evidenziano criticità.`);
+  }
+  return P.join(' ');
+}
+function _setRecapBtn(on){ const b=document.getElementById('recap-btn'); if(b) b.textContent=on?'⏹ Ferma':'🔊 Ascolta'; }
+// Legge il recap ad alta voce con la sintesi nativa del browser (it-IT).
+// Toggle: se sta già parlando, ferma. Il tap dell'utente è il gesto richiesto
+// da iOS per far partire l'audio.
+function speakRecap(){
+  const synth=window.speechSynthesis;
+  if(!synth){ alert('La lettura vocale non è supportata su questo browser.'); return; }
+  if(synth.speaking || _recapSpeaking){ synth.cancel(); _recapSpeaking=false; _setRecapBtn(false); return; }
+  const u=new SpeechSynthesisUtterance(_dailyRecapText||'Nessun dato disponibile.');
+  u.lang='it-IT';
+  const v=(synth.getVoices()||[]).find(x=>/^it(-|_)/i.test(x.lang));
+  if(v) u.voice=v;
+  u.onend=()=>{ _recapSpeaking=false; _setRecapBtn(false); };
+  u.onerror=()=>{ _recapSpeaking=false; _setRecapBtn(false); };
+  synth.cancel();
+  synth.speak(u); _recapSpeaking=true; _setRecapBtn(true);
+}
+
 // Sezione "Aperture" della Dashboard: SEMPRE compatta. Banner ricevute/mancanti
 // + CONTATORI di anomalia (fondo cassa / pulizia / guasti) visibili solo se >0.
 // Click sul contatore → espande l'elenco dei negozi coinvolti; click sul

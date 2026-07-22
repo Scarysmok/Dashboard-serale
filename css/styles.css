@@ -759,6 +759,18 @@ body{display:flex;flex-direction:column}
 /* "N mancanti" cliccabile dentro il banner aperture: sottolineato per
    distinguerlo dal resto del banner (che naviga alla vista Aperture). */
 .oggi-banner .ob-missing{text-decoration:underline;text-underline-offset:2px;cursor:pointer;white-space:nowrap}
+/* Recap giornata (card in cima alla home + tasto voce) */
+/* Riga in alto: Riepilogo (hero) + Recap affiancati su schermo largo,
+   impilati su mobile. align-items:start così il recap chiuso resta compatto. */
+.oggi-top-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:start}
+@media (max-width:700px){ .oggi-top-row{grid-template-columns:1fr} }
+.recap-card{background:var(--s1);border:1px solid var(--bd);border-radius:var(--radius-card);padding:16px;box-shadow:var(--shadow);cursor:pointer}
+.recap-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.recap-title{font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.5px}
+.recap-caret{color:var(--t3)}
+.recap-btn{flex-shrink:0;font-family:var(--font);font-size:12.5px;font-weight:700;padding:7px 13px;border-radius:999px;border:1px solid var(--acc);background:#eff3ff;color:var(--acc);cursor:pointer}
+.recap-btn:active{filter:brightness(.95)}
+.recap-text{font-size:13.5px;line-height:1.55;color:var(--t1);margin-top:10px}
 /* Recap malfunzionamenti (memoria guasti) */
 /* Riga-testata prominente: colpisce l'occhio, cliccabile per espandere. */
 .malf-head{display:flex;align-items:center;gap:11px;padding:15px 16px;cursor:pointer;border-radius:14px;
