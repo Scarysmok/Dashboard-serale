@@ -193,9 +193,11 @@ function renderOggi(){
   // il testo viene anche salvato sul server per la lettura via Siri (URL /recap.txt).
   _dailyRecapText=_composeRecap({refDate,recs,missing,expectedCount,totNet,tgtD,pyD,anomalie,dateLabel,apD});
   // Salva il recap sul server per l'URL Siri (fire-and-forget, solo se cambiato).
+  // Alla voce mando una versione "fonetica" (accenti per la pronuncia corretta);
+  // la card a schermo resta con l'ortografia normale.
   if(_dailyRecapText && _dailyRecapText!==_lastPostedRecap){
     _lastPostedRecap=_dailyRecapText;
-    api('/recap',{method:'POST',body:JSON.stringify({text:_dailyRecapText,date:refDate})}).catch(()=>{});
+    api('/recap',{method:'POST',body:JSON.stringify({text:_recapForSpeech(_dailyRecapText),date:refDate})}).catch(()=>{});
   }
   const recapCard=`<div class="recap-card${_recapOpen?' open':''}" onclick="toggleRecap()">
     <div class="recap-head">
@@ -265,6 +267,15 @@ function _composeRecap(o){
     }else P.push(`Le store check ricevute non evidenziano criticità.`);
   }
   return P.join(' ');
+}
+// Adatta il testo per la sintesi vocale (Siri): accenti per la pronuncia
+// corretta. Applicato SOLO al testo mandato all'URL /recap.txt, non alla card.
+// Per aggiungere altre parole: nuova coppia [regex, sostituzione].
+function _recapForSpeech(t){
+  const fixes=[
+    [/\baperture\b/gi, 'apertùre'],   // altrimenti Siri legge "apertiùre"
+  ];
+  return fixes.reduce((s,[re,rep])=>s.replace(re,rep), t);
 }
 
 // Sezione "Aperture" della Dashboard: SEMPRE compatta. Banner ricevute/mancanti
