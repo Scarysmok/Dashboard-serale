@@ -189,8 +189,8 @@ function renderOggi(){
     </div>`;
   const duo = `<div class="oggi-duo">${apCard}${chCard}</div>`;
 
-  // Recap giornata (testo a regole) + tasto voce. Salvo il testo in globale così
-  // speakRecap() lo legge senza ricalcolare.
+  // Recap giornata (testo a regole). Card collassabile in fondo alla Dashboard;
+  // il testo viene anche salvato sul server per la lettura via Siri (URL /recap.txt).
   _dailyRecapText=_composeRecap({refDate,recs,missing,expectedCount,totNet,tgtD,pyD,anomalie,dateLabel,apD});
   // Salva il recap sul server per l'URL Siri (fire-and-forget, solo se cambiato).
   if(_dailyRecapText && _dailyRecapText!==_lastPostedRecap){
@@ -200,13 +200,12 @@ function renderOggi(){
   const recapCard=`<div class="recap-card${_recapOpen?' open':''}" onclick="toggleRecap()">
     <div class="recap-head">
       <span class="recap-title">🗒️ Recap giornata <span class="recap-caret">${_recapOpen?'▴':'▾'}</span></span>
-      <button class="recap-btn" id="recap-btn" onclick="event.stopPropagation();speakRecap()">🔊 Ascolta</button>
     </div>
     ${_recapOpen?`<div class="recap-text">${_escHtml(_dailyRecapText)}</div>`:''}
   </div>`;
 
   el.innerHTML=`
-    <div class="oggi-top-row">${hero}${recapCard}</div>
+    ${hero}
     <div class="oggi-grid">
       <div class="oggi-mini"><div class="oggi-mini-l">Net sales</div><div class="oggi-mini-v">${fmt(totNet)}</div></div>
       <div class="oggi-mini"><div class="oggi-mini-l">Contanti</div><div class="oggi-mini-v">${fmt(totCash)}</div></div>
@@ -219,10 +218,11 @@ function renderOggi(){
     ${unexpectedLine}
     ${checkList}
     ${brandSection}
+    ${recapCard}
   `;
 }
 // ── RECAP GIORNATA (testo a regole + lettura vocale nativa) ──
-let _dailyRecapText='', _recapSpeaking=false, _recapOpen=false, _lastPostedRecap='';
+let _dailyRecapText='', _recapOpen=false, _lastPostedRecap='';
 // Apre/chiude la card recap (chiusa = solo titolo + tasto Ascolta).
 function toggleRecap(){ _recapOpen=!_recapOpen; renderOggi(); }
 // Compone il racconto della giornata dai dati già calcolati in renderOggi +
@@ -265,54 +265,6 @@ function _composeRecap(o){
     }else P.push(`Le store check ricevute non evidenziano criticità.`);
   }
   return P.join(' ');
-}
-function _setRecapBtn(on){ const b=document.getElementById('recap-btn'); if(b) b.textContent=on?'⏹ Ferma':'🔊 Ascolta'; }
-// Legge il recap ad alta voce. Prova prima Piper TTS (voce italiana naturale
-// generata dal backend, endpoint /tts, audio in cache per testo). Se il backend
-// non produce l'audio (Piper non disponibile, rete, ecc.) ripiega SENZA errore
-// sulla voce di sistema del browser: la lettura funziona comunque.
-// Toggle play/stop; il tap dell'utente è il gesto richiesto da iOS per l'audio.
-let _recapAudioCache={text:null,url:null};
-let _recapAudioEl=null;
-// Fallback: voce nativa del browser (speechSynthesis).
-function _speakBrowser(text){
-  const synth=window.speechSynthesis;
-  if(!synth){ alert('Lettura vocale non disponibile su questo dispositivo.'); return; }
-  const u=new SpeechSynthesisUtterance(text); u.lang='it-IT';
-  const v=(synth.getVoices()||[]).find(x=>/^it(-|_)/i.test(x.lang)); if(v) u.voice=v;
-  u.onend=()=>{ _recapSpeaking=false; _setRecapBtn(false); };
-  u.onerror=()=>{ _recapSpeaking=false; _setRecapBtn(false); };
-  synth.cancel(); synth.speak(u); _recapSpeaking=true; _setRecapBtn(true);
-}
-async function speakRecap(){
-  // Se sta già leggendo (Piper o browser), ferma tutto.
-  if(_recapSpeaking){
-    if(_recapAudioEl && !_recapAudioEl.paused) _recapAudioEl.pause();
-    if(window.speechSynthesis) window.speechSynthesis.cancel();
-    _recapSpeaking=false; _setRecapBtn(false); return;
-  }
-  const text=_dailyRecapText||'Nessun dato disponibile.';
-  try{
-    if(_recapAudioCache.text!==text){
-      const r=await api('/tts',{method:'POST',body:JSON.stringify({text})});
-      if(!r.ok) throw new Error('TTS non disponibile');
-      const blob=await r.blob();
-      if(_recapAudioCache.url) URL.revokeObjectURL(_recapAudioCache.url);
-      _recapAudioCache={text,url:URL.createObjectURL(blob)};
-    }
-    if(!_recapAudioEl){
-      _recapAudioEl=new Audio();
-      _recapAudioEl.onended=()=>{_recapSpeaking=false;_setRecapBtn(false);};
-      _recapAudioEl.onerror=()=>{_recapSpeaking=false;_setRecapBtn(false);};
-    }
-    _recapAudioEl.src=_recapAudioCache.url;
-    await _recapAudioEl.play();
-    _recapSpeaking=true; _setRecapBtn(true);
-  }catch(e){
-    // Piper non ha prodotto l'audio → uso la voce del browser, senza errore.
-    console.warn('Piper TTS non disponibile, uso voce di sistema:', e && e.message);
-    _speakBrowser(text);
-  }
 }
 
 // Sezione "Aperture" della Dashboard: SEMPRE compatta. Banner ricevute/mancanti
