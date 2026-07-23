@@ -262,21 +262,52 @@ function _composeRecap(o){
   return P.join(' ');
 }
 function _setRecapBtn(on){ const b=document.getElementById('recap-btn'); if(b) b.textContent=on?'⏹ Ferma':'🔊 Ascolta'; }
-// Legge il recap ad alta voce con la sintesi nativa del browser (it-IT).
-// Toggle: se sta già parlando, ferma. Il tap dell'utente è il gesto richiesto
-// da iOS per far partire l'audio.
-function speakRecap(){
+// Legge il recap ad alta voce. Prova prima Piper TTS (voce italiana naturale
+// generata dal backend, endpoint /tts, audio in cache per testo). Se il backend
+// non produce l'audio (Piper non disponibile, rete, ecc.) ripiega SENZA errore
+// sulla voce di sistema del browser: la lettura funziona comunque.
+// Toggle play/stop; il tap dell'utente è il gesto richiesto da iOS per l'audio.
+let _recapAudioCache={text:null,url:null};
+let _recapAudioEl=null;
+// Fallback: voce nativa del browser (speechSynthesis).
+function _speakBrowser(text){
   const synth=window.speechSynthesis;
-  if(!synth){ alert('La lettura vocale non è supportata su questo browser.'); return; }
-  if(synth.speaking || _recapSpeaking){ synth.cancel(); _recapSpeaking=false; _setRecapBtn(false); return; }
-  const u=new SpeechSynthesisUtterance(_dailyRecapText||'Nessun dato disponibile.');
-  u.lang='it-IT';
-  const v=(synth.getVoices()||[]).find(x=>/^it(-|_)/i.test(x.lang));
-  if(v) u.voice=v;
+  if(!synth){ alert('Lettura vocale non disponibile su questo dispositivo.'); return; }
+  const u=new SpeechSynthesisUtterance(text); u.lang='it-IT';
+  const v=(synth.getVoices()||[]).find(x=>/^it(-|_)/i.test(x.lang)); if(v) u.voice=v;
   u.onend=()=>{ _recapSpeaking=false; _setRecapBtn(false); };
   u.onerror=()=>{ _recapSpeaking=false; _setRecapBtn(false); };
-  synth.cancel();
-  synth.speak(u); _recapSpeaking=true; _setRecapBtn(true);
+  synth.cancel(); synth.speak(u); _recapSpeaking=true; _setRecapBtn(true);
+}
+async function speakRecap(){
+  // Se sta già leggendo (Piper o browser), ferma tutto.
+  if(_recapSpeaking){
+    if(_recapAudioEl && !_recapAudioEl.paused) _recapAudioEl.pause();
+    if(window.speechSynthesis) window.speechSynthesis.cancel();
+    _recapSpeaking=false; _setRecapBtn(false); return;
+  }
+  const text=_dailyRecapText||'Nessun dato disponibile.';
+  try{
+    if(_recapAudioCache.text!==text){
+      const r=await api('/tts',{method:'POST',body:JSON.stringify({text})});
+      if(!r.ok) throw new Error('TTS non disponibile');
+      const blob=await r.blob();
+      if(_recapAudioCache.url) URL.revokeObjectURL(_recapAudioCache.url);
+      _recapAudioCache={text,url:URL.createObjectURL(blob)};
+    }
+    if(!_recapAudioEl){
+      _recapAudioEl=new Audio();
+      _recapAudioEl.onended=()=>{_recapSpeaking=false;_setRecapBtn(false);};
+      _recapAudioEl.onerror=()=>{_recapSpeaking=false;_setRecapBtn(false);};
+    }
+    _recapAudioEl.src=_recapAudioCache.url;
+    await _recapAudioEl.play();
+    _recapSpeaking=true; _setRecapBtn(true);
+  }catch(e){
+    // Piper non ha prodotto l'audio → uso la voce del browser, senza errore.
+    console.warn('Piper TTS non disponibile, uso voce di sistema:', e && e.message);
+    _speakBrowser(text);
+  }
 }
 
 // Sezione "Aperture" della Dashboard: SEMPRE compatta. Banner ricevute/mancanti
