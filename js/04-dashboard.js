@@ -192,6 +192,11 @@ function renderOggi(){
   // Recap giornata (testo a regole) + tasto voce. Salvo il testo in globale così
   // speakRecap() lo legge senza ricalcolare.
   _dailyRecapText=_composeRecap({refDate,recs,missing,expectedCount,totNet,tgtD,pyD,anomalie,dateLabel,apD});
+  // Salva il recap sul server per l'URL Siri (fire-and-forget, solo se cambiato).
+  if(_dailyRecapText && _dailyRecapText!==_lastPostedRecap){
+    _lastPostedRecap=_dailyRecapText;
+    api('/recap',{method:'POST',body:JSON.stringify({text:_dailyRecapText,date:refDate})}).catch(()=>{});
+  }
   const recapCard=`<div class="recap-card${_recapOpen?' open':''}" onclick="toggleRecap()">
     <div class="recap-head">
       <span class="recap-title">🗒️ Recap giornata <span class="recap-caret">${_recapOpen?'▴':'▾'}</span></span>
@@ -217,7 +222,7 @@ function renderOggi(){
   `;
 }
 // ── RECAP GIORNATA (testo a regole + lettura vocale nativa) ──
-let _dailyRecapText='', _recapSpeaking=false, _recapOpen=false;
+let _dailyRecapText='', _recapSpeaking=false, _recapOpen=false, _lastPostedRecap='';
 // Apre/chiude la card recap (chiusa = solo titolo + tasto Ascolta).
 function toggleRecap(){ _recapOpen=!_recapOpen; renderOggi(); }
 // Compone il racconto della giornata dai dati già calcolati in renderOggi +
