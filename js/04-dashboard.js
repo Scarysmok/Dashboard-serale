@@ -74,14 +74,17 @@ function renderOggi(){
   // Chiusure arrivate da negozi NON attivi in quella data (non attesi): sono
   // quelle che gonfiano "N su M". Le elenco così l'utente vede quali sono.
   const unexpected=recs.filter(r=>!isStoreMonitoredOn(r.brand,r.location,refDate));
-  const totCorr=recs.reduce((a,r)=>a+r.corrispettivo,0);
-  const totNet=totCorr/1.22;
-  const totCash=recs.reduce((a,r)=>a+r.contanti,0);
+  const totCorr=recs.reduce((a,r)=>a+r.corrispettivo,0);   // lordo dai PDF (registratore)
+  const totCash=recs.reduce((a,r)=>a+r.contanti,0);        // contanti dai PDF
   const anomalie=recs.filter(r=>r.anomaly);
 
-  // Badge vs target / vs anno scorso (stessa logica e soglie delle altre tab)
-  const tgtD=periodTargetData(recs);
-  const pyD=periodPyData(recs);
+  // NET Sales e confronti (vs target / vs anno scorso): stessa fonte di Analisi
+  // → consuntivo Excel dove c'è, altrimenti PDF. Così i numeri coincidono con la
+  // sezione Analisi quando arrivano i consuntivi (prima erano PDF puri e divergevano).
+  const agg=dayAggregates(refDate);
+  const totNet=agg.net;
+  const tgtD=agg.tgt>0 ? {pct:agg.net/agg.tgt*100} : null;
+  const pyD =agg.py>0  ? {pct:agg.net/agg.py*100}  : null;
   const badge=(delta,label)=>{
     const cls=delta>=-5?'green':(delta>=-30?'yellow':'red');
     const sign=delta>=0?'+':'';

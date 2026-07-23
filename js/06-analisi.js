@@ -335,6 +335,40 @@ function periodPyBadgeHTML(records){
   const pctStr = sign + delta.toLocaleString('it-IT',{minimumFractionDigits:2,maximumFractionDigits:2}) + '%';
   return `<div class="card-target ${cls}" title="${fmt(d.totCur)} vs ${fmt(d.totPy)} anno scorso · ${records.length} chiusur${records.length===1?'a':'e'}">${pctStr} vs PY</div>`;
 }
+// Aggregati di UN giorno con la stessa gerarchia di priorità di Andamento:
+// NET = consuntivo Excel (storico) dove c'è, altrimenti PDF; target = somma dei
+// target di tutti i negozi a budget quel giorno; py = NET consuntivo dello
+// stesso giorno-settimana dell'anno scorso. Serve alla home ("Riepilogo") per
+// mostrare gli stessi numeri di Analisi (net/target) quando arrivano i consuntivi.
+// Nessun filtro brand/negozio: la home mostra sempre il totale.
+function dayAggregates(dateISO){
+  let net=0, tgt=0, py=0;
+  const inAll = sk => ALL_STORES.some(s => storeKey(s.brand,s.location)===sk);
+  const covered=new Set();
+  for(const k in historicalByKey){
+    const i=k.lastIndexOf('|'); if(i<0||k.slice(i+1)!==dateISO) continue;
+    const sk=k.slice(0,i); if(!inAll(sk)) continue;
+    net += +historicalByKey[k]||0; covered.add(sk);
+  }
+  for(const r of allData){
+    if(!r||r.dateISO!==dateISO) continue;
+    const sk=storeKey(r.brand,r.location);
+    if(covered.has(sk)) continue;
+    net += (+r.netSales)||((+r.corrispettivo||0)/1.22);
+  }
+  for(const k in targetsByKey){
+    const i=k.lastIndexOf('|'); if(i<0||k.slice(i+1)!==dateISO) continue;
+    const sk=k.slice(0,i); if(!inAll(sk)) continue;
+    tgt += +targetsByKey[k]||0;
+  }
+  const pd=pyDateISO(dateISO);
+  for(const k in historicalByKey){
+    const i=k.lastIndexOf('|'); if(i<0||k.slice(i+1)!==pd) continue;
+    const sk=k.slice(0,i); if(!inAll(sk)) continue;
+    py += +historicalByKey[k]||0;
+  }
+  return {net, tgt, py};
+}
 // ── RENDER TAB ANDAMENTO (v2: gerarchica anno → mese → giorno) ──────────
 // Costruisce un albero anno → mese → giorno includendo tutti i giorni per
 // cui c'è almeno un dato (NET o target). I giorni futuri (con solo target)
