@@ -45,9 +45,26 @@ async function parsePDF(ab,fname,modifiedTime,fileId){
     const str=String(s).trim();
     const hasDot=str.includes('.'),hasComma=str.includes(',');
     let norm;
-    if(hasDot&&hasComma) norm=str.replace(/\./g,'').replace(',','.');
-    else if(hasComma)    norm=str.replace(',','.');
-    else                 norm=str;
+    if(hasDot&&hasComma){
+      // "1.234,56" → punto=migliaia, virgola=decimale
+      norm=str.replace(/\./g,'').replace(',','.');
+    }else if(hasComma){
+      // "302,83" → virgola=decimale
+      norm=str.replace(',','.');
+    }else if(hasDot){
+      // Solo punti, nessuna virgola: ambiguo. Se dopo l'ULTIMO punto ci sono
+      // esattamente 3 cifre lo trattiamo come separatore di migliaia
+      // ("1.234"→1234, "500.000"→500000); altrimenti l'ultimo punto è il
+      // decimale ("302.83"→302.83, "1234.5"→1234.5). Gli importi cassa hanno
+      // sempre 2 decimali, quindi il caso "3 cifre = migliaia" è sicuro.
+      const parts=str.split('.');
+      const last=parts[parts.length-1];
+      norm=(parts.length>1 && last.length===3)
+        ? parts.join('')                              // tutti migliaia
+        : parts.slice(0,-1).join('')+'.'+last;        // ultimo = decimale
+    }else{
+      norm=str;
+    }
     const n=parseFloat(norm);
     return isNaN(n)?0:n;
   };
@@ -86,7 +103,10 @@ async function parsePDF(ab,fname,modifiedTime,fileId){
 
   // Helper label-based usato sia nel ramo non-RESPONSE sia come fallback per
   // RESPONSE quando la posizione fissa nel vettore vals non è affidabile.
-  const NUM='\\d+(?:\\.\\d{3})*(?:,\\d+)?';
+  // Cattura permissiva: prende cifre + . e , senza pretendere gruppi da 3.
+  // La disambiguazione punto-migliaia/decimale è tutta dentro toNum, così
+  // "1234.56" (punto decimale) non viene troncato a "1234".
+  const NUM='[\\d][\\d.,]*';
   const gfLabel=(label,def=0)=>{
     const esc=label.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
     const re=new RegExp(esc+'(?![A-Za-z])[^\\d\\n]{0,30}\\n?\\s*(?:€|EUR)?\\s*('+NUM+')','i');
@@ -97,7 +117,7 @@ async function parsePDF(ab,fname,modifiedTime,fileId){
   if(isFormatoA){
     const respMatch=txt.match(/RESPONSE\s*([\s\S]*?)(?:FATTURE|DISTINTA)/i);
     const vals=respMatch
-      ?(respMatch[1].match(/\d+(?:\.\d{3})*(?:,\d+)?|\d+|Non utilizzato|S[iì]|No\b/gi)||[]).map(t=>t.trim())
+      ?(respMatch[1].match(/[\d][\d.,]*|Non utilizzato|S[iì]|No\b/gi)||[]).map(t=>t.trim())
       :[];
     const rv=i=>vals[i]||'';
     const rvn=i=>toNum(rv(i));
@@ -185,7 +205,7 @@ async function parsePDF(ab,fname,modifiedTime,fileId){
   }
   if(cur) qa.push(cur);
 
-  return{fileId,store,brand,location,dateISO,dateDisplay,
+  return{pv:1,fileId,store,brand,location,dateISO,dateDisplay,
     corrispettivo,netSales,contanti,pos,fondo,versato,daVersare,
     cambi,giftcard,buonoE,buonoR,sconti,annull,anomaly,diff,qa};
 }

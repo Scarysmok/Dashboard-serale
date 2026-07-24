@@ -61,14 +61,20 @@ async function syncNow(){
     let fromBackend=0, fromLocal=0;
 
     // Per ogni file scegliere la sorgente: cache backend > cache locale > download
+    // Cache valida solo se il parser chiusure non è cambiato: pv vecchio (o
+    // assente, = record parsati prima dell'introduzione del versioning) → si
+    // rilegge il PDF una volta sola, poi la cache condivisa si aggiorna. Basta
+    // incrementare PV_CHIUSURA nel parser per forzare la rilettura di tutti.
+    const PV_CHIUSURA=1;
+    const cacheOk=rec=>rec && rec.pv===PV_CHIUSURA;
     files.forEach((f,i)=>{
       const key=f.id+'_'+f.modifiedTime;
-      if(backendCache[key]){
+      if(cacheOk(backendCache[key])){
         results[i]=backendCache[key];
         // Aggiorno anche la cache locale così se vai offline funzioni
         localCache[key]=backendCache[key];
         fromBackend++;
-      }else if(localCache[key]){
+      }else if(cacheOk(localCache[key])){
         results[i]=localCache[key];
         fromLocal++;
       }else{
