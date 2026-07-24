@@ -309,7 +309,12 @@ async function parseAperturaPDF(ab,fname,modifiedTime,fileId){
           if(notes.length) break; // nota già iniziata: il rumore la chiude
           continue;               // nota non ancora trovata: salto il rumore
         }
-        notes.push(l);
+        // GoAudits antepone l'etichetta "Action:" al testo del provvedimento
+        // (es. "Action: Condizionatore non funzionante"): la rimuovo, non fa
+        // parte della nota. Se la riga era solo l'etichetta, salto senza chiudere.
+        const cleaned=l.replace(/^Actions?\s*:\s*/i,'').trim();
+        if(!cleaned) continue;
+        notes.push(cleaned);
       }
       return notes.length?notes.join(' ').slice(0,300):null;
     }
@@ -340,7 +345,8 @@ async function parseAperturaPDF(ab,fname,modifiedTime,fileId){
   // pv = versione del parser: syncAperture rilegge i PDF in cache con pv più
   // vecchio, così le nuove estrazioni (es. note) arrivano senza svuotare tutto.
   // pv3 (08/07/2026): note cercate anche oltre il cambio pagina / foto allegate.
-  return {type:'apertura',pv:3,fileId,fname,modifiedTime,brand,location,dateISO,
+  // pv4 (24/07/2026): rimossa l'etichetta "Action:" dal testo della nota.
+  return {type:'apertura',pv:4,fileId,fname,modifiedTime,brand,location,dateISO,
           fondoCassa,puliziaOk,insegnaOk,inventarioOk,puliziaNote,insegnaNote};
 }
 
@@ -392,7 +398,7 @@ async function syncAperture(backendCache){
       let rec=(backendCache&&backendCache[key])||localCache[key];
       // Cache valida solo se il parser non è cambiato: pv vecchio → rileggo il
       // PDF (una volta sola, poi la cache si aggiorna con la nuova versione).
-      if(rec && rec.type==='apertura' && rec.pv!==3) rec=null;
+      if(rec && rec.type==='apertura' && rec.pv!==4) rec=null;
       if(!rec){
         try{
           const r=await api(`/drive/file/${encodeURIComponent(f.id)}`);

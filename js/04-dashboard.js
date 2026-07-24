@@ -254,20 +254,45 @@ function _composeRecap(o){
   if(pyD)  b.push(scost(pyD.pct-100,"l'anno scorso"));
   if(b.length) c+=`, ${b.join(' e ')}`;
   P.push(c+'.');
-  // Anomalie cassa + malfunzionamenti aperti
-  const an=anomalie.length;
-  if(an) P.push(`${an>1?'Ci sono':"C'è"} ${an} anomali${an>1?'e':'a'} di cassa da verificare.`);
-  const mo=(typeof malfMemoria==='function')?malfMemoria().open.length:0;
-  if(mo) P.push(`Malfunzionamenti aperti da risolvere: ${mo}.`);
-  // Store check: criticità sull'ultima check di ogni negozio
+  // Top e flop negozi rispetto al target del giorno. Net consuntivo-preferred
+  // (come dayAggregates): se c'è lo storico/consuntivo uso quello, altrimenti il
+  // netto della chiusura PDF. Scostamento % = net/target − 100.
+  const perStore=[];
+  for(const k in targetsByKey){
+    const i=k.lastIndexOf('|'); if(i<0||k.slice(i+1)!==refDate) continue;
+    const sk=k.slice(0,i); const tgt=+targetsByKey[k]||0; if(tgt<=0) continue;
+    let net=null; const hk=sk+'|'+refDate;
+    if(historicalByKey[hk]!=null) net=+historicalByKey[hk]||0;
+    else{ const r=recs.find(x=>storeKey(x.brand,x.location)===sk);
+          if(r) net=(+r.netSales)||((+r.corrispettivo||0)/1.22); }
+    if(net==null) continue;
+    const st=ALL_STORES.find(s=>storeKey(s.brand,s.location)===sk);
+    perStore.push({name: st?`${st.brand} ${st.location}`:sk, pct: net/tgt*100-100});
+  }
+  if(perStore.length>=2){
+    const s=perStore.sort((a,b)=>b.pct-a.pct);
+    const nEach=s.length>=4?2:1;   // con pochi negozi evito che migliori e peggiori si sovrappongano
+    const fmt=x=>`${x.name} (${x.pct>=0?'+':''}${x.pct.toFixed(1).replace('.',',')}%)`;
+    P.push(`${nEach>1?'I migliori':'Il migliore'} sul target: ${s.slice(0,nEach).map(fmt).join(' e ')}.`);
+    P.push(`${nEach>1?'I peggiori':'Il peggiore'} sul target: ${s.slice(-nEach).reverse().map(fmt).join(' e ')}.`);
+  }
+  // Malfunzionamenti aperti: elenco esplicito (tipo + negozio), non solo il numero.
+  const malfOpen=(typeof malfMemoria==='function')?malfMemoria().open:[];
+  if(malfOpen.length){
+    const t=malfOpen.slice(0,4).map(g=>`${g.tipoLabel} (${g.brand} ${g.location})`).join('; ');
+    P.push(`Malfunzionamenti aperti: ${t}${malfOpen.length>4?` e altri ${malfOpen.length-4}`:''}.`);
+  }
+  // Store check: SOLO quelle effettuate nella giornata di riferimento, altrimenti
+  // ogni giorno si ripeterebbero le stesse criticità storiche.
   if(typeof allStoreChecks!=='undefined' && allStoreChecks.length){
-    const sorted=[...allStoreChecks].filter(x=>x.dateISO).sort((a,b)=>b.dateISO.localeCompare(a.dateISO));
-    const latest=new Map(); for(const x of sorted){const k=storeKey(x.brand,x.location); if(!latest.has(k))latest.set(k,x);}
-    const prob=[...latest.values()].filter(x=>x.noCount>0);
-    if(prob.length){
-      const t=prob.slice(0,3).map(x=>`${x.brand} ${x.location}`).join(', ');
-      P.push(`Store check con criticità: ${t}${prob.length>3?` e altri ${prob.length-3}`:''}.`);
-    }else P.push(`Le store check ricevute non evidenziano criticità.`);
+    const oggi=allStoreChecks.filter(x=>x.dateISO===refDate);
+    if(oggi.length){
+      const prob=oggi.filter(x=>x.noCount>0);
+      if(prob.length){
+        const t=prob.slice(0,3).map(x=>`${x.brand} ${x.location}`).join(', ');
+        P.push(`Store check di oggi con criticità: ${t}${prob.length>3?` e altri ${prob.length-3}`:''}.`);
+      }else P.push(`Le store check di oggi non evidenziano criticità.`);
+    }
   }
   return P.join(' ');
 }
