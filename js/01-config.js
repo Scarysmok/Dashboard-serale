@@ -403,6 +403,7 @@ var _coldTimer=null;
 function load(on,msg='',coldHint=false){
   document.getElementById('loading').classList.toggle('show',on);
   if(msg)document.getElementById('loading-msg').textContent=msg;
+  if(!on) setLoadingCount(0,0);   // fine caricamento: azzero il contatore in alto
   const note=document.getElementById('coldstart-note');
   if(_coldTimer){clearTimeout(_coldTimer);_coldTimer=null;}
   if(note){
@@ -412,6 +413,20 @@ function load(on,msg='',coldHint=false){
     }else{
       note.classList.remove('show');
     }
+  }
+}
+
+// Contatore PDF mostrato in alto SULL'overlay di caricamento (il logo resta).
+// done<=0 o tot<=0 lo nasconde.
+function setLoadingCount(done, tot){
+  const el=document.getElementById('loading-count');
+  if(!el) return;
+  if(tot>0 && done>0 && done<tot){
+    el.textContent=`${done} / ${tot} pdf`;
+    el.classList.add('show');
+  }else{
+    el.textContent='';
+    el.classList.remove('show');
   }
 }
 

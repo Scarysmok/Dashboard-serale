@@ -121,7 +121,10 @@ async function syncNow(){
           lastErrors.push({name:job.f.name,msg:e.message||String(e)});
         }
         done++;
+        // Overlay col logo resta visibile per tutto il caricamento; il contatore
+        // in alto sull'overlay mostra l'avanzamento del ri-download.
         load(true,`PDF ${done}/${files.length}…`);
+        setLoadingCount(done, files.length);
         maybeRender();  // render incrementale ad ogni nuovo PDF (throttled)
       }
     };
