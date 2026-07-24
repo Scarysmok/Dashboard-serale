@@ -132,11 +132,15 @@ async function parsePDF(ab,fname,modifiedTime,fileId){
   }
 
   const pos=posTml1+posTml2+posTml3+posTml4;
-  const fondo=gn(/Fondo cassa[^\d\n]{0,30}\n?\s*(?:€|EUR)?\s*(\d+(?:\.\d{3})*(?:,\d+)?)/i);
-  const versato=gn(/Importo [Vv]ersato[^\d\n]{0,30}\n?\s*(?:€|EUR)?\s*(\d+(?:\.\d{3})*(?:,\d+)?)/i);
+  // Fondo/versato/da-versare sono campi a testo libero: alcuni negozi scrivono
+  // i decimali col PUNTO (es. "302.83") invece della virgola. Cattura permissiva
+  // ([\d][\d.,]*) + toNum (che gestisce sia "302.83" sia "302,83" sia "1.234,56").
+  // Prima la regex pretendeva 3 cifre dopo il punto e leggeva "302.83" come 302.
+  const fondo=gn(/Fondo cassa[^\d\n]{0,30}\n?\s*(?:€|EUR)?\s*([\d][\d.,]*)/i);
+  const versato=gn(/Importo [Vv]ersato[^\d\n]{0,30}\n?\s*(?:€|EUR)?\s*([\d][\d.,]*)/i);
   // "Importo da versare": il valore che il negozio doveva depositare quel giorno.
   // Cumulato per negozio (sum daVersare - sum versato) dà il saldo aperto residuo.
-  const daVersare=gn(/Importo da versare[^\d\n]{0,30}\n?\s*(?:€|EUR)?\s*(\d+(?:\.\d{3})*(?:,\d+)?)/i);
+  const daVersare=gn(/Importo da versare[^\d\n]{0,30}\n?\s*(?:€|EUR)?\s*([\d][\d.,]*)/i);
   const netSales=corrispettivo/1.22;
   // Verifica cassa: corrispettivo deve uguagliare (contanti+POS) al netto di
   // movimenti che non rappresentano corrispettivo: cambi (rimborsi/cambi merce),
