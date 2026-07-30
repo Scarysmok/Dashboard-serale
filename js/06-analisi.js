@@ -832,10 +832,16 @@ function kpiValFromRecord(r, kpi){
       }
     }
   }
-  // (2) Fallback GoAudits PDF. Stesso comportamento di prima.
+  // (2) Fallback GoAudits PDF: trovo la domanda per ETICHETTA, non per numero.
+  // Il numero delle domande KPI è cambiato nel tempo: inserite "Incasso/Storico/
+  // Target" prima, Ingressi/CR/UPT sono passate da 25/26/27 a 27/28/29. Cercarle
+  // per testo è robusto a questi spostamenti (prima leggeva il Target come CR →
+  // valori assurdi tipo 3138%). CR nel PDF è già in percentuale ("11,74%"), UPT un
+  // decimale ("2,53"), Ingressi un intero ("545"): kpiParseValue li normalizza,
+  // senza ×100 (a differenza del consuntivo dove CR è una frazione).
   if(!r.qa) return null;
-  const qNum = {ingressi:25, cr:26, upt:27}[kpi];
-  const item = r.qa.find(x => x.n === qNum);
+  const labelRe = {ingressi:/^ingressi\b/i, cr:/^cr\b/i, upt:/^upt\b/i}[kpi];
+  const item = r.qa.find(x => x && labelRe.test(String(x.q||'').trim()));
   if(!item) return null;
   return kpiParseValue(item.a);
 }
