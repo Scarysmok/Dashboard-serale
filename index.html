@@ -226,6 +226,7 @@
         <button class="seg-btn on" onclick="switchTab('tempo')">📈 Vendite</button>
         <button class="seg-btn" onclick="switchTab('kpi')">📊 KPI negozio</button>
       </div>
+      <div style="display:flex;justify-content:flex-end;margin:4px 0 8px"><button onclick="openExportDialog('andamento')" style="background:#2563eb;color:#fff;border:0;border-radius:8px;padding:7px 12px;font:700 12px Nunito;cursor:pointer">⬇ Esporta XLS</button></div>
       <!-- Filtri: Brand multi-select + Punto Vendita multi-select + toggle.
            Il pannello dei filtri viene popolato da renderAmFilterPanels()
            subito dopo il fetch dei dati, così riflette esattamente quello
@@ -279,6 +280,7 @@
         <button class="seg-btn" onclick="switchTab('tempo')">📈 Vendite</button>
         <button class="seg-btn on" onclick="switchTab('kpi')">📊 KPI negozio</button>
       </div>
+      <div style="display:flex;justify-content:flex-end;margin:4px 0 8px"><button onclick="openExportDialog('kpi')" style="background:#2563eb;color:#fff;border:0;border-radius:8px;padding:7px 12px;font:700 12px Nunito;cursor:pointer">⬇ Esporta XLS</button></div>
 
       <!-- Hero + selettore KPI -->
       <div class="kpi-tabs" id="kpi-tabs">

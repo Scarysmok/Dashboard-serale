@@ -1627,3 +1627,182 @@ renderKpiAll = function(){
   _renderKpiAllOriginal();
 };
 
+
+// ── EXPORT XLS (Andamento vendite / KPI negozio) ────────────────────────────
+// Due pulsanti (uno per sezione) aprono un dialog: brand → punti vendita →
+// confronti (vs Target solo Andamento, vs Anno scorso). Genera un .xlsx con 6
+// fogli, uno per granularità temporale, una riga per negozio×periodo su tutto
+// lo storico disponibile. SheetJS (XLSX) è già caricato in pagina.
+const _EXP_MONTHS=['Gen','Feb','Mar','Apr','Mag','Giu','Lug','Ago','Set','Ott','Nov','Dic'];
+const _EXP_GRANS=[['giorno','Giornaliero'],['settimana','Settimanale'],['mese','Mensile'],
+                  ['trimestre','Trimestrale'],['semestre','Semestrale'],['anno','Annuale']];
+const _r2=n=>Math.round(n*100)/100, _r1=n=>Math.round(n*10)/10;
+// Bucket temporale da una data ISO. Ritorna {k:chiave ordinabile, l:etichetta}.
+function _expBucket(iso, gran){
+  const [y,m,d]=iso.split('-').map(Number);
+  if(gran==='giorno')     return {k:iso, l:`${String(d).padStart(2,'0')}/${String(m).padStart(2,'0')}/${y}`};
+  if(gran==='mese')       return {k:`${y}-${String(m).padStart(2,'0')}`, l:`${_EXP_MONTHS[m-1]} ${y}`};
+  if(gran==='trimestre'){ const q=Math.floor((m-1)/3)+1; return {k:`${y}-Q${q}`, l:`T${q} ${y}`}; }
+  if(gran==='semestre'){  const s=m<=6?1:2; return {k:`${y}-S${s}`, l:`S${s} ${y}`}; }
+  if(gran==='anno')       return {k:`${y}`, l:`${y}`};
+  // settimana ISO (lun–dom): algoritmo standard basato sul giovedì della settimana
+  const dt=new Date(Date.UTC(y,m-1,d));
+  const dayNum=(dt.getUTCDay()+6)%7;            // lun=0 … dom=6
+  dt.setUTCDate(dt.getUTCDate()-dayNum+3);      // giovedì di questa settimana
+  const wy=dt.getUTCFullYear();
+  const jan4=new Date(Date.UTC(wy,0,4));
+  const wk=1+Math.round(((dt-jan4)/86400000 - 3 + ((jan4.getUTCDay()+6)%7))/7);
+  return {k:`${wy}-W${String(wk).padStart(2,'0')}`, l:`Sett. ${String(wk).padStart(2,'0')} ${wy}`};
+}
+// Componenti KPI grezzi per negozio×giorno: consuntivo (historicalKpi) preferito,
+// altrimenti derivati dal PDF di chiusura (qa). scontrini/pezzi derivati da CR/UPT
+// dove il consuntivo non li ha, così l'aggregazione per periodo è sempre corretta
+// (CR=Σscontrini/Σingressi, UPT=Σpezzi/Σscontrini).
+function _expKpiRaw(brand, location, dateISO){
+  const sk=storeKey(brand,location);
+  const h=historicalKpiByKey[sk+'|'+dateISO];
+  if(h){
+    const walk=(h.walkIn!=null&&isFinite(h.walkIn))?+h.walkIn:null;
+    let scont=(h.scontrini!=null&&isFinite(h.scontrini))?+h.scontrini:null;
+    let qty=(h.quantity!=null&&isFinite(h.quantity))?+h.quantity:null;
+    if(scont==null && h.cr!=null && walk!=null) scont=h.cr*walk;   // cr consuntivo = frazione
+    if(qty==null && h.upt!=null && scont!=null) qty=h.upt*scont;
+    if(walk!=null||scont!=null||qty!=null) return {walk,scont,qty};
+  }
+  const rec=allData.find(r=>r.brand===brand&&r.location===location&&r.dateISO===dateISO&&r.qa);
+  if(rec){
+    const g=lbl=>{const it=rec.qa.find(x=>x&&new RegExp('^'+lbl+'\\b','i').test(String(x.q||'').trim()));return it?kpiParseValue(it.a):null;};
+    const walk=g('ingressi'), cr=g('cr'), upt=g('upt');
+    const scont=(cr!=null&&walk!=null)?cr/100*walk:null;   // cr PDF = percentuale
+    const qty=(upt!=null&&scont!=null)?upt*scont:null;
+    if(walk!=null||scont!=null||qty!=null) return {walk,scont,qty};
+  }
+  return null;
+}
+// Elenco (b,l,date) distinti con KPI: consuntivo + chiusure, filtrati sui negozi scelti.
+function _expKpiDays(storeSet){
+  const seen=new Set(), out=[];
+  for(const k in historicalKpiByKey){
+    const i=k.lastIndexOf('|'); const st=ALL_STORES.find(s=>storeKey(s.brand,s.location)===k.slice(0,i));
+    if(!st || !storeSet.has(st.brand+'|'+st.location)) continue;
+    const date=k.slice(i+1), id=st.brand+'|'+st.location+'|'+date;
+    if(seen.has(id))continue; seen.add(id); out.push({b:st.brand,l:st.location,date});
+  }
+  for(const r of allData){
+    if(!r.dateISO||!storeSet.has(r.brand+'|'+r.location))continue;
+    const id=r.brand+'|'+r.location+'|'+r.dateISO;
+    if(seen.has(id))continue; seen.add(id); out.push({b:r.brand,l:r.location,date:r.dateISO});
+  }
+  return out;
+}
+function _expHeader(kind,sel){
+  if(kind==='andamento'){
+    const h=['Brand','Negozio','Periodo','Net Sales'];
+    if(sel.vsTgt)h.push('Target','Δ% vs Target');
+    if(sel.vsPy) h.push('Anno scorso','Δ% vs Anno scorso');
+    return h;
+  }
+  const h=['Brand','Negozio','Periodo','Ingressi','CR %','UPT','Scontrini','Quantità'];
+  if(sel.vsPy)h.push('Ingressi A-1','CR % A-1','UPT A-1','Scontrini A-1','Quantità A-1');
+  return h;
+}
+function _expRow(kind,sel,a){
+  if(kind==='andamento'){
+    const row=[a.b,a.l,a.bl,_r2(a.net)];
+    if(sel.vsTgt)row.push(a.tgt?_r2(a.tgt):'', a.tgt?_r1(a.net/a.tgt*100-100):'');
+    if(sel.vsPy) row.push(a.py?_r2(a.py):'',  a.py?_r1(a.net/a.py*100-100):'');
+    return row;
+  }
+  const cr =a.walk>0?_r1(a.scont/a.walk*100):'';
+  const upt=a.scont>0?_r2(a.qty/a.scont):'';
+  const row=[a.b,a.l,a.bl, a.walk>0?Math.round(a.walk):'', cr, upt,
+             a.scont>0?Math.round(a.scont):'', a.qty>0?Math.round(a.qty):''];
+  if(sel.vsPy){
+    const pcr =a.pwalk>0?_r1(a.pscont/a.pwalk*100):'';
+    const pupt=a.pscont>0?_r2(a.pqty/a.pscont):'';
+    row.push(a.pwalk>0?Math.round(a.pwalk):'', pcr, pupt,
+             a.pscont>0?Math.round(a.pscont):'', a.pqty>0?Math.round(a.pqty):'');
+  }
+  return row;
+}
+function _expGenerate(kind, sel){
+  const wb=XLSX.utils.book_new();
+  // Base per-giorno calcolata UNA volta, poi ri-aggregata per ogni granularità.
+  let base=[];
+  if(kind==='andamento'){
+    for(const r of buildAndamentoRecords()){
+      if(!sel.stores.has(r.brand+'|'+r.location))continue;
+      const sk=storeKey(r.brand,r.location);
+      base.push({b:r.brand,l:r.location,date:r.dateISO,
+        net:r.netSales||0,
+        tgt:+targetsByKey[sk+'|'+r.dateISO]||0,
+        py:+historicalByKey[sk+'|'+shiftYearBack(r.dateISO,1)]||0});
+    }
+  }else{
+    for(const {b,l,date} of _expKpiDays(sel.stores)){
+      const raw=_expKpiRaw(b,l,date)||{};
+      const p=sel.vsPy?(_expKpiRaw(b,l,shiftYearBack(date,1))||{}):{};
+      base.push({b,l,date,walk:raw.walk||0,scont:raw.scont||0,qty:raw.qty||0,
+                 pwalk:p.walk||0,pscont:p.scont||0,pqty:p.qty||0});
+    }
+  }
+  for(const [gran,sheet] of _EXP_GRANS){
+    const agg=new Map();
+    for(const r of base){
+      const bu=_expBucket(r.date,gran), key=r.b+'|'+r.l+'|'+bu.k;
+      let a=agg.get(key);
+      if(!a){a={b:r.b,l:r.l,bk:bu.k,bl:bu.l,net:0,tgt:0,py:0,walk:0,scont:0,qty:0,pwalk:0,pscont:0,pqty:0};agg.set(key,a);}
+      if(kind==='andamento'){a.net+=r.net;a.tgt+=r.tgt;a.py+=r.py;}
+      else{a.walk+=r.walk;a.scont+=r.scont;a.qty+=r.qty;a.pwalk+=r.pwalk;a.pscont+=r.pscont;a.pqty+=r.pqty;}
+    }
+    const rows=[...agg.values()].sort((x,y)=>x.b.localeCompare(y.b)||x.l.localeCompare(y.l)||x.bk.localeCompare(y.bk));
+    const aoa=[_expHeader(kind,sel)];
+    for(const a of rows) aoa.push(_expRow(kind,sel,a));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), sheet);
+  }
+  XLSX.writeFile(wb, `${kind==='andamento'?'Andamento':'KPI'}_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+// Dialog: brand → punti vendita (filtrati sui brand) → confronti → genera.
+function openExportDialog(kind){
+  const brands=[...new Set(ALL_STORES.map(s=>s.brand))].sort((a,b)=>a.localeCompare(b));
+  const ov=document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:400;display:flex;align-items:center;justify-content:center;padding:16px';
+  ov.innerHTML=`<div style="background:#fff;border-radius:14px;max-width:440px;width:100%;max-height:88vh;overflow:auto;padding:18px;font-family:Nunito">
+    <div style="font-weight:800;font-size:16px">Esporta ${kind==='andamento'?'Andamento vendite':'KPI negozio'}</div>
+    <div style="color:#64748b;font-size:12px;margin:2px 0 14px">6 fogli (giornaliero → annuale), una riga per negozio×periodo.</div>
+    <div style="font-weight:700;font-size:12px;margin-bottom:6px">Brand</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">
+      ${brands.map(b=>`<label style="display:flex;align-items:center;gap:5px;font-size:13px;background:#f1f5f9;border-radius:8px;padding:5px 9px;cursor:pointer"><input type="checkbox" class="exp-brand" value="${attrEsc(b)}" checked>${attrEsc(b)}</label>`).join('')}
+    </div>
+    <div style="font-weight:700;font-size:12px;margin-bottom:6px">Punti vendita</div>
+    <div id="exp-stores" style="max-height:200px;overflow:auto;border:1px solid #e2e8f0;border-radius:8px;padding:8px;margin-bottom:14px"></div>
+    <div style="font-weight:700;font-size:12px;margin-bottom:6px">Confronti</div>
+    <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px">
+      ${kind==='andamento'?`<label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="exp-tgt" checked> vs Target</label>`:''}
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="exp-py" checked> vs Anno scorso</label>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button id="exp-cancel" style="background:#f1f5f9;border:0;border-radius:8px;padding:9px 14px;font:600 13px Nunito;cursor:pointer">Annulla</button>
+      <button id="exp-go" style="background:#2563eb;color:#fff;border:0;border-radius:8px;padding:9px 16px;font:700 13px Nunito;cursor:pointer">⬇ Genera XLS</button>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+  const box=ov.querySelector('#exp-stores');
+  const renderStores=()=>{
+    const bs=new Set([...ov.querySelectorAll('.exp-brand:checked')].map(c=>c.value));
+    const list=ALL_STORES.filter(s=>bs.has(s.brand)).sort((a,b)=>a.brand.localeCompare(b.brand)||a.location.localeCompare(b.location));
+    box.innerHTML=list.length?list.map(s=>`<label style="display:flex;align-items:center;gap:6px;font-size:13px;padding:3px 0;cursor:pointer"><input type="checkbox" class="exp-store" value="${attrEsc(s.brand+'|'+s.location)}" checked> ${attrEsc(s.brand)} · ${attrEsc(s.location)}</label>`).join(''):'<div style="color:#94a3b8;font-size:12px">Nessun brand selezionato</div>';
+  };
+  renderStores();
+  ov.querySelectorAll('.exp-brand').forEach(c=>c.onchange=renderStores);
+  const close=()=>ov.remove();
+  ov.onclick=e=>{if(e.target===ov)close();};
+  ov.querySelector('#exp-cancel').onclick=close;
+  ov.querySelector('#exp-go').onclick=()=>{
+    const stores=new Set([...ov.querySelectorAll('.exp-store:checked')].map(c=>c.value));
+    if(!stores.size){alert('Seleziona almeno un punto vendita.');return;}
+    const sel={stores, vsTgt:kind==='andamento'&&ov.querySelector('#exp-tgt')?.checked, vsPy:!!ov.querySelector('#exp-py')?.checked};
+    try{ _expGenerate(kind, sel); close(); }
+    catch(e){ alert('Errore export: '+(e.message||e)); }
+  };
+}
