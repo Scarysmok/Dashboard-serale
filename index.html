@@ -226,37 +226,39 @@
         <button class="seg-btn on" onclick="switchTab('tempo')">📈 Vendite</button>
         <button class="seg-btn" onclick="switchTab('kpi')">📊 KPI negozio</button>
       </div>
-      <div style="display:flex;justify-content:flex-end;margin:4px 0 8px"><button onclick="openExportDialog('andamento')" style="background:#2563eb;color:#fff;border:0;border-radius:8px;padding:7px 12px;font:700 12px Nunito;cursor:pointer">⬇ Esporta XLS</button></div>
       <!-- Filtri: Brand multi-select + Punto Vendita multi-select + toggle.
            Il pannello dei filtri viene popolato da renderAmFilterPanels()
            subito dopo il fetch dei dati, così riflette esattamente quello
            che è disponibile (30 negozi mappati). -->
       <div class="tempo-filters">
-        <div style="position:relative">
-          <button class="am-filter-btn" id="am-btn-brand" onclick="toggleAmPanel('brand')">
-            <span>Brand</span><span class="am-count" id="am-cnt-brand">tutti</span><span class="am-arrow">▾</span>
-          </button>
-          <div class="am-filter-panel" id="am-panel-brand">
-            <div id="am-panel-brand-list"></div>
-            <div class="am-filter-actions">
-              <button class="am-filter-action" onclick="setAmAll('brand', true)">Tutti</button>
-              <button class="am-filter-action" onclick="setAmAll('brand', false)">Nessuno</button>
-              <button class="am-filter-action primary" onclick="applyAmFilter('brand')">Applica</button>
+        <div style="display:flex;gap:8px;align-items:center;flex:1 1 100%;flex-wrap:nowrap;min-width:0">
+          <div style="position:relative;flex-shrink:0">
+            <button class="am-filter-btn" id="am-btn-brand" onclick="toggleAmPanel('brand')">
+              <span>Brand</span><span class="am-count" id="am-cnt-brand">tutti</span><span class="am-arrow">▾</span>
+            </button>
+            <div class="am-filter-panel" id="am-panel-brand">
+              <div id="am-panel-brand-list"></div>
+              <div class="am-filter-actions">
+                <button class="am-filter-action" onclick="setAmAll('brand', true)">Tutti</button>
+                <button class="am-filter-action" onclick="setAmAll('brand', false)">Nessuno</button>
+                <button class="am-filter-action primary" onclick="applyAmFilter('brand')">Applica</button>
+              </div>
             </div>
           </div>
-        </div>
-        <div style="position:relative">
-          <button class="am-filter-btn" id="am-btn-store" onclick="toggleAmPanel('store')">
-            <span>Punto vendita</span><span class="am-count" id="am-cnt-store">tutti</span><span class="am-arrow">▾</span>
-          </button>
-          <div class="am-filter-panel" id="am-panel-store" style="left:120px">
-            <div id="am-panel-store-list"></div>
-            <div class="am-filter-actions">
-              <button class="am-filter-action" onclick="setAmAll('store', true)">Tutti</button>
-              <button class="am-filter-action" onclick="setAmAll('store', false)">Nessuno</button>
-              <button class="am-filter-action primary" onclick="applyAmFilter('store')">Applica</button>
+          <div style="position:relative;flex-shrink:0">
+            <button class="am-filter-btn" id="am-btn-store" onclick="toggleAmPanel('store')">
+              <span>Punto vendita</span><span class="am-count" id="am-cnt-store">tutti</span><span class="am-arrow">▾</span>
+            </button>
+            <div class="am-filter-panel" id="am-panel-store" style="left:120px">
+              <div id="am-panel-store-list"></div>
+              <div class="am-filter-actions">
+                <button class="am-filter-action" onclick="setAmAll('store', true)">Tutti</button>
+                <button class="am-filter-action" onclick="setAmAll('store', false)">Nessuno</button>
+                <button class="am-filter-action primary" onclick="applyAmFilter('store')">Applica</button>
+              </div>
             </div>
           </div>
+          <button onclick="openExportDialog('andamento')" style="margin-left:auto;flex-shrink:0;white-space:nowrap;background:#2563eb;color:#fff;border:0;border-radius:8px;padding:8px 12px;font:700 12px Nunito;cursor:pointer">⬇ Esporta XLS</button>
         </div>
         <div class="tempo-compare">
           <button class="tempo-toggle on" id="tc-tgt" onclick="toggleCompare('tgt',this)">vs Target</button>
@@ -280,7 +282,6 @@
         <button class="seg-btn" onclick="switchTab('tempo')">📈 Vendite</button>
         <button class="seg-btn on" onclick="switchTab('kpi')">📊 KPI negozio</button>
       </div>
-      <div style="display:flex;justify-content:flex-end;margin:4px 0 8px"><button onclick="openExportDialog('kpi')" style="background:#2563eb;color:#fff;border:0;border-radius:8px;padding:7px 12px;font:700 12px Nunito;cursor:pointer">⬇ Esporta XLS</button></div>
 
       <!-- Hero + selettore KPI -->
       <div class="kpi-tabs" id="kpi-tabs">
@@ -302,19 +303,20 @@
       </div>
 
       <!-- Filtri Brand + Store -->
-      <div class="kpi-filters">
-        <div style="position:relative">
+      <div class="kpi-filters" style="flex-wrap:nowrap">
+        <div style="position:relative;flex-shrink:0">
           <button class="kfbtn" id="kfb-brand" onclick="toggleKpiPanel('brand')">
             <span>Brand</span><span class="kfcnt" id="kfcnt-brand">tutti</span><span class="kfarrow">▾</span>
           </button>
           <div class="kfpanel" id="kfp-brand"></div>
         </div>
-        <div style="position:relative">
+        <div style="position:relative;flex-shrink:0">
           <button class="kfbtn" id="kfb-store" onclick="toggleKpiPanel('store')">
             <span>Punto vendita</span><span class="kfcnt" id="kfcnt-store">tutti</span><span class="kfarrow">▾</span>
           </button>
           <div class="kfpanel" id="kfp-store" style="left:120px"></div>
         </div>
+        <button onclick="openExportDialog('kpi')" style="margin-left:auto;flex-shrink:0;white-space:nowrap;background:#2563eb;color:#fff;border:0;border-radius:8px;padding:8px 12px;font:700 12px Nunito;cursor:pointer">⬇ Esporta XLS</button>
       </div>
 
       <!-- Granularità + range -->

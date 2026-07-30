@@ -1732,6 +1732,7 @@ function _expGenerate(kind, sel){
   if(kind==='andamento'){
     for(const r of buildAndamentoRecords()){
       if(!sel.stores.has(r.brand+'|'+r.location))continue;
+      if(!sel.years.has(r.dateISO.slice(0,4)))continue;
       const sk=storeKey(r.brand,r.location);
       base.push({b:r.brand,l:r.location,date:r.dateISO,
         net:r.netSales||0,
@@ -1740,6 +1741,7 @@ function _expGenerate(kind, sel){
     }
   }else{
     for(const {b,l,date} of _expKpiDays(sel.stores)){
+      if(!sel.years.has(date.slice(0,4)))continue;
       const raw=_expKpiRaw(b,l,date)||{};
       const p=sel.vsPy?(_expKpiRaw(b,l,shiftYearBack(date,1))||{}):{};
       base.push({b,l,date,walk:raw.walk||0,scont:raw.scont||0,qty:raw.qty||0,
@@ -1760,16 +1762,32 @@ function _expGenerate(kind, sel){
     for(const a of rows) aoa.push(_expRow(kind,sel,a));
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), sheet);
   }
-  XLSX.writeFile(wb, `${kind==='andamento'?'Andamento':'KPI'}_${new Date().toISOString().slice(0,10)}.xlsx`);
+  const ytag=[...sel.years].sort().join('-');
+  XLSX.writeFile(wb, `${kind==='andamento'?'Andamento':'KPI'}_${ytag}.xlsx`);
 }
-// Dialog: brand → punti vendita (filtrati sui brand) → confronti → genera.
+// Anni presenti nei dati (per il selettore Anno), più recenti prima.
+function _expAvailableYears(kind){
+  const ys=new Set();
+  if(kind==='andamento'){ for(const r of buildAndamentoRecords()) if(r.dateISO) ys.add(r.dateISO.slice(0,4)); }
+  else{
+    for(const k in historicalKpiByKey){ const i=k.lastIndexOf('|'); ys.add(k.slice(i+1,i+5)); }
+    for(const r of allData) if(r.dateISO) ys.add(r.dateISO.slice(0,4));
+  }
+  return [...ys].filter(y=>/^\d{4}$/.test(y)).sort().reverse();
+}
+// Dialog: anno → brand → punti vendita (filtrati sui brand) → confronti → genera.
 function openExportDialog(kind){
+  const years=_expAvailableYears(kind);
   const brands=[...new Set(ALL_STORES.map(s=>s.brand))].sort((a,b)=>a.localeCompare(b));
   const ov=document.createElement('div');
   ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:400;display:flex;align-items:center;justify-content:center;padding:16px';
   ov.innerHTML=`<div style="background:#fff;border-radius:14px;max-width:440px;width:100%;max-height:88vh;overflow:auto;padding:18px;font-family:Nunito">
     <div style="font-weight:800;font-size:16px">Esporta ${kind==='andamento'?'Andamento vendite':'KPI negozio'}</div>
     <div style="color:#64748b;font-size:12px;margin:2px 0 14px">6 fogli (giornaliero → annuale), una riga per negozio×periodo.</div>
+    <div style="font-weight:700;font-size:12px;margin-bottom:6px">Anno</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">
+      ${years.map((y,idx)=>`<label style="display:flex;align-items:center;gap:5px;font-size:13px;background:#f1f5f9;border-radius:8px;padding:5px 9px;cursor:pointer"><input type="checkbox" class="exp-year" value="${y}" ${idx===0?'checked':''}>${y}</label>`).join('')||'<div style="color:#94a3b8;font-size:12px">Nessun anno con dati</div>'}
+    </div>
     <div style="font-weight:700;font-size:12px;margin-bottom:6px">Brand</div>
     <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">
       ${brands.map(b=>`<label style="display:flex;align-items:center;gap:5px;font-size:13px;background:#f1f5f9;border-radius:8px;padding:5px 9px;cursor:pointer"><input type="checkbox" class="exp-brand" value="${attrEsc(b)}" checked>${attrEsc(b)}</label>`).join('')}
@@ -1801,7 +1819,9 @@ function openExportDialog(kind){
   ov.querySelector('#exp-go').onclick=()=>{
     const stores=new Set([...ov.querySelectorAll('.exp-store:checked')].map(c=>c.value));
     if(!stores.size){alert('Seleziona almeno un punto vendita.');return;}
-    const sel={stores, vsTgt:kind==='andamento'&&ov.querySelector('#exp-tgt')?.checked, vsPy:!!ov.querySelector('#exp-py')?.checked};
+    const yset=new Set([...ov.querySelectorAll('.exp-year:checked')].map(c=>c.value));
+    if(!yset.size){alert('Seleziona almeno un anno.');return;}
+    const sel={stores, years:yset, vsTgt:kind==='andamento'&&ov.querySelector('#exp-tgt')?.checked, vsPy:!!ov.querySelector('#exp-py')?.checked};
     try{ _expGenerate(kind, sel); close(); }
     catch(e){ alert('Errore export: '+(e.message||e)); }
   };
