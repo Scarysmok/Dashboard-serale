@@ -252,20 +252,20 @@ function setChip(el,f){
 // Mostra/nasconde la sidebar (☰). Chiusa = barretta con solo l'hamburger.
 function toggleNav(){ document.getElementById('dash-wrap').classList.toggle('nav-hidden'); }
 function switchTab(t){
-  ['oggi','negozi','storecheck','stores','tempo','kpi','settings','account','template','scmail'].forEach(n=>{
+  ['oggi','negozi','storecheck','stores','tempo','kpi','bestseller','settings','account','template','scmail'].forEach(n=>{
     const el=document.getElementById('tab-'+n);
     if(el)el.style.display=n===t?'block':'none';
   });
   // Mappa tab → voce della nav da evidenziare. Andamento (tempo) e KPI vivono
   // sotto "Analisi"; gestione utenti (account), template segnalazioni (template)
   // e template email store check (scmail) sotto "Altro".
-  const navMap={oggi:'oggi',negozi:'negozi',storecheck:'storecheck',stores:'stores',tempo:'analisi',kpi:'analisi',settings:'settings',account:'settings',template:'settings',scmail:'settings'};
+  const navMap={oggi:'oggi',negozi:'negozi',storecheck:'storecheck',stores:'stores',tempo:'analisi',kpi:'analisi',bestseller:'bestseller',settings:'settings',account:'settings',template:'settings',scmail:'settings'};
   const activeNav=navMap[t]||t;
-  ['oggi','negozi','storecheck','analisi','stores','settings'].forEach(n=>{
+  ['oggi','negozi','storecheck','analisi','bestseller','stores','settings'].forEach(n=>{
     const nav=document.getElementById('nav-'+n);
     if(nav)nav.classList.toggle('active',n===activeNav);
   });
-  const titles={oggi:'Dashboard',negozi:'Aperture / Chiusure',storecheck:'Store Check',stores:'Negozi',tempo:'Analisi · Vendite',kpi:'Analisi · KPI negozio',settings:'Altro',account:'Gestione utenti',template:'Template segnalazioni',scmail:'Template email store check'};
+  const titles={oggi:'Dashboard',negozi:'Aperture / Chiusure',storecheck:'Store Check',stores:'Negozi',tempo:'Analisi · Vendite',kpi:'Analisi · KPI negozio',bestseller:'Best Seller',settings:'Altro',account:'Gestione utenti',template:'Template segnalazioni',scmail:'Template email store check'};
   const titleEl=document.getElementById('app-title');
   if(titleEl)titleEl.textContent=titles[t]||'Chiusure';
   if(t==='oggi')renderOggi();
@@ -276,6 +276,7 @@ function switchTab(t){
   if(t==='template')renderTemplateEditor();
   if(t==='storecheck')renderStoreCheck();
   if(t==='scmail')renderScMailEditor();
+  if(t==='bestseller')renderBestSeller();
   // Scelta una sezione, richiudo la sidebar (torna alla barretta con l'hamburger)
   document.getElementById('dash-wrap').classList.add('nav-hidden');
 }

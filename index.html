@@ -29,6 +29,10 @@
      300 (mai), 400 (testo base), 500 (label/sub), 600 (card values),
      700 (KPI grandi, header), 800 (saldo cumulato, accent). -->
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<!-- Archivo + JetBrains Mono: usati solo dal modulo Best Seller, che replica
+     la grafica adidas (AdihausDIN via @font-face in styles.css, Archivo come
+     fallback ravvicinato, JetBrains Mono per le etichette tecniche). -->
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="css/styles.css"/>
 </head>
 <body>
@@ -204,6 +208,13 @@
       </div>
       <div class="cards-list" id="aperture-list"></div>
     </div>
+  </div>
+
+  <!-- TAB BEST SELLER (report sell-out settimanali negozi Adidas)
+       Il contenuto è generato interamente da js/09-bestseller.js: qui c'è solo
+       il contenitore, così la grafica adidas resta isolata dal resto dell'app. -->
+  <div class="scroll-area" id="tab-bestseller" style="display:none">
+    <div id="bs-root"></div>
   </div>
 
   <!-- TAB NEGOZI (lista negozi + popup metriche + calendario range) -->
@@ -475,6 +486,7 @@
     <div class="nav-item" id="nav-negozi" onclick="switchTab('negozi')"><div class="nav-icon">📋</div><span>Aperture / Chiusure</span></div>
     <div class="nav-item" id="nav-storecheck" onclick="switchTab('storecheck')"><div class="nav-icon">🔎</div><span>Store Check</span></div>
     <div class="nav-item" id="nav-analisi" onclick="switchTab('tempo')"><div class="nav-icon">📈</div><span>Analisi</span></div>
+    <div class="nav-item" id="nav-bestseller" onclick="switchTab('bestseller')"><div class="nav-icon">🔥</div><span>Best Seller</span></div>
     <div class="nav-item" id="nav-stores" onclick="switchTab('stores')"><div class="nav-icon">🏪</div><span>Negozi</span></div>
     <div class="nav-item" id="nav-settings" onclick="switchTab('settings')"><div class="nav-icon">⚙️</div><span>Altro</span></div>
   </div>
@@ -507,6 +519,10 @@
 <script src="js/05-chiusure.js"></script>
 <script src="js/06-analisi.js"></script>
 <script src="js/07-negozi-altro.js"></script>
+<!-- 09-bestseller.js è caricato prima di 08-boot.js (che chiude la sequenza con
+     l'auto-login): così renderBestSeller esiste già quando il boot mostra la
+     dashboard, senza dipendere dai tempi della chiamata /auth/me. -->
+<script src="js/09-bestseller.js"></script>
 <script src="js/08-boot.js"></script>
 </body>
 </html>
