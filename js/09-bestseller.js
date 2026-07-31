@@ -368,6 +368,7 @@ function bsAdminChips(d){
     <input type="file" id="bs-file" accept=".xlsx,.xls" multiple style="display:none">
     <button class="bs-chip-btn" id="bs-import"${BS.busy?' disabled':''}>
       ${BS.busy?'⏳ Importo…':'📥 Importa Excel'}</button>
+    <button class="bs-chip-btn" id="bs-codes"${BS.busy?' disabled':''}>⬇ Scarica codici</button>
     ${canDelete?`<button class="bs-chip-btn" id="bs-del">🗑 Elimina settimana</button>`:''}`;
 }
 
@@ -552,6 +553,45 @@ async function bsImportFiles(files){
   bsLog(`Import concluso: ${ok} ok${ko?`, ${ko} con errori`:''}.`);
 }
 
+// ── Esportazione codici articolo ────────────────────────────────────────
+// Scarica l'elenco unico dei codici presenti in TUTTI i report (ogni negozio,
+// ogni settimana), non solo in quello a schermo. CSV con separatore ';' e BOM,
+// così Excel in italiano lo apre in colonne senza chiedere nulla.
+async function bsDownloadCodes(){
+  try{
+    bsLog('Preparo l\'elenco codici…');
+    const r = await api('/bestseller/codes');
+    if(!r.ok) throw new Error(r.status===404
+      ? 'endpoint non disponibile: il backend va aggiornato'
+      : 'errore '+r.status);
+    const j = await r.json();
+    const items = j.items || [];
+    if(!items.length){ bsLog('Nessun codice da esportare.', true); return; }
+
+    const esc = v => {
+      const s = String(v==null?'':v);
+      return /[;"\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
+    };
+    const rows = [['codice','nome','divisione','genere','categoria','foto']];
+    items.forEach(i => rows.push([i.code, i.name, i.div, i.gender, i.cat, i.has_photo?'sì':'no']));
+    const csv = '﻿' + rows.map(r => r.map(esc).join(';')).join('\r\n');
+
+    const today = new Date().toISOString().slice(0,10);
+    const url = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8'}));
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `codici-articolo-best-seller-${today}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    const senza = items.filter(i=>!i.has_photo).length;
+    bsLog(`Scaricati <b>${items.length}</b> codici`+(senza?` (${senza} senza foto)`:'')+'.');
+  }catch(e){
+    bsLog('Esportazione codici fallita: '+(e.message||e), true);
+  }
+}
+
 async function bsDeleteWeek(){
   const c = BS.cur;
   if(!c || c.aggregate) return;
@@ -625,6 +665,7 @@ function bsBind(){
     e.target.value = '';
     if(files.length) bsImportFiles(files);
   });
+  on('bs-codes','click', bsDownloadCodes);
   on('bs-del','click', bsDeleteWeek);
   on('bs-log-clear','click', () => { BS.log = []; bsPaint(); });
 }
