@@ -41,7 +41,7 @@ const BS_GROUPS = [
   {title:'Performance',       idx:[12,13,21,17,18,19,20,14,15,16]},
   {title:'Stock & rotazione', idx:[22,23,24,25,26,27]},
 ];
-const BS_I_UNITS = 13, BS_I_ST = 25;
+const BS_I_UNITS = 13, BS_I_ST = 25, BS_I_OHQ = 22;   // OHQ = giacenza residua
 
 // Codici da escludere dai report: materiale di consumo che nell'export adidas
 // compare come articolo venduto ma non è un prodotto da classifica (buste).
@@ -201,6 +201,9 @@ function bsPaint(){
         <div class="bs-pmeta">${bsEsc(p.code)} · ${bsEsc(p.gender)} · ${bsEsc(p.cat)}</div>
         <div class="bs-pfoot">
           <div><div class="bs-pnum">${p.units}</div><div class="bs-plab">Pezzi</div></div>
+          <div style="text-align:center">
+            <div class="bs-pohq${bsOhqZero(p)?' bs-zero':''}">${bsOhqTxt(p)}</div>
+            <div class="bs-plab">Giacenza</div></div>
           <div style="text-align:right"><div class="bs-pnet">${bsEur(p.net)}</div><div class="bs-plab">Valore</div></div>
         </div>
       </div>
@@ -209,6 +212,9 @@ function bsPaint(){
   const rows = list.map((p,i)=>{
     const st = Number((p.all||[])[BS_I_ST]);
     const stOk = isFinite(st) && (p.all||[])[BS_I_ST]!=null;
+    const ohqRaw = (p.all||[])[BS_I_OHQ];
+    const ohq = Number(ohqRaw);
+    const ohqOk = ohqRaw!=null && isFinite(ohq);
     return `
     <button class="bs-row" data-open="${bsEsc(p.code)}">
       <div class="bs-c-rank">${i+1}</div>
@@ -221,6 +227,10 @@ function bsPaint(){
       <div class="bs-c-units">
         <div class="bs-runits">${p.units}</div>
         <div class="bs-bar"><i style="width:${Math.max(6,Math.round((p.units/max)*100))}%"></i></div>
+      </div>
+      <div class="bs-c-ohq">
+        <div class="bs-rohq${ohqOk && ohq<=0 ? ' bs-zero':''}">${ohqOk?bsFmt(ohq,'i'):'—'}</div>
+        ${ohqOk && ohq<=0 ? '<div class="bs-ohq-note">esaurito</div>' : ''}
       </div>
       <div class="bs-c-net">${bsEur(p.net)}</div>
       <div class="bs-c-st${stOk && st<0.5 ? ' bs-low':''}">${stOk?bsFmt(st,'p'):'—'}</div>
@@ -267,6 +277,7 @@ function bsPaint(){
       <div style="flex:0 0 clamp(48px,5vw,64px)">Art.</div>
       <div style="flex:1 1 auto">Prodotto</div>
       <div class="bs-c-units">Pezzi</div>
+      <div class="bs-c-ohq">Giacenza</div>
       <div class="bs-c-net">Valore</div>
       <div class="bs-c-st">Sell-thru</div>
       <div style="flex:0 0 14px"></div>
@@ -279,6 +290,16 @@ function bsPaint(){
   ${BS.detail?bsModal(BS.detail):''}`;
   bsBind();
 }
+
+// Giacenza residua dell'articolo (colonna OHQ dell'export).
+// Nell'aggregato è la somma delle giacenze dei negozi di quella settimana.
+function bsOhq(p){
+  const v = (p.all||[])[BS_I_OHQ];
+  const n = Number(v);
+  return (v==null || !isFinite(n)) ? null : n;
+}
+function bsOhqTxt(p){ const n = bsOhq(p); return n==null ? '—' : bsFmt(n,'i'); }
+function bsOhqZero(p){ const n = bsOhq(p); return n!=null && n<=0; }
 
 function bsImg(p){
   return p.img
