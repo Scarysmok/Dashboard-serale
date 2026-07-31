@@ -42,6 +42,11 @@ const BS_GROUPS = [
 ];
 const BS_I_UNITS = 13, BS_I_ST = 25;
 
+// Codici da escludere dai report: materiale di consumo che nell'export adidas
+// compare come articolo venduto ma non è un prodotto da classifica (buste).
+// Per aggiungerne altri basta inserire il codice in questa lista.
+const BS_EXCLUDE = new Set(['LAB33290', 'LAB33291']);
+
 // Traduzioni delle categorie dell'export (in inglese) per la vista negozio.
 const BS_DIV = {FOOTWEAR:'Calzature', APPAREL:'Abbigliamento', HARDWARE:'Accessori'};
 const BS_GEN = {MEN:'Uomo', WOMEN:'Donna', KIDS:'Bambino', INFANTS:'Neonato'};
@@ -442,11 +447,13 @@ function bsParseWorkbook(ab, fileName){
     : (v===undefined ? null : v);
 
   const products = [];
+  let excluded = 0;
   for(let i=head+1;i<rows.length;i++){
     const r = rows[i]; if(!r) continue;
     const code = r[1];
     if(!code || String(code).trim()==='Product Code') continue;
     if(String(r[2]||'').trim().toUpperCase()==='TOTAL') continue;
+    if(BS_EXCLUDE.has(String(code).trim().toUpperCase())){ excluded++; continue; }
     const units = Number(r[14]||0);
     if(!(units > 0)) continue;              // solo venduto reale: no resi, no zeri
     const all = [];
@@ -466,7 +473,7 @@ function bsParseWorkbook(ab, fileName){
   }
   if(!products.length) throw new Error(`${fileName}: nessun prodotto con vendite maggiori di zero.`);
   products.sort((a,b)=>b.units-a.units);
-  return {storeRaw, period:periodLabel, period_start, period_end, season, products};
+  return {storeRaw, period:periodLabel, period_start, period_end, season, products, excluded};
 }
 
 // Corrispondenza nome-negozio adidas → brand|location della dashboard.
@@ -505,7 +512,8 @@ async function bsImportFiles(files){
         throw new Error(detail);
       }
       ok++;
-      bsLog(`<b>${bsEsc(store.location)}</b> · ${parsed.products.length} prodotti · ${parsed.period} — salvato`);
+      bsLog(`<b>${bsEsc(store.location)}</b> · ${parsed.products.length} prodotti · ${parsed.period} — salvato`
+            + (parsed.excluded ? ` (${parsed.excluded} buste escluse)` : ''));
     }catch(e){
       ko++; bsLog(`${f.name}: ${e.message||e}`, true);
     }
