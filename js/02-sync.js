@@ -2,6 +2,10 @@
 // Estratto da index.html (split del 2026-07-07). Script classici:
 // tutti i file js/ condividono lo scope globale; ordine di caricamento 01→08.
 // ── SYNC (parallelo + cache locale + cache backend condivisa + render incrementale) ──
+// Versioni degli insiemi dichiarate dal server nell'ultimo giro di sync.
+// Vuoto = nessuna informazione, quindi si scarica tutto (comportamento di prima).
+let _dsVersions = {};
+
 async function syncNow(){
   setPip('spin','Sincronizzazione…');
   load(true,'Lettura Google Drive…');
@@ -17,6 +21,10 @@ async function syncNow(){
     // (se il file su Drive non è cambiato non fa nulla) e non-bloccante: eventuali
     // errori sono silenziati e non fermano la sincronizzazione della dashboard.
     await syncConsuntiviFromDrive({silent:true});
+    // Chiedo le versioni PRIMA del blocco parallelo: è una risposta di poche
+    // decine di byte e permette ai quattro insiemi pesanti di usare la copia
+    // locale quando nulla è cambiato.
+    _dsVersions = await fetchDatasetVersions();
     // Lista file da Drive + cache backend + overrides + target + storico in
     // parallelo (latenza coperta dal request più lento). Tutti questi dati
     // servono per le viste della dashboard: pdf cache per le chiusure,
@@ -273,18 +281,123 @@ function applyOverrides(records, overrides){
   }
 }
 
+// ── CACHE LOCALE DEGLI INSIEMI PESANTI ──────────────────────────────────
+// pdfcache, historical/kpi e targets pesano insieme diversi megabyte ma
+// cambiano solo quando si importa qualcosa. Ricostruirli a ogni caricamento
+// costava ~55s sul solo pdfcache (tempo di CPU del server, non di rete).
+// Ora il browser li conserva in IndexedDB e li riscarica soltanto quando il
+// server segnala una versione diversa.
+// Tutto è a prova di guasto: se IndexedDB non è disponibile, se le versioni
+// non arrivano o se qualcosa va storto, si torna al comportamento di prima
+// (scaricare tutto), quindi la dashboard funziona comunque.
+const DCACHE_DB='chiusure-cache', DCACHE_STORE='datasets', DCACHE_VER=1;
+let _dcacheFailed=false;
+
+function dcacheOpen(){
+  return new Promise((resolve,reject)=>{
+    if(_dcacheFailed || !window.indexedDB) return reject(new Error('IndexedDB non disponibile'));
+    const req=indexedDB.open(DCACHE_DB, DCACHE_VER);
+    req.onupgradeneeded=()=>{
+      const db=req.result;
+      if(!db.objectStoreNames.contains(DCACHE_STORE)) db.createObjectStore(DCACHE_STORE);
+    };
+    req.onsuccess=()=>resolve(req.result);
+    req.onerror=()=>{_dcacheFailed=true;reject(req.error||new Error('apertura cache fallita'));};
+  });
+}
+function dcacheGet(name){
+  return dcacheOpen().then(db=>new Promise((resolve,reject)=>{
+    const tx=db.transaction(DCACHE_STORE,'readonly').objectStore(DCACHE_STORE).get(name);
+    tx.onsuccess=()=>resolve(tx.result||null);
+    tx.onerror=()=>reject(tx.error);
+  })).catch(e=>{console.debug('dcacheGet',name,e);return null;});
+}
+function dcachePut(name, version, data){
+  return dcacheOpen().then(db=>new Promise((resolve,reject)=>{
+    const tx=db.transaction(DCACHE_STORE,'readwrite').objectStore(DCACHE_STORE).put({version,data},name);
+    tx.onsuccess=()=>resolve(true);
+    tx.onerror=()=>reject(tx.error);
+  })).catch(e=>{console.debug('dcachePut',name,e);return false;});
+}
+
+// Versioni correnti degli insiemi: risposta minuscola, nessuna scansione.
+// Se l'endpoint non c'è ancora (backend non aggiornato) torna {} e si scarica
+// tutto come prima.
+async function fetchDatasetVersions(){
+  try{
+    const r=await api('/datasets/version');
+    if(!r.ok) return {};
+    const v=await r.json();
+    return (v && typeof v==='object') ? v : {};
+  }catch(e){console.debug('fetchDatasetVersions',e);return {};}
+}
+
+// Scarica `path` solo se la versione è cambiata, altrimenti riusa il locale.
+// `name` è la chiave in cache; `version` quella dichiarata dal server.
+async function fetchCached(name, path, version){
+  if(version){
+    const local=await dcacheGet(name);
+    if(local && local.version===version && local.data && typeof local.data==='object'){
+      return local.data;
+    }
+  }
+  try{
+    const r=await api(path);
+    if(!r.ok) return {};
+    const data=await r.json();
+    const out=(data && typeof data==='object') ? data : {};
+    if(version) dcachePut(name, version, out);   // in background, non attendo
+    return out;
+  }catch(e){
+    console.warn('fetchCached',path,e);
+    const local=await dcacheGet(name);           // rete giù: meglio dati vecchi che nessun dato
+    return (local && local.data) ? local.data : {};
+  }
+}
+
 // ── CACHE BACKEND CONDIVISA (PDF parsati) ──
 // Il primo utente che parsa un PDF lo deposita qui; tutti gli altri lo
 // recuperano in millisecondi senza doverlo scaricare e riparsare. Funzioni
 // non-fatali: se il backend non risponde la dashboard funziona comunque
 // (cade sulla cache locale + parsing).
+// I PDF parsati si aggiornano in modo incrementale: le chiavi contengono la
+// data di modifica del file, quindi un record non cambia mai. Si confronta
+// l'elenco chiavi del server con la copia locale e si scarica solo il mancante.
+// Questo evita di ripagare i 4 MB ogni volta che qualcuno parsa una chiusura.
+// Se qualcosa non risponde come previsto, si ricade sul vecchio /pdfcache.
 async function fetchPdfCache(){
   try{
-    const r=await api('/pdfcache');
-    if(!r.ok) return {};
-    const data=await r.json();
-    return (data && typeof data==='object') ? data : {};
-  }catch(e){console.warn('fetchPdfCache',e);return {};}
+    const rk = await api('/pdfcache/keys');
+    if(!rk.ok) throw new Error('keys non disponibile');
+    const keys = (await rk.json()).keys || [];
+    const local = await dcacheGet('pdfcache');
+    const have = (local && local.data && typeof local.data==='object') ? local.data : {};
+    const missing = keys.filter(k => !(k in have));
+
+    if(!missing.length){
+      // Tutto già in locale: elimino gli eventuali record non più sul server.
+      const out = {};
+      keys.forEach(k => { if(have[k]!==undefined) out[k] = have[k]; });
+      return out;
+    }
+
+    const rs = await api('/pdfcache/subset', {method:'POST', body: JSON.stringify({keys: missing})});
+    if(!rs.ok) throw new Error('subset non disponibile');
+    const fresh = await rs.json();
+
+    // Ricompongo tenendo solo le chiavi ancora presenti sul server.
+    const out = {};
+    keys.forEach(k => {
+      const v = (fresh && fresh[k]!==undefined) ? fresh[k] : have[k];
+      if(v!==undefined) out[k] = v;
+    });
+    dcachePut('pdfcache', 'keys:'+keys.length, out);   // in background
+    console.debug('[pdfcache] scaricati', missing.length, 'record nuovi su', keys.length);
+    return out;
+  }catch(e){
+    console.warn('fetchPdfCache incrementale non riuscito, uso il percorso completo', e);
+    return fetchCached('pdfcache', '/pdfcache', _dsVersions.pdfcache);
+  }
 }
 // Target giornalieri per negozio (caricati periodicamente da Excel via /targets/bulk).
 // Il backend restituisce un dict {storeKey|date: target} con la chiave già
@@ -292,24 +405,15 @@ async function fetchPdfCache(){
 // Non-fatale: se il backend non risponde o non ha target, le card mostrano
 // "TGT=0" come da richiesta utente.
 async function fetchTargets(){
-  try{
-    const r=await api('/targets');
-    if(!r.ok) return {};
-    const data=await r.json();
-    return (data && typeof data==='object') ? data : {};
-  }catch(e){console.warn('fetchTargets',e);return {};}
+  return fetchCached('targets', '/targets', _dsVersions.targets);
 }
 // Incassi storici (2025 + Jan-Apr 2026). Stessa struttura dei target ma il
 // valore è il net sales effettivamente incassato. Usato in tab Andamento per:
 //   1) Riempire i giorni del 2026 prima del 23/04 (pre-GoAudits)
 //   2) Confronto anno-su-anno quando il toggle "vs Anno scorso" è attivo
 async function fetchHistorical(){
-  try{
-    const r=await api('/historical');
-    if(!r.ok) return {};
-    const data=await r.json();
-    return (data && typeof data==='object') ? data : {};
-  }catch(e){console.warn('fetchHistorical',e);return {};}
+  // Stessa collezione di fetchHistoricalKpi, quindi stessa versione.
+  return fetchCached('historical', '/historical', _dsVersions.historical);
 }
 // KPI storici dal backend. Endpoint introdotto col deploy v1.2: ritorna
 // {storeKey|date: {walkIn?, quantity?, scontrini?, cr?, upt?}} solo per i
@@ -318,12 +422,7 @@ async function fetchHistorical(){
 // risponde 404/500, ritorno {} e la tab KPI continua a leggere solo dai PDF
 // GoAudits (comportamento pre-v1.2).
 async function fetchHistoricalKpi(){
-  try{
-    const r=await api('/historical/kpi');
-    if(!r.ok) return {};
-    const data=await r.json();
-    return (data && typeof data==='object') ? data : {};
-  }catch(e){console.warn('fetchHistoricalKpi',e);return {};}
+  return fetchCached('historical_kpi', '/historical/kpi', _dsVersions.historical);
 }
 // ── IMPORT AUTOMATICO CONSUNTIVI DA GOOGLE DRIVE ──
 // Chiede al backend di pescare l'ultimo .xlsx dalla cartella Drive dedicata
