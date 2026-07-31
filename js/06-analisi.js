@@ -1160,7 +1160,7 @@ function kpiRenderChart(){
       borderWidth: 2,
       tension: 0.3,
       fill: false,
-      pointRadius: 0
+      pointRadius: 3
     });
   }
 
@@ -1216,7 +1216,7 @@ function kpiRenderChart(){
       borderWidth: 2,
       tension: 0.3,
       fill: false,
-      pointRadius: 0
+      pointRadius: 3
     });
   }
 
@@ -1248,7 +1248,7 @@ function kpiRenderChart(){
       borderWidth: 2,
       tension: 0.3,
       fill: false,
-      pointRadius: 0
+      pointRadius: 3
     });
   }
 
