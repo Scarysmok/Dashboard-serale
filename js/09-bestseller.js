@@ -45,7 +45,7 @@ const BS_I_UNITS = 13, BS_I_ST = 25;
 // Codici da escludere dai report: materiale di consumo che nell'export adidas
 // compare come articolo venduto ma non è un prodotto da classifica (buste).
 // Per aggiungerne altri basta inserire il codice in questa lista.
-const BS_EXCLUDE = new Set(['LAB33290', 'LAB33291']);
+const BS_EXCLUDE = new Set(['LAB33290', 'LAB33291', 'LAB33292']);
 
 // Traduzioni delle categorie dell'export (in inglese) per la vista negozio.
 const BS_DIV = {FOOTWEAR:'Calzature', APPAREL:'Abbigliamento', HARDWARE:'Accessori'};
@@ -287,28 +287,40 @@ function bsStrip(){
 
 // Selettore combinato negozio+settimana: una voce per report disponibile,
 // più la voce aggregata per ciascuna settimana con almeno due negozi.
+// È un listbox costruito a mano perché la tendina di un <select> nativo la
+// disegna il sistema operativo e non si può portare nello stile del modulo.
 function bsHeader(d){
   const weeks = {};
   (BS.index||[]).forEach(w => { (weeks[w.period_start] = weeks[w.period_start] || []).push(w); });
   const keys = Object.keys(weeks).sort().reverse();
+
+  let cur = '—';
   let opts = '';
   keys.forEach(ps => {
     const label = weeks[ps][0].period || bsPeriodLabel(ps);
-    opts += `<optgroup label="${bsEsc(label)}">`;
+    opts += `<div class="bs-picker-group">${bsEsc(label)}</div>`;
     if(weeks[ps].length > 1){
-      const val = 'AGG|'+ps;
-      const sel = BS.cur && BS.cur.aggregate && BS.cur.period_start===ps;
-      opts += `<option value="${bsEsc(val)}"${sel?' selected':''}>★ Tutti i negozi (${weeks[ps].length})</option>`;
+      const sel = !!(BS.cur && BS.cur.aggregate && BS.cur.period_start===ps);
+      const txt = '★ Tutti i negozi';
+      if(sel) cur = txt;
+      opts += `<button class="bs-picker-opt bs-agg${sel?' bs-sel':''}" role="option"
+        aria-selected="${sel}" data-val="AGG|${bsEsc(ps)}">
+        <span class="bs-picker-mark"></span>
+        <span class="bs-picker-lab">${txt}</span>
+        <span class="bs-picker-n">${weeks[ps].length} negozi</span></button>`;
     }
     weeks[ps].forEach(w => {
-      const val = [w.brand,w.location,w.period_start].join('|');
-      const sel = BS.cur && !BS.cur.aggregate && BS.cur.brand===w.brand
-                  && BS.cur.location===w.location && BS.cur.period_start===ps;
-      opts += `<option value="${bsEsc(val)}"${sel?' selected':''}>${bsEsc(w.brand+' · '+w.location)}</option>`;
+      const sel = !!(BS.cur && !BS.cur.aggregate && BS.cur.brand===w.brand
+                     && BS.cur.location===w.location && BS.cur.period_start===ps);
+      const txt = w.brand+' · '+w.location;
+      if(sel) cur = txt;
+      opts += `<button class="bs-picker-opt${sel?' bs-sel':''}" role="option"
+        aria-selected="${sel}" data-val="${bsEsc([w.brand,w.location,w.period_start].join('|'))}">
+        <span class="bs-picker-mark"></span>
+        <span class="bs-picker-lab">${bsEsc(txt)}</span></button>`;
     });
-    opts += `</optgroup>`;
   });
-  const title = d ? (d.aggregate ? 'Tutti i negozi' : d.location) : '';
+
   return `
   <header class="bs-header"><div class="bs-header-in">
     <div class="bs-brandcol">
@@ -322,8 +334,15 @@ function bsHeader(d){
     </div>
     <div class="bs-selcol">
       <div>
-        <div class="bs-sellabel">Negozio${title?' · '+bsEsc(title):''}</div>
-        <select class="bs-storesel" id="bs-store">${opts||'<option>—</option>'}</select>
+        <div class="bs-sellabel">Negozio</div>
+        <div class="bs-picker" id="bs-picker">
+          <button class="bs-picker-btn" id="bs-picker-btn" aria-haspopup="listbox"
+            aria-expanded="false"${opts?'':' disabled'}>
+            <span class="bs-picker-cur">${bsEsc(cur)}</span>
+            <span class="bs-picker-chev">▼</span>
+          </button>
+          <div class="bs-picker-panel" id="bs-picker-panel" role="listbox">${opts}</div>
+        </div>
       </div>
       <div class="bs-chips">
         ${d&&d.period?`<span class="bs-chip">${bsEsc(d.period)}</span>`:''}
@@ -629,13 +648,28 @@ async function bsDeleteWeek(){
 function bsBind(){
   const on = (id, ev, fn) => { const el = document.getElementById(id); if(el) el.addEventListener(ev, fn); };
 
-  on('bs-store','change', async e => {
-    const v = e.target.value.split('|');
-    BS.cur = v[0]==='AGG' ? {aggregate:true, period_start:v[1]}
-                          : {brand:v[0], location:v[1], period_start:v[2]};
-    BS.query=''; BS.fDiv=''; BS.fGen=''; BS.fCat=''; BS.detail=null;
-    await bsLoadCurrent();
+  // Selettore negozio: apre/chiude senza ridisegnare tutto il modulo, così
+  // resta fluido. Scegliendo una voce parte il caricamento, che ridisegna
+  // (e quindi chiude il pannello) da solo.
+  on('bs-picker-btn','click', e => {
+    e.stopPropagation();
+    const p = document.getElementById('bs-picker');
+    if(!p) return;
+    const open = p.classList.toggle('bs-open');
+    e.currentTarget.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if(open){
+      const sel = p.querySelector('.bs-picker-opt.bs-sel');
+      if(sel) sel.scrollIntoView({block:'nearest'});
+    }
   });
+  document.querySelectorAll('#bs-picker-panel .bs-picker-opt').forEach(b =>
+    b.addEventListener('click', async () => {
+      const v = b.dataset.val.split('|');
+      BS.cur = v[0]==='AGG' ? {aggregate:true, period_start:v[1]}
+                            : {brand:v[0], location:v[1], period_start:v[2]};
+      BS.query=''; BS.fDiv=''; BS.fGen=''; BS.fCat=''; BS.detail=null;
+      await bsLoadCurrent();
+    }));
 
   const q = document.getElementById('bs-q');
   if(q) q.addEventListener('input', e => {
@@ -676,7 +710,26 @@ function bsBind(){
   on('bs-del','click', bsDeleteWeek);
 }
 
-// Esc chiude la scheda prodotto (registrato una volta sola).
+// Chiude il selettore negozio cliccando fuori. Registrato una volta sola:
+// il pannello viene ricreato a ogni paint, quindi si cerca al momento del clic.
+document.addEventListener('click', e => {
+  const p = document.getElementById('bs-picker');
+  if(p && p.classList.contains('bs-open') && !p.contains(e.target)){
+    p.classList.remove('bs-open');
+    const b = document.getElementById('bs-picker-btn');
+    if(b) b.setAttribute('aria-expanded','false');
+  }
+});
+
+// Esc: prima chiude il selettore, altrimenti la scheda prodotto.
 document.addEventListener('keydown', e => {
-  if(e.key==='Escape' && BS.detail){ BS.detail=null; bsPaint(); }
+  if(e.key !== 'Escape') return;
+  const p = document.getElementById('bs-picker');
+  if(p && p.classList.contains('bs-open')){
+    p.classList.remove('bs-open');
+    const b = document.getElementById('bs-picker-btn');
+    if(b){ b.setAttribute('aria-expanded','false'); b.focus(); }
+    return;
+  }
+  if(BS.detail){ BS.detail=null; bsPaint(); }
 });
