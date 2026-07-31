@@ -768,7 +768,9 @@ function _buildDayRow(r){
 const kpiState = {
   kpi: 'ingressi',          // 'ingressi' | 'cr' | 'upt'
   gran: 'month',            // 'day' | 'month' | 'year'
-  range: '30',              // '7' | '30' | '90' | 'ytd'
+  range: 'last',            // 'last'(default=ultimo giorno) | 'custom' | 'wtd' | 'mtd' | 'ytd'
+  customStart: null,        // ISO YYYY-MM-DD, usati quando range==='custom'
+  customEnd: null,
   view: 'chart',            // 'chart' | 'heatmap'
   brands: new Set(),        // empty = tutti
   stores: new Set(),        // keys = `${brand}|${location}` ; empty = tutti
@@ -928,18 +930,33 @@ function kpiDelta(curr, base){
 function kpiToday(){ return new Date(); }
 function kpiFmtDateISO(d){ return d.toISOString().slice(0,10); }
 function kpiShiftYear(d, n){ const x = new Date(d); x.setFullYear(x.getFullYear()+n); return x; }
+// Ancoro le date a mezzogiorno UTC così kpiFmtDateISO (toISOString) restituisce
+// ESATTAMENTE la data voluta anche per il singolo giorno (niente slittamento TZ).
+function _isoAnchor(iso){ return new Date(iso + 'T12:00:00Z'); }
+function _todayIso(){ const t=kpiToday(); return `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`; }
+// Ultimo giorno per cui esistono KPI (consuntivo o chiusura). Default all'apertura.
+function _kpiLatestDay(){
+  let max='';
+  for(const k in historicalKpiByKey){ const d=k.slice(k.lastIndexOf('|')+1); if(d>max) max=d; }
+  for(const r of allData){ if(r.dateISO && r.dateISO>max) max=r.dateISO; }
+  return max || _todayIso();
+}
 function kpiDateRange(rangeKey){
-  const end = kpiToday();
-  end.setHours(23,59,59,999);
-  if(rangeKey === 'ytd'){
-    const start = new Date(end.getFullYear(),0,1);
-    return [start, end];
+  const today=_todayIso();
+  if(rangeKey === 'ytd') return [_isoAnchor(today.slice(0,4)+'-01-01'), _isoAnchor(today)];
+  if(rangeKey === 'mtd') return [_isoAnchor(today.slice(0,7)+'-01'),   _isoAnchor(today)];
+  if(rangeKey === 'wtd'){ // da lunedì (ISO) a oggi
+    const s=_isoAnchor(today); s.setUTCDate(s.getUTCDate()-((s.getUTCDay()+6)%7));
+    return [s, _isoAnchor(today)];
   }
-  const n = +rangeKey;
-  const start = new Date(end);
-  start.setDate(start.getDate() - n + 1);
-  start.setHours(0,0,0,0);
-  return [start, end];
+  if(rangeKey === 'custom'){
+    const a=kpiState.customStart||_kpiLatestDay(), b=kpiState.customEnd||a;
+    return a<=b ? [_isoAnchor(a),_isoAnchor(b)] : [_isoAnchor(b),_isoAnchor(a)];
+  }
+  if(rangeKey === 'last'){ const d=_kpiLatestDay(); return [_isoAnchor(d), _isoAnchor(d)]; }
+  // fallback numerico (ultimi N giorni) — non più esposto da bottoni
+  const n=+rangeKey||30, e=_isoAnchor(today), s=new Date(e); s.setUTCDate(s.getUTCDate()-n+1);
+  return [s, e];
 }
 function kpiBucketKey(dateISO, gran){
   if(gran === 'day') return dateISO;
@@ -1583,9 +1600,22 @@ function kpiBindEvents(){
       document.querySelectorAll('#tab-kpi .kpi-pill[data-range]').forEach(x => x.classList.remove('on'));
       b.classList.add('on');
       kpiState.range = b.dataset.range;
+      const cust = document.getElementById('kpi-custom-dates');
+      if(kpiState.range === 'custom'){
+        const df=document.getElementById('kpi-date-from'), dt=document.getElementById('kpi-date-to');
+        if(!df.value){ const d=_kpiLatestDay(); df.value=d; dt.value=d; }
+        kpiState.customStart=df.value; kpiState.customEnd=dt.value||df.value;
+        if(cust) cust.style.display='';
+      } else if(cust){ cust.style.display='none'; }
       renderKpiAll();
     };
   });
+  // Campi data del range personalizzato: ri-renderizzo appena cambiano.
+  const _df=document.getElementById('kpi-date-from'), _dt=document.getElementById('kpi-date-to');
+  if(_df && _dt){
+    const onDate=()=>{ if(!_df.value) return; kpiState.customStart=_df.value; kpiState.customEnd=_dt.value||_df.value; kpiState.range='custom'; renderKpiAll(); };
+    _df.onchange=onDate; _dt.onchange=onDate;
+  }
   document.querySelectorAll('#tab-kpi .kpi-cmp').forEach(b => {
     b.onclick = () => {
       const k = b.dataset.cmp;

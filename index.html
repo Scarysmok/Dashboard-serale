@@ -326,10 +326,15 @@
         <button class="kpi-pill" data-gran="year">Anno</button>
       </div>
       <div class="kpi-pillrow">
-        <button class="kpi-pill" data-range="7">7gg</button>
-        <button class="kpi-pill on" data-range="30">30gg</button>
-        <button class="kpi-pill" data-range="90">90gg</button>
+        <button class="kpi-pill" data-range="custom">📅 Giorno / Periodo</button>
+        <button class="kpi-pill" data-range="wtd">WTD</button>
+        <button class="kpi-pill" data-range="mtd">MTD</button>
         <button class="kpi-pill" data-range="ytd">YTD</button>
+      </div>
+      <div class="kpi-pillrow" id="kpi-custom-dates" style="display:none">
+        <input type="date" id="kpi-date-from" style="flex:1;padding:8px 10px;border:1px solid #cbd5e1;border-radius:10px;font:600 13px Nunito;color:#334155">
+        <span style="align-self:center;color:#94a3b8">→</span>
+        <input type="date" id="kpi-date-to" style="flex:1;padding:8px 10px;border:1px solid #cbd5e1;border-radius:10px;font:600 13px Nunito;color:#334155">
       </div>
 
       <!-- Confronti -->
