@@ -4,12 +4,13 @@
 // Il rendering è lazy (parte da switchTab('bestseller')), quindi non serve che
 // le funzioni esistano già al boot.
 //
-// Divisione dei compiti, dettata da un vincolo esterno:
-//   • L'Excel viene letto nel BROWSER con SheetJS (stesso schema dei consuntivi).
-//   • Anche le foto prodotto si recuperano dal browser: l'API prodotti di adidas
-//     risponde 403 a qualunque chiamata server-side (verificato). Il backend fa
-//     solo da cache. Se anche il browser viene bloccato, c'è la via manuale
-//     (snippet da eseguire su adidas.it, risultato incollato nel pannello admin).
+// L'Excel viene letto nel BROWSER con SheetJS (stesso schema dei consuntivi):
+// al server arriva già il JSON dei prodotti.
+//
+// Foto prodotto: il recupero automatico da adidas è stato rimosso perché il
+// loro sito risponde 403 alle richieste che non arrivano da una sessione reale.
+// Il modulo mostra la foto se il prodotto ha il campo `img`, altrimenti lascia
+// il riquadro vuoto: il popolamento delle immagini avverrà per altra via.
 
 // ── Stato del modulo ────────────────────────────────────────────────────
 const BS = {
@@ -98,10 +99,15 @@ async function renderBestSeller(){
       BS.index = [];
       console.warn('[bestseller] caricamento indice fallito', e);
     }
-    // Selezione iniziale: la settimana più recente del primo negozio disponibile.
+    // Selezione iniziale: settimana più recente, vista "tutti i negozi".
+    // Se quella settimana ha un solo negozio l'aggregato non ha senso, quindi
+    // si apre direttamente su quel negozio.
     if(BS.index.length && !BS.cur){
-      const f = BS.index[0];
-      BS.cur = {brand:f.brand, location:f.location, period_start:f.period_start};
+      const last = BS.index.map(w=>w.period_start).sort().reverse()[0];
+      const inWeek = BS.index.filter(w => w.period_start === last);
+      BS.cur = inWeek.length > 1
+        ? {aggregate:true, period_start:last}
+        : {brand:inWeek[0].brand, location:inWeek[0].location, period_start:last};
     }
   }
   if(BS.cur && !BS.data) { await bsLoadCurrent(); return; }
@@ -150,16 +156,16 @@ function bsPaint(){
 
   if(!BS.index || !BS.index.length){
     root.innerHTML = bsStrip() + bsHeader(null) +
-      (admin ? bsAdminPanel() : '') +
+      bsAdminLog() +
       bsState('Nessun report caricato',
-              admin ? 'Carica il primo Excel dal pannello qui sopra.'
+              admin ? 'Usa “Importa Excel” qui sopra per caricare il primo report.'
                     : 'I best seller compariranno qui appena caricati.') +
       bsFooter();
     bsBind();
     return;
   }
   if(BS.data && BS.data.error){
-    root.innerHTML = bsStrip() + bsHeader(null) + (admin?bsAdminPanel():'') +
+    root.innerHTML = bsStrip() + bsHeader(BS.data) + bsAdminLog() +
       bsState('Report non disponibile', BS.data.error) + bsFooter();
     bsBind();
     return;
@@ -232,7 +238,7 @@ function bsPaint(){
       <div class="bs-kpi-v" style="font-size:${k.size}">${bsEsc(k.v)}</div>
       <div class="bs-kpi-s">${bsEsc(k.s)}</div></div>`).join('')}
   </div></div>
-  ${bsIsAdmin()?bsAdminPanel():''}
+  ${bsAdminLog()}
   ${list.length>=3?`<section class="bs-section">
     <div class="bs-sechead"><h3>Podio</h3><div class="bs-rule"></div>
       <span class="bs-secmeta">Top 3 · ${BS.sort==='units'?'per pezzi venduti':'per valore netto'}</span></div>
@@ -347,9 +353,22 @@ function bsHeader(d){
       <div class="bs-chips">
         ${d&&d.period?`<span class="bs-chip">${bsEsc(d.period)}</span>`:''}
         ${d&&d.season?`<span class="bs-chip">${bsEsc(d.season)}</span>`:''}
+        ${bsAdminChips(d)}
       </div>
     </div>
   </div></header>`;
+}
+
+// Azioni admin come pillole accanto al periodo: l'import è l'operazione più
+// frequente e sta dove si guarda la settimana di riferimento.
+function bsAdminChips(d){
+  if(!bsIsAdmin()) return '';
+  const canDelete = !!(BS.cur && !BS.cur.aggregate && d && !d.error);
+  return `
+    <input type="file" id="bs-file" accept=".xlsx,.xls" multiple style="display:none">
+    <button class="bs-chip-btn" id="bs-import"${BS.busy?' disabled':''}>
+      ${BS.busy?'⏳ Importo…':'📥 Importa Excel'}</button>
+    ${canDelete?`<button class="bs-chip-btn" id="bs-del">🗑 Elimina settimana</button>`:''}`;
 }
 
 function bsFooter(){
@@ -393,37 +412,19 @@ function bsModal(p){
   </div></div>`;
 }
 
-// ── Pannello admin: import Excel, foto, corrispondenze ──────────────────
-function bsAdminPanel(){
-  const logHtml = BS.log.length
-    ? `<div class="bs-log">${BS.log.map(l=>l).join('<br>')}</div>` : '';
-  const cur = BS.cur && !BS.cur.aggregate && BS.data && !BS.data.error;
+// ── Registro operazioni admin ───────────────────────────────────────────
+// I pulsanti stanno nell'header (vedi bsAdminChips): qui resta solo l'esito
+// degli import, mostrato finché ci sono righe da leggere.
+function bsAdminLog(){
+  if(!bsIsAdmin() || !BS.log.length) return '';
   return `
   <div class="bs-admin"><div class="bs-admin-box">
     <div class="bs-admin-h">
-      <h4>Gestione report</h4>
-      <span class="bs-note">solo admin</span>
+      <h4>Esito import</h4>
       <div style="flex:1"></div>
-      <input type="file" id="bs-file" accept=".xlsx,.xls" multiple style="display:none">
-      <button class="bs-btn" id="bs-import"${BS.busy?' disabled':''}>📥 Importa Excel</button>
-      <button class="bs-btn bs-ghost" id="bs-photos"${BS.busy?' disabled':''}>🖼 Recupera foto</button>
-      ${cur?`<button class="bs-btn bs-ghost" id="bs-del">🗑 Elimina settimana</button>`:''}
+      <button class="bs-btn bs-ghost" id="bs-log-clear">Nascondi</button>
     </div>
-    <div class="bs-note">Un file per negozio: negozio, periodo e stagione vengono letti dal file stesso.
-      Ricaricare la stessa settimana la sostituisce; le altre restano nello storico.</div>
-    ${logHtml}
-    <details style="margin-top:14px">
-      <summary class="bs-note" style="cursor:pointer">Foto bloccate da adidas? Via manuale</summary>
-      <div class="bs-note" style="margin-top:10px">
-        1. Apri <b>adidas.it</b> in un'altra scheda · 2. Console (F12) · 3. incolla lo snippet che trovi
-        col pulsante qui sotto · 4. incolla qui il risultato.
-      </div>
-      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
-        <button class="bs-btn bs-ghost" id="bs-snippet">📋 Copia snippet</button>
-        <button class="bs-btn bs-ghost" id="bs-paste-save">💾 Salva incollato</button>
-      </div>
-      <textarea class="bs-ta" id="bs-paste" placeholder='{"JY5212":"https://assets.adidas.com/..."}'></textarea>
-    </details>
+    <div class="bs-log">${BS.log.join('<br>')}</div>
   </div></div>`;
 }
 
@@ -548,95 +549,7 @@ async function bsImportFiles(files){
   // Ricarico indice e corrispondenze, poi riparto dalla settimana appena caricata.
   BS.index = null; BS.data = null; BS.cur = null; BS.busy = false;
   await renderBestSeller();
-  bsLog(`Import concluso: ${ok} ok${ko?`, ${ko} con errori`:''}. Ora recupera le foto.`);
-}
-
-// ── Foto prodotto ───────────────────────────────────────────────────────
-// L'API adidas concede i CORS ma può rispondere 403 alle richieste che non
-// arrivano da una sessione reale sul suo sito: se accade, il pannello indica
-// la via manuale invece di fallire silenziosamente.
-async function bsFetchPhotos(){
-  BS.busy = true; bsPaint();
-  try{
-    const rm = await api('/bestseller/images/missing');
-    if(!rm.ok) throw new Error('Errore '+rm.status);
-    const codes = (await rm.json()).codes || [];
-    if(!codes.length){ bsLog('Nessuna foto mancante.'); BS.busy=false; bsPaint(); return; }
-    bsLog(`Cerco ${codes.length} foto su adidas…`);
-    const found = {}; let blocked = 0, idx = 0;
-    async function worker(){
-      while(idx < codes.length){
-        const c = codes[idx++];
-        try{
-          const r = await fetch('https://www.adidas.it/api/products/'+encodeURIComponent(c));
-          if(!r.ok){ blocked++; continue; }
-          const j = await r.json();
-          let u = j.image_url || (j.view_list||[]).map(v=>v.image_url).find(Boolean);
-          if(u) found[c] = u.replace(/w_\d+/,'w_300').replace(/h_\d+/,'h_300');
-        }catch(_){ blocked++; }
-      }
-    }
-    await Promise.all(Array.from({length:6}, worker));
-    const n = Object.keys(found).length;
-    if(n) await bsSaveImages(found);
-    if(!n && blocked) bsLog(`adidas ha bloccato le richieste (${blocked}). Usa la via manuale qui sotto.`, true);
-    else bsLog(`Foto trovate: ${n} su ${codes.length}${blocked?` (${blocked} non disponibili)`:''}.`);
-  }catch(e){
-    bsLog('Recupero foto fallito: '+(e.message||e), true);
-  }
-  BS.busy = false; BS.data = null; await bsLoadCurrent();
-}
-
-async function bsSaveImages(map){
-  const images = Object.entries(map).map(([code,url])=>({code,url}));
-  const r = await api('/bestseller/images', {method:'POST', body: JSON.stringify({images})});
-  if(!r.ok) throw new Error('Salvataggio foto: errore '+r.status);
-  const j = await r.json();
-  bsLog(`Foto salvate in cache: ${j.saved}.`);
-}
-
-const BS_SNIPPET = `// Incolla nella console di adidas.it, poi copia il risultato e incollalo nella dashboard.
-(async () => {
-  const codes = CODICI;
-  const out = {}; let i = 0;
-  async function w(){ while(i < codes.length){ const c = codes[i++];
-    try { const r = await fetch('/api/products/'+c); if(!r.ok) continue; const j = await r.json();
-      let u = j.image_url || (j.view_list||[]).map(v=>v.image_url).find(Boolean);
-      if(u) out[c] = u.replace(/w_\\d+/,'w_300').replace(/h_\\d+/,'h_300');
-    } catch(e){} } }
-  await Promise.all(Array.from({length:6}, w));
-  console.log('Trovate', Object.keys(out).length, 'foto — copia la riga qui sotto:');
-  console.log(JSON.stringify(out));
-})();`;
-
-async function bsCopySnippet(){
-  try{
-    const r = await api('/bestseller/images/missing');
-    const codes = r.ok ? ((await r.json()).codes || []) : [];
-    if(!codes.length){ bsLog('Nessuna foto mancante: snippet non necessario.'); return; }
-    const txt = BS_SNIPPET.replace('CODICI', JSON.stringify(codes));
-    await navigator.clipboard.writeText(txt);
-    bsLog(`Snippet copiato (${codes.length} codici). Incollalo nella console di adidas.it.`);
-  }catch(e){
-    bsLog('Copia snippet fallita: '+(e.message||e), true);
-  }
-}
-
-async function bsSavePasted(){
-  const ta = document.getElementById('bs-paste');
-  const raw = (ta && ta.value || '').trim();
-  if(!raw){ bsLog('Incolla prima il risultato dello snippet.', true); return; }
-  try{
-    const map = JSON.parse(raw);
-    const clean = {};
-    Object.entries(map).forEach(([k,v])=>{ if(k && typeof v==='string' && v.startsWith('http')) clean[k]=v; });
-    if(!Object.keys(clean).length) throw new Error('Nessun link valido trovato.');
-    await bsSaveImages(clean);
-    if(ta) ta.value = '';
-    BS.data = null; await bsLoadCurrent();
-  }catch(e){
-    bsLog('Testo incollato non valido: '+(e.message||e), true);
-  }
+  bsLog(`Import concluso: ${ok} ok${ko?`, ${ko} con errori`:''}.`);
 }
 
 async function bsDeleteWeek(){
@@ -712,10 +625,8 @@ function bsBind(){
     e.target.value = '';
     if(files.length) bsImportFiles(files);
   });
-  on('bs-photos','click', bsFetchPhotos);
-  on('bs-snippet','click', bsCopySnippet);
-  on('bs-paste-save','click', bsSavePasted);
   on('bs-del','click', bsDeleteWeek);
+  on('bs-log-clear','click', () => { BS.log = []; bsPaint(); });
 }
 
 // Chiude il selettore negozio cliccando fuori. Registrato una volta sola:
