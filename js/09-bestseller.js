@@ -85,19 +85,38 @@ function bsPeriodLabel(iso){
   return m ? `${m[3]}/${m[2]}/${m[1]}` : iso;
 }
 
+// Chiamata con limite di attesa. Il backend sta su Render: dopo un periodo di
+// inattività o subito dopo un deploy la prima risposta può richiedere quasi un
+// minuto (cold start). Senza un limite l'attesa resterebbe muta a schermo.
+const BS_TIMEOUT = 50000;
+async function bsApi(path, opts){
+  const ac = new AbortController();
+  const t = setTimeout(() => ac.abort(), BS_TIMEOUT);
+  try{
+    return await api(path, Object.assign({}, opts, {signal: ac.signal}));
+  }finally{
+    clearTimeout(t);
+  }
+}
+const bsIsAbort = e => e && (e.name === 'AbortError' || /abort/i.test(e.message||''));
+
 // ── Ingresso: chiamato da switchTab('bestseller') ───────────────────────
 async function renderBestSeller(){
   const root = document.getElementById('bs-root');
   if(!root) return;
   if(BS.index === null){
-    root.innerHTML = bsState('Carico i report…','');
+    root.innerHTML = bsState('Carico i report…','il server si sta svegliando, può richiedere qualche secondo');
     try{
-      const [ri, rm] = await Promise.all([api('/bestseller/index'), api('/bestseller/map')]);
+      const [ri, rm] = await Promise.all([bsApi('/bestseller/index'), bsApi('/bestseller/map')]);
       BS.index = ri.ok ? await ri.json() : [];
       BS.map = rm.ok ? await rm.json() : [];
     }catch(e){
-      BS.index = [];
       console.warn('[bestseller] caricamento indice fallito', e);
+      root.innerHTML = bsStrip() + bsHeader(null) + bsRetry(bsIsAbort(e)
+        ? 'Il server non ha risposto in tempo'
+        : 'Non riesco a contattare il server') + bsFooter();
+      bsBind();
+      return;   // BS.index resta null: al prossimo tentativo si riprova davvero
     }
     // Selezione iniziale: settimana più recente, vista "tutti i negozi".
     // Se quella settimana ha un solo negozio l'aggregato non ha senso, quindi
@@ -147,6 +166,16 @@ function bsFiltered(){
 function bsState(title, sub){
   return `<div class="bs-state"><div class="bs-state-t">${bsEsc(title)}</div>`+
          (sub?`<div class="bs-state-s">${bsEsc(sub)}</div>`:'')+`</div>`;
+}
+
+// Stato di errore con possibilità di riprovare, invece di un'attesa infinita.
+function bsRetry(msg){
+  return `<div class="bs-state">
+    <div class="bs-state-t">${bsEsc(msg)}</div>
+    <div class="bs-state-s">Il servizio va in pausa quando non è usato: il primo
+      risveglio può richiedere fino a un minuto.</div>
+    <div style="margin-top:22px"><button class="bs-btn" id="bs-reload">↻ Riprova</button></div>
+  </div>`;
 }
 
 function bsPaint(){
@@ -458,8 +487,10 @@ function bsAdminLog(){
   </div></div>`;
 }
 
+// Il messaggio è HTML: chi chiama passa i valori variabili già ripuliti con
+// bsEsc, così restano leggibili le parti in grassetto volute.
 function bsLog(msg, err){
-  BS.log.unshift(err?`<span class="bs-err">${bsEsc(msg)}</span>`:bsEsc(msg));
+  BS.log.unshift(err?`<span class="bs-err">${msg}</span>`:String(msg));
   BS.log = BS.log.slice(0,40);
   const el = document.querySelector('.bs-log');
   if(el) el.innerHTML = BS.log.join('<br>');
@@ -547,10 +578,10 @@ async function bsImportFiles(files){
   let ok=0, ko=0;
   for(const f of files){
     try{
-      bsLog(`Leggo ${f.name}…`);
+      bsLog(`Leggo ${bsEsc(f.name)}…`);
       const parsed = bsParseWorkbook(await f.arrayBuffer(), f.name);
       const store = bsResolveStore(parsed.storeRaw);
-      if(!store){ bsLog(`${f.name}: salto (nessun negozio scelto).`); continue; }
+      if(!store){ bsLog(`${bsEsc(f.name)}: salto (nessun negozio scelto).`); continue; }
       const r = await api('/bestseller/week', {method:'POST', body: JSON.stringify({
         brand: store.brand, location: store.location, store_raw: parsed.storeRaw,
         period: parsed.period, period_start: parsed.period_start,
@@ -573,7 +604,7 @@ async function bsImportFiles(files){
       bsLog(`<b>${bsEsc(store.location)}</b> · ${parsed.products.length} prodotti · ${parsed.period} — salvato`
             + (parsed.excluded ? ` (${parsed.excluded} buste escluse)` : ''));
     }catch(e){
-      ko++; bsLog(`${f.name}: ${e.message||e}`, true);
+      ko++; bsLog(`${bsEsc(f.name)}: ${bsEsc(e.message||e)}`, true);
     }
   }
   // Ricarico indice e corrispondenze, poi riparto dalla settimana appena caricata.
@@ -613,7 +644,7 @@ async function bsPickPhotos(files){
     for(const f of files){
       if(/\.zip$/i.test(f.name)){
         if(typeof JSZip === 'undefined') throw new Error('JSZip non caricato: ricarica la pagina');
-        bsLog(`Apro ${f.name}…`);
+        bsLog(`Apro ${bsEsc(f.name)}…`);
         const zip = await JSZip.loadAsync(await f.arrayBuffer());
         const entries = [];
         zip.forEach((path, e) => { if(!e.dir && /\.(png|jpe?g|webp)$/i.test(path)) entries.push(e); });
@@ -626,7 +657,7 @@ async function bsPickPhotos(files){
     bsLog(`Trovate ${imgs.length} immagini, le preparo…`);
 
     // Abbinamento nome file → codice articolo.
-    let noMatch = 0, done = 0, saved = 0;
+    let noMatch = 0, done = 0, saved = 0, rejected = 0, shown = false;
     let batch = [];
     for(const im of imgs){
       const code = bsMatchCode(im.name, byCode);
@@ -638,17 +669,31 @@ async function bsPickPhotos(files){
       batch.push({code, data_url: dataUrl});
       done++;
       if(batch.length >= BS_PHOTO_BATCH){
-        saved += await bsSendPhotos(batch); batch = [];
+        const res = await bsSendPhotos(batch);
+        saved += res.written; rejected += res.skipped;
+        if(res.skipped && !shown){
+          shown = true;
+          const why = Object.entries(res.reasons).map(([k,v])=>`${v}× ${k}`).join(', ');
+          const d = batch[0].data_url || '';
+          bsLog(`Il server ha rifiutato ${res.skipped} immagini: ${bsEsc(why)}. `
+            + `Esempio — codice <b>${bsEsc(batch[0].code)}</b>, dato di ${d.length} `
+            + `caratteri che inizia con “${bsEsc(d.slice(0,32))}”.`, true);
+        }
+        batch = [];
         bsLog(`Caricate ${saved} foto su ${imgs.length - noMatch}…`);
       }
     }
-    if(batch.length) saved += await bsSendPhotos(batch);
+    if(batch.length){
+      const res = await bsSendPhotos(batch);
+      saved += res.written; rejected += res.skipped;
+    }
 
     bsLog(`Foto salvate: <b>${saved}</b>`
       + (noMatch ? ` · ${noMatch} file senza codice riconoscibile` : '')
-      + `. Articoli ancora senza foto: ${known.length - done < 0 ? 0 : known.length - done}.`);
+      + (rejected ? ` · <b>${rejected} rifiutate dal server</b>` : '')
+      + `. Articoli ancora senza foto: ${known.length - saved < 0 ? 0 : known.length - saved}.`);
   }catch(e){
-    bsLog('Caricamento foto fallito: '+(e.message||e), true);
+    bsLog('Caricamento foto fallito: '+bsEsc(e.message||e), true);
   }
   BS.busy = false;
   BS.data = null;
@@ -696,7 +741,11 @@ async function bsSendPhotos(photos){
   const r = await api('/bestseller/photos', {method:'POST', body: JSON.stringify({photos})});
   if(!r.ok) throw new Error('salvataggio foto: errore '+r.status);
   const j = await r.json();
-  return j.saved || 0;
+  // `written` sono le scritture effettivamente eseguite: è il dato che conta.
+  // `saved` è il conteggio riportato da Mongo e può essere 0 anche a scrittura
+  // avvenuta (documento identico), quindi non lo si usa come verità.
+  return {written: j.written || 0, saved: j.saved || 0,
+          skipped: j.skipped || 0, reasons: j.reasons || {}};
 }
 
 // ── Esportazione codici articolo ────────────────────────────────────────
@@ -735,7 +784,7 @@ async function bsDownloadCodes(){
     URL.revokeObjectURL(url);
     bsLog(`Scaricati <b>${items.length}</b> codici senza foto (su ${all.length} totali).`);
   }catch(e){
-    bsLog('Esportazione codici fallita: '+(e.message||e), true);
+    bsLog('Esportazione codici fallita: '+bsEsc(e.message||e), true);
   }
 }
 
@@ -821,6 +870,7 @@ function bsBind(){
   on('bs-codes','click', bsDownloadCodes);
   on('bs-del','click', bsDeleteWeek);
   on('bs-log-clear','click', () => { BS.log = []; bsPaint(); });
+  on('bs-reload','click', () => { BS.index = null; BS.data = null; renderBestSeller(); });
 }
 
 // Chiude il selettore negozio cliccando fuori. Registrato una volta sola:
