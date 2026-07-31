@@ -531,6 +531,14 @@ async function bsImportFiles(files){
         throw new Error(detail);
       }
       ok++;
+      // La corrispondenza appena confermata entra subito nella cache locale:
+      // caricando più settimane dello stesso negozio non la richiede di nuovo.
+      if(!(BS.map||[]).some(m => m.raw === bsNorm(parsed.storeRaw))){
+        (BS.map = BS.map || []).push({
+          raw: bsNorm(parsed.storeRaw), label: parsed.storeRaw,
+          brand: store.brand, location: store.location,
+        });
+      }
       bsLog(`<b>${bsEsc(store.location)}</b> · ${parsed.products.length} prodotti · ${parsed.period} — salvato`
             + (parsed.excluded ? ` (${parsed.excluded} buste escluse)` : ''));
     }catch(e){
