@@ -19,7 +19,7 @@ const BS = {
   cur: null,        // selezione: {brand, location, period_start} | {aggregate:true, period_start}
   data: null,       // report caricato
   photos: null,     // elenco file della cartella Drive foto; null = non ancora chiesto
-  query: '', fDiv: '', fGen: '', fCat: '', sort: 'units',
+  query: '', fDiv: '', fGen: '', fCat: '', fSea: '', sort: 'units',
   detail: null,     // prodotto aperto nella scheda
   busy: false,
   log: [],
@@ -43,6 +43,21 @@ const BS_GROUPS = [
   {title:'Stock & rotazione', idx:[22,23,24,25,26,27]},
 ];
 const BS_I_UNITS = 13, BS_I_ST = 25, BS_I_OHQ = 22;   // OHQ = giacenza residua
+const BS_I_SEASON = 5;   // colonna G dell'export: la stagione è un dato per articolo
+
+// Ordina le stagioni dalla più recente: FW2026, SS2026, FW2025… L'ordine
+// alfabetico metterebbe tutte le FW prima di tutte le SS, che non serve a nulla.
+// Una sigla non riconosciuta finisce in fondo, in ordine alfabetico.
+function bsSeasonCmp(a,b){
+  const p = s => { const m = String(s||'').match(/^(SS|FW)\s*(\d{4})$/i);
+    return m ? [+m[2], m[1].toUpperCase()==='FW' ? 1 : 0] : null; };
+  const pa = p(a), pb = p(b);
+  if(!pa && !pb) return String(a).localeCompare(String(b));
+  if(!pa) return 1;
+  if(!pb) return -1;
+  return pb[0]-pa[0] || pb[1]-pa[1];
+}
+const bsSeason = p => String((p.all||[])[BS_I_SEASON] || '').trim();
 
 // Nomi delle colonne nell'export adidas, nell'ordine di BS_FIELDS. Servono a
 // riconoscere le colonne PER NOME e non per posizione.
@@ -180,6 +195,7 @@ function bsFiltered(){
   const q = BS.query.trim().toLowerCase();
   const list = (BS.data.products||[]).filter(p =>
     (!BS.fDiv || p.div===BS.fDiv) && (!BS.fGen || p.gender===BS.fGen) && (!BS.fCat || p.cat===BS.fCat) &&
+    (!BS.fSea || bsSeason(p)===BS.fSea) &&
     (!q || (p.name||'').toLowerCase().includes(q) || (p.code||'').toLowerCase().includes(q)));
   return list.slice().sort((a,b)=> BS.sort==='units' ? b.units-a.units : b.net-a.net);
 }
@@ -289,7 +305,7 @@ function bsPaint(){
     </button>`;
   }).join('');
 
-  const hasF = !!(BS.query||BS.fDiv||BS.fGen||BS.fCat);
+  const hasF = !!(BS.query||BS.fDiv||BS.fGen||BS.fCat||BS.fSea);
   const opt = (v,cur)=>`<option value="${bsEsc(v)}"${v===cur?' selected':''}>${bsEsc(v)}</option>`;
 
   root.innerHTML = bsStrip() + bsHeader(d) + `
@@ -314,6 +330,8 @@ function bsPaint(){
       ${bsUniq(all.map(p=>p.gender)).map(v=>opt(v,BS.fGen)).join('')}</select>
     <select class="bs-fsel" id="bs-fcat"><option value="">Categoria</option>
       ${bsUniq(all.map(p=>p.cat)).map(v=>opt(v,BS.fCat)).join('')}</select>
+    <select class="bs-fsel" id="bs-fsea"><option value="">Stagione</option>
+      ${bsUniq(all.map(bsSeason)).sort(bsSeasonCmp).map(v=>opt(v,BS.fSea)).join('')}</select>
     <div class="bs-sortgrp">
       <button class="bs-sortbtn${BS.sort==='units'?' bs-on':''}" data-sort="units">Pezzi</button>
       <button class="bs-sortbtn${BS.sort==='net'?' bs-on':''}" data-sort="net">Valore</button>
@@ -505,7 +523,6 @@ function bsHeader(d){
         </div>
       </div>
       <div class="bs-chips">
-        ${d&&d.season?`<span class="bs-chip">${bsEsc(d.season)}</span>`:''}
         ${bsAdminChips(d)}
       </div>
     </div>
@@ -901,7 +918,8 @@ function bsBind(){
   on('bs-fdiv','change', e => { BS.fDiv = e.target.value; bsPaint(); });
   on('bs-fgen','change', e => { BS.fGen = e.target.value; bsPaint(); });
   on('bs-fcat','change', e => { BS.fCat = e.target.value; bsPaint(); });
-  on('bs-reset','click', () => { BS.query=''; BS.fDiv=''; BS.fGen=''; BS.fCat=''; bsPaint(); });
+  on('bs-fsea','change', e => { BS.fSea = e.target.value; bsPaint(); });
+  on('bs-reset','click', () => { bsResetView(); bsPaint(); });
 
   document.querySelectorAll('#bs-root [data-sort]').forEach(b =>
     b.addEventListener('click', () => { BS.sort = b.dataset.sort; bsPaint(); }));
@@ -932,7 +950,7 @@ function bsBind(){
 // Azzera vista e filtri quando cambia la selezione: i filtri di una settimana
 // non hanno senso su un'altra (una divisione può non esserci nemmeno).
 function bsResetView(){
-  BS.query=''; BS.fDiv=''; BS.fGen=''; BS.fCat=''; BS.detail=null;
+  BS.query=''; BS.fDiv=''; BS.fGen=''; BS.fCat=''; BS.fSea=''; BS.detail=null;
 }
 
 // Chiude i pannelli aperti, tranne `keep`. Restituisce quanti ne ha chiusi.
