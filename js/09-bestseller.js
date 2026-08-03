@@ -44,6 +44,24 @@ const BS_GROUPS = [
 ];
 const BS_I_UNITS = 13, BS_I_ST = 25, BS_I_OHQ = 22;   // OHQ = giacenza residua
 
+// Nomi delle colonne nell'export adidas, nell'ordine di BS_FIELDS. Servono a
+// riconoscere le colonne PER NOME e non per posizione.
+// Perché: il portale esporta con insiemi di colonne diversi. Il file del 30/07
+// ha "Gross Sales FP %" e "Net Sales FP" fra SQ e Net Sales WSP, altri export ne
+// sono privi: tutto ciò che segue slitta di due e la giacenza finisce a leggere
+// Unit WSP, cioè euro. È così che in classifica sono comparse giacenze con i
+// decimali (03/08). Una colonna assente resta null e in scheda mostra "—".
+const BS_COLNAMES = [
+  'Product Code','Product Name','Sports Category','Gender','Gender 2','Season',
+  'Business Segment','Carry overs','Product Division','Class ID','First Trace','ABC',
+  'Net Sales','SQ','Gross Sales FP %','Net Sales FP','Net Sales WSP',
+  'Margin','Margin %','Discount','Discount %','ASP','OHQ','OHQ WSP',
+  'Unit WSP','Sell through %','Sell through WSP %','WOS',
+];
+// Senza queste non si può costruire una classifica affidabile.
+const BS_COL_REQUIRED = ['Product Code','Net Sales','SQ','OHQ'];
+const bsNormCol = s => String(s==null?'':s).replace(/\s+/g,' ').trim().toLowerCase();
+
 // Codici da escludere dai report: materiale di consumo che nell'export adidas
 // compare come articolo venduto ma non è un prodotto da classifica (buste).
 // Per aggiungerne altri basta inserire il codice in questa lista.
@@ -604,34 +622,46 @@ function bsParseWorkbook(ab, fileName){
     ? v.toISOString().slice(0,10)
     : (v===undefined ? null : v);
 
+  // Colonne riconosciute per NOME dalla riga di intestazione, non per posizione:
+  // il portale esporta con insiemi di colonne diversi (vedi BS_COLNAMES).
+  // `col[k]` = posizione nel file della k-esima colonna canonica, -1 se assente.
+  const pos = {};
+  (rows[head]||[]).forEach((h,i) => { const k = bsNormCol(h); if(k && !(k in pos)) pos[k] = i; });
+  const col = BS_COLNAMES.map(n => { const i = pos[bsNormCol(n)]; return i===undefined ? -1 : i; });
+  const mancanti = BS_COL_REQUIRED.filter(n => col[BS_COLNAMES.indexOf(n)] < 0);
+  if(mancanti.length) throw new Error(`${fileName}: colonne mancanti nell'export (${mancanti.join(', ')}).`);
+  const ignorate = BS_COLNAMES.filter(n => col[BS_COLNAMES.indexOf(n)] < 0);
+  const at = (r, k) => col[k] < 0 ? null : r[col[k]];
+
+  const I_CODE=0, I_NAME=1, I_CAT=2, I_GEN=3, I_DIV=8, I_NET=12, I_SQ=13;
   const products = [];
   let excluded = 0;
   for(let i=head+1;i<rows.length;i++){
     const r = rows[i]; if(!r) continue;
-    const code = r[1];
+    const code = at(r, I_CODE);
     if(!code || String(code).trim()==='Product Code') continue;
-    if(String(r[2]||'').trim().toUpperCase()==='TOTAL') continue;
+    if(String(at(r, I_NAME)||'').trim().toUpperCase()==='TOTAL') continue;
     if(BS_EXCLUDE.has(String(code).trim().toUpperCase())){ excluded++; continue; }
-    const units = Number(r[14]||0);
+    const units = Number(at(r, I_SQ)||0);
     if(!(units > 0)) continue;              // solo venduto reale: no resi, no zeri
-    const all = [];
-    for(let c=1;c<=28;c++) all.push(cell(r[c]));
+    const all = BS_COLNAMES.map((_,k) => cell(at(r, k)));
     const up = s => String(s||'').trim().toUpperCase();
     const tit = s => { const t=String(s||'').trim(); return t? t.charAt(0)+t.slice(1).toLowerCase() : ''; };
     products.push({
       code: String(code).trim(),
-      name: String(r[2]||'').trim(),
-      cat:  BS_CAT[up(r[3])] || tit(r[3]),
-      gender: BS_GEN[up(r[4])] || tit(r[4]),
-      div:  BS_DIV[up(r[9])] || tit(r[9]),
+      name: String(at(r, I_NAME)||'').trim(),
+      cat:  BS_CAT[up(at(r, I_CAT))] || tit(at(r, I_CAT)),
+      gender: BS_GEN[up(at(r, I_GEN))] || tit(at(r, I_GEN)),
+      div:  BS_DIV[up(at(r, I_DIV))] || tit(at(r, I_DIV)),
       units: Math.round(units),
-      net: Math.round(Number(r[13]||0)),
+      net: Math.round(Number(at(r, I_NET)||0)),
       all,
     });
   }
   if(!products.length) throw new Error(`${fileName}: nessun prodotto con vendite maggiori di zero.`);
   products.sort((a,b)=>b.units-a.units);
-  return {storeRaw, period:periodLabel, period_start, period_end, season, products, excluded};
+  return {storeRaw, period:periodLabel, period_start, period_end, season, products, excluded,
+          missingCols: ignorate};
 }
 
 // Corrispondenza nome-negozio adidas → brand|location della dashboard.
@@ -657,6 +687,9 @@ async function bsImportFiles(files){
     try{
       bsLog(`Leggo ${bsEsc(f.name)}…`);
       const parsed = bsParseWorkbook(await f.arrayBuffer(), f.name);
+      if(parsed.missingCols && parsed.missingCols.length)
+        bsLog(`${bsEsc(f.name)}: in questo export mancano ${bsEsc(parsed.missingCols.join(', '))}`
+          + ` — restano vuote in scheda, il resto è allineato per nome di colonna.`);
       const store = bsResolveStore(parsed.storeRaw);
       if(!store){ bsLog(`${bsEsc(f.name)}: salto (nessun negozio scelto).`); continue; }
       const r = await api('/bestseller/week', {method:'POST', body: JSON.stringify({
