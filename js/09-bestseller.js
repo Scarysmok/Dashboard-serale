@@ -719,7 +719,12 @@ async function bsAttachPhotos(products){
     if(!products || !products.length) return;
     if(BS.photos === null){
       const r = await api('/bestseller/photos');
-      BS.photos = r.ok ? ((await r.json()).files || []) : [];
+      const list = r.ok ? ((await r.json()).files || []) : [];
+      // Ordino per nome: dell'export adidas arrivano più viste per articolo
+      // (IA5379_1_…, IA5379_2_…) e sotto si tiene la prima che abbina. Senza
+      // ordinamento vincerebbe quella che Drive restituisce per prima, cioè a
+      // caso; così vince sempre la vista _1_, quella standard.
+      BS.photos = list.sort((a,b) => String(a.name||'').localeCompare(String(b.name||'')));
     }
     if(!BS.photos.length) return;
     const byCode = new Map(products.map(p => [String(p.code||'').toUpperCase(), p.code]));
