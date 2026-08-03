@@ -18,6 +18,7 @@ const BS = {
   map: [],          // corrispondenze nome-negozio adidas → brand|location
   cur: null,        // selezione: {brand, location, period_start} | {aggregate:true, period_start}
   data: null,       // report caricato
+  photos: null,     // elenco file della cartella Drive foto; null = non ancora chiesto
   query: '', fDiv: '', fGen: '', fCat: '', sort: 'units',
   detail: null,     // prodotto aperto nella scheda
   busy: false,
@@ -145,7 +146,10 @@ async function bsLoadCurrent(){
       : await api('/bestseller/week?brand='+encodeURIComponent(c.brand)
                  +'&location='+encodeURIComponent(c.location)
                  +'&period_start='+encodeURIComponent(c.period_start));
-    if(r.ok) BS.data = await r.json();
+    if(r.ok){
+      BS.data = await r.json();
+      await bsAttachPhotos(BS.data.products);
+    }
     else BS.data = {error: 'Errore '+r.status};
   }catch(e){
     BS.data = {error: String(e.message||e)};
@@ -612,15 +616,44 @@ async function bsImportFiles(files){
 }
 
 // ── Foto prodotto ───────────────────────────────────────────────────────
-// Il caricamento delle foto dall'app è stato RIMOSSO il 03/08: le miniature
-// finivano in MongoDB e hanno saturato la memoria di Render (OOM, app offline).
-// Le foto andranno in una cartella Drive condivisa, caricate a mano, e il
-// backend la leggerà con l'API key che ha già. Fino ad allora i prodotti non
-// hanno il campo `img` e bsImg() lascia il riquadro vuoto.
+// Le foto stanno in una cartella Drive condivisa, caricate a mano dall'admin e
+// rinominate col codice articolo (JY5212.png). Il backend elenca solo nome e id
+// dei file (/bestseller/photos); l'abbinamento nome-file → codice lo facciamo
+// qui con bsMatchCode, e l'immagine la chiede il browser DIRETTAMENTE a Google.
 //
-// Di quella macchina resta solo `bsMatchCode` qui sotto: l'abbinamento
-// nome-file → codice articolo è collaudato su nomi reali e servirà comunque
-// per riconoscere i file nella cartella Drive.
+// Questo è il punto: le foto non passano né da Mongo né da Render. Tenerle in
+// database è ciò che ha mandato il backend in OOM il 31/07 (app offline), e il
+// caricamento dall'app con ZIP e ridimensionamento è stato rimosso il 03/08.
+//
+// L'elenco si chiede una volta per sessione: se aggiungi foto su Drive mentre
+// la pagina è aperta, ricaricala per vederle.
+
+// Miniatura servita da Google, 400px di lato lungo. Richiede che la cartella
+// sia condivisa "chiunque abbia il link".
+const bsDriveThumb = id => 'https://drive.google.com/thumbnail?id='+encodeURIComponent(id)+'&sz=w400';
+
+// Aggancia ai prodotti il campo `img`. Non solleva mai: senza foto il modulo
+// funziona identico, con i riquadri vuoti (bsImg torna stringa vuota).
+async function bsAttachPhotos(products){
+  try{
+    if(!products || !products.length) return;
+    if(BS.photos === null){
+      const r = await api('/bestseller/photos');
+      BS.photos = r.ok ? ((await r.json()).files || []) : [];
+    }
+    if(!BS.photos.length) return;
+    const byCode = new Map(products.map(p => [String(p.code||'').toUpperCase(), p.code]));
+    const idByCode = new Map();
+    for(const f of BS.photos){
+      const code = bsMatchCode(f.name, byCode);
+      if(code && !idByCode.has(code)) idByCode.set(code, f.id);
+    }
+    for(const p of products){
+      const id = idByCode.get(p.code);
+      if(id) p.img = bsDriveThumb(id);
+    }
+  }catch(e){ console.debug('bsAttachPhotos', e); }
+}
 
 // Cerca un codice noto nel nome del file. Prima prova il nome esatto senza
 // estensione (il caso normale), poi lo cerca come sottostringa.
@@ -647,8 +680,12 @@ async function bsDownloadCodes(){
       ? 'endpoint non disponibile: il backend va aggiornato'
       : 'errore '+r.status);
     const all = (await r.json()).items || [];
-    const items = all.filter(i => !i.has_photo);
     if(!all.length){ bsLog('Nessun report caricato: niente da esportare.', true); return; }
+    // Chi ha già la foto non lo sa il backend (che non guarda la cartella
+    // Drive): lo decide bsAttachPhotos, che mette `img` a chi ha un file
+    // abbinato. Stessa logica della vista, un solo posto dove sbagliare.
+    await bsAttachPhotos(all);
+    const items = all.filter(i => !i.img);
     if(!items.length){ bsLog('Tutti gli articoli hanno già la foto: niente da scaricare.'); return; }
 
     const esc = v => {
