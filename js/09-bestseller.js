@@ -366,10 +366,23 @@ function bsWeekNum(iso){
   return 1 + Math.round((d - firstThu) / 604800000);
 }
 
-// Etichetta della settimana: la più recente in archivio è "LAST WEEK", le altre
-// portano il numero ISO (richiesta del 03/08).
-function bsWeekLabel(ps, isLast){
-  if(isLast) return 'LAST WEEK';
+// Lunedì della settimana precedente a oggi, in ISO. Il confronto si fa per
+// DATA e non per numero di settimana: a cavallo d'anno "numero - 1" sbaglia,
+// perché prima della W1 non c'è la W0 ma la W52 (o la W53) dell'anno prima.
+function bsLastWeekStart(){
+  const d = new Date();
+  d.setHours(0,0,0,0);
+  const day = (d.getDay() + 6) % 7;                // lun=0 … dom=6
+  d.setDate(d.getDate() - day - 7);                // lunedì di sette giorni prima
+  const p = n => String(n).padStart(2,'0');
+  return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());
+}
+
+// Etichetta della settimana: "LAST WEEK" solo se è davvero quella precedente al
+// giorno in cui si guarda, altrimenti il numero ISO (richiesta del 03/08).
+// Se il periodo non inizia di lunedì il confronto non scatta e resta il numero.
+function bsWeekLabel(ps){
+  if(ps && ps === bsLastWeekStart()) return 'LAST WEEK';
   const n = bsWeekNum(ps);
   return n ? 'W'+n : bsPeriodLabel(ps);
 }
@@ -401,8 +414,8 @@ function bsHeader(d){
   // ── Selettore settimana: tutte le settimane presenti in archivio.
   let curWeek = '—';
   let weekOpts = '';
-  keys.forEach((ps, i) => {
-    const label = bsWeekLabel(ps, i===0);   // keys è ordinato dal più recente
+  keys.forEach(ps => {
+    const label = bsWeekLabel(ps);
     const sel = ps === curPs;
     if(sel) curWeek = label;
     weekOpts += `<button class="bs-picker-opt${sel?' bs-sel':''}" role="option"
