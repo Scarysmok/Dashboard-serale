@@ -351,40 +351,60 @@ function bsStrip(){
     <span class="bs-dot"></span><span>Best Seller settimanali di negozio</span></div>`;
 }
 
-// Selettore combinato negozio+settimana: una voce per report disponibile,
-// più la voce aggregata per ciascuna settimana con almeno due negozi.
-// È un listbox costruito a mano perché la tendina di un <select> nativo la
-// disegna il sistema operativo e non si può portare nello stile del modulo.
-function bsHeader(d){
+// Report disponibili raggruppati per settimana: {period_start: [voci indice]}.
+function bsWeeks(){
   const weeks = {};
   (BS.index||[]).forEach(w => { (weeks[w.period_start] = weeks[w.period_start] || []).push(w); });
-  const keys = Object.keys(weeks).sort().reverse();
+  return weeks;
+}
 
-  let cur = '—';
-  let opts = '';
+// Due selettori distinti, SETTIMANA e NEGOZIO. La settimana comanda: la lista
+// negozi contiene solo chi ha caricato quella settimana, così non si può
+// scegliere una combinazione senza dati (deciso il 03/08).
+// Sono listbox costruiti a mano perché la tendina di un <select> nativo la
+// disegna il sistema operativo e non si può portare nello stile del modulo.
+function bsHeader(d){
+  const weeks = bsWeeks();
+  const keys = Object.keys(weeks).sort().reverse();
+  const curPs = BS.cur ? BS.cur.period_start : null;
+
+  // ── Selettore settimana: tutte le settimane presenti in archivio.
+  let curWeek = '—';
+  let weekOpts = '';
   keys.forEach(ps => {
     const label = weeks[ps][0].period || bsPeriodLabel(ps);
-    opts += `<div class="bs-picker-group">${bsEsc(label)}</div>`;
-    if(weeks[ps].length > 1){
-      const sel = !!(BS.cur && BS.cur.aggregate && BS.cur.period_start===ps);
-      const txt = '★ Tutti i negozi';
-      if(sel) cur = txt;
-      opts += `<button class="bs-picker-opt bs-agg${sel?' bs-sel':''}" role="option"
-        aria-selected="${sel}" data-val="AGG|${bsEsc(ps)}">
-        <span class="bs-picker-mark"></span>
-        <span class="bs-picker-lab">${txt}</span>
-        <span class="bs-picker-n">${weeks[ps].length} negozi</span></button>`;
-    }
-    weeks[ps].forEach(w => {
-      const sel = !!(BS.cur && !BS.cur.aggregate && BS.cur.brand===w.brand
-                     && BS.cur.location===w.location && BS.cur.period_start===ps);
-      const txt = w.brand+' · '+w.location;
-      if(sel) cur = txt;
-      opts += `<button class="bs-picker-opt${sel?' bs-sel':''}" role="option"
-        aria-selected="${sel}" data-val="${bsEsc([w.brand,w.location,w.period_start].join('|'))}">
-        <span class="bs-picker-mark"></span>
-        <span class="bs-picker-lab">${bsEsc(txt)}</span></button>`;
-    });
+    const sel = ps === curPs;
+    if(sel) curWeek = label;
+    weekOpts += `<button class="bs-picker-opt${sel?' bs-sel':''}" role="option"
+      aria-selected="${sel}" data-week="${bsEsc(ps)}">
+      <span class="bs-picker-mark"></span>
+      <span class="bs-picker-lab">${bsEsc(label)}</span>
+      <span class="bs-picker-n">${weeks[ps].length} ${weeks[ps].length===1?'negozio':'negozi'}</span></button>`;
+  });
+
+  // ── Selettore negozio: solo i negozi della settimana selezionata.
+  const inWeek = curPs ? (weeks[curPs] || []) : [];
+  let curStore = '—';
+  let storeOpts = '';
+  if(inWeek.length > 1){
+    const sel = !!(BS.cur && BS.cur.aggregate);
+    const txt = '★ Tutti i negozi';
+    if(sel) curStore = txt;
+    storeOpts += `<button class="bs-picker-opt bs-agg${sel?' bs-sel':''}" role="option"
+      aria-selected="${sel}" data-val="AGG|${bsEsc(curPs)}">
+      <span class="bs-picker-mark"></span>
+      <span class="bs-picker-lab">${txt}</span>
+      <span class="bs-picker-n">${inWeek.length} negozi</span></button>`;
+  }
+  inWeek.forEach(w => {
+    const sel = !!(BS.cur && !BS.cur.aggregate && BS.cur.brand===w.brand
+                   && BS.cur.location===w.location);
+    const txt = w.brand+' · '+w.location;
+    if(sel) curStore = txt;
+    storeOpts += `<button class="bs-picker-opt${sel?' bs-sel':''}" role="option"
+      aria-selected="${sel}" data-val="${bsEsc([w.brand,w.location,w.period_start].join('|'))}">
+      <span class="bs-picker-mark"></span>
+      <span class="bs-picker-lab">${bsEsc(txt)}</span></button>`;
   });
 
   return `
@@ -399,19 +419,31 @@ function bsHeader(d){
       <div class="bs-claim">Impossible is nothing</div>
     </div>
     <div class="bs-selcol">
-      <div>
-        <div class="bs-sellabel">Negozio</div>
-        <div class="bs-picker" id="bs-picker">
-          <button class="bs-picker-btn" id="bs-picker-btn" aria-haspopup="listbox"
-            aria-expanded="false"${opts?'':' disabled'}>
-            <span class="bs-picker-cur">${bsEsc(cur)}</span>
-            <span class="bs-picker-chev">▼</span>
-          </button>
-          <div class="bs-picker-panel" id="bs-picker-panel" role="listbox">${opts}</div>
+      <div class="bs-selrow">
+        <div class="bs-selfield">
+          <div class="bs-sellabel">Settimana</div>
+          <div class="bs-picker" data-picker="week">
+            <button class="bs-picker-btn" aria-haspopup="listbox"
+              aria-expanded="false"${weekOpts?'':' disabled'}>
+              <span class="bs-picker-cur">${bsEsc(curWeek)}</span>
+              <span class="bs-picker-chev">▼</span>
+            </button>
+            <div class="bs-picker-panel" role="listbox">${weekOpts}</div>
+          </div>
+        </div>
+        <div class="bs-selfield">
+          <div class="bs-sellabel">Negozio</div>
+          <div class="bs-picker" data-picker="store">
+            <button class="bs-picker-btn" aria-haspopup="listbox"
+              aria-expanded="false"${storeOpts?'':' disabled'}>
+              <span class="bs-picker-cur">${bsEsc(curStore)}</span>
+              <span class="bs-picker-chev">▼</span>
+            </button>
+            <div class="bs-picker-panel" role="listbox">${storeOpts}</div>
+          </div>
         </div>
       </div>
       <div class="bs-chips">
-        ${d&&d.period?`<span class="bs-chip">${bsEsc(d.period)}</span>`:''}
         ${d&&d.season?`<span class="bs-chip">${bsEsc(d.season)}</span>`:''}
         ${bsAdminChips(d)}
       </div>
@@ -736,23 +768,44 @@ function bsBind(){
   // Selettore negozio: apre/chiude senza ridisegnare tutto il modulo, così
   // resta fluido. Scegliendo una voce parte il caricamento, che ridisegna
   // (e quindi chiude il pannello) da solo.
-  on('bs-picker-btn','click', e => {
-    e.stopPropagation();
-    const p = document.getElementById('bs-picker');
-    if(!p) return;
-    const open = p.classList.toggle('bs-open');
-    e.currentTarget.setAttribute('aria-expanded', open ? 'true' : 'false');
-    if(open){
-      const sel = p.querySelector('.bs-picker-opt.bs-sel');
-      if(sel) sel.scrollIntoView({block:'nearest'});
-    }
+  document.querySelectorAll('#bs-root .bs-picker').forEach(p => {
+    const btn = p.querySelector('.bs-picker-btn');
+    if(!btn) return;
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      bsClosePickers(p);            // un solo pannello aperto per volta
+      const open = p.classList.toggle('bs-open');
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      if(open){
+        const sel = p.querySelector('.bs-picker-opt.bs-sel');
+        if(sel) sel.scrollIntoView({block:'nearest'});
+      }
+    });
   });
-  document.querySelectorAll('#bs-picker-panel .bs-picker-opt').forEach(b =>
+
+  // Settimana: tengo il negozio selezionato se ha caricato anche la settimana
+  // nuova, altrimenti ricado sull'aggregato (o sull'unico negozio presente).
+  document.querySelectorAll('#bs-root [data-week]').forEach(b =>
+    b.addEventListener('click', async () => {
+      const ps = b.dataset.week;
+      const inWeek = bsWeeks()[ps] || [];
+      if(!inWeek.length) return;
+      const keep = BS.cur && !BS.cur.aggregate
+        && inWeek.find(w => w.brand===BS.cur.brand && w.location===BS.cur.location);
+      BS.cur = keep ? {brand:keep.brand, location:keep.location, period_start:ps}
+        : (inWeek.length > 1
+            ? {aggregate:true, period_start:ps}
+            : {brand:inWeek[0].brand, location:inWeek[0].location, period_start:ps});
+      bsResetView();
+      await bsLoadCurrent();
+    }));
+
+  document.querySelectorAll('#bs-root [data-val]').forEach(b =>
     b.addEventListener('click', async () => {
       const v = b.dataset.val.split('|');
       BS.cur = v[0]==='AGG' ? {aggregate:true, period_start:v[1]}
                             : {brand:v[0], location:v[1], period_start:v[2]};
-      BS.query=''; BS.fDiv=''; BS.fGen=''; BS.fCat=''; BS.detail=null;
+      bsResetView();
       await bsLoadCurrent();
     }));
 
@@ -795,26 +848,35 @@ function bsBind(){
   on('bs-reload','click', () => { BS.index = null; BS.data = null; renderBestSeller(); });
 }
 
-// Chiude il selettore negozio cliccando fuori. Registrato una volta sola:
-// il pannello viene ricreato a ogni paint, quindi si cerca al momento del clic.
-document.addEventListener('click', e => {
-  const p = document.getElementById('bs-picker');
-  if(p && p.classList.contains('bs-open') && !p.contains(e.target)){
+// Azzera vista e filtri quando cambia la selezione: i filtri di una settimana
+// non hanno senso su un'altra (una divisione può non esserci nemmeno).
+function bsResetView(){
+  BS.query=''; BS.fDiv=''; BS.fGen=''; BS.fCat=''; BS.detail=null;
+}
+
+// Chiude i pannelli aperti, tranne `keep`. Restituisce quanti ne ha chiusi.
+function bsClosePickers(keep){
+  let n = 0;
+  document.querySelectorAll('#bs-root .bs-picker.bs-open').forEach(p => {
+    if(p === keep) return;
     p.classList.remove('bs-open');
-    const b = document.getElementById('bs-picker-btn');
+    const b = p.querySelector('.bs-picker-btn');
     if(b) b.setAttribute('aria-expanded','false');
-  }
+    n++;
+  });
+  return n;
+}
+
+// Chiude i selettori cliccando fuori. Registrato una volta sola: i pannelli
+// vengono ricreati a ogni paint, quindi si cercano al momento del clic.
+document.addEventListener('click', e => {
+  const inside = e.target && e.target.closest && e.target.closest('#bs-root .bs-picker');
+  if(!inside) bsClosePickers(null);
 });
 
-// Esc: prima chiude il selettore, altrimenti la scheda prodotto.
+// Esc: prima chiude i selettori, altrimenti la scheda prodotto.
 document.addEventListener('keydown', e => {
   if(e.key !== 'Escape') return;
-  const p = document.getElementById('bs-picker');
-  if(p && p.classList.contains('bs-open')){
-    p.classList.remove('bs-open');
-    const b = document.getElementById('bs-picker-btn');
-    if(b){ b.setAttribute('aria-expanded','false'); b.focus(); }
-    return;
-  }
+  if(bsClosePickers(null)) return;
   if(BS.detail){ BS.detail=null; bsPaint(); }
 });
