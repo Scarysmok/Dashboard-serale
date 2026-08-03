@@ -656,7 +656,7 @@ function initPullToRefresh(){
       ind.style.height='0px';
       ind.classList.remove('armed');
       pulling=false; startY=null;
-      if(armed) syncNow();
+      if(armed) syncNow(true);   // gesto dell'utente: salta il freno sui riavvii
     });
   });
 }

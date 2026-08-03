@@ -140,7 +140,7 @@ let auth={user:null, accessToken:null, refreshToken:null};
 function loadCache(){try{return JSON.parse(localStorage.getItem(CACHE_KEY)||'{}');}catch(e){return {};}}
 function saveCache(c){try{localStorage.setItem(CACHE_KEY,JSON.stringify(c));}catch(e){console.warn('Cache save fallita',e);}}
 function clearCache(){localStorage.removeItem(CACHE_KEY);['rp_cache_v1','rp_cache_v2','rp_cache_v3','rp_cache_v4'].forEach(k=>localStorage.removeItem(k));}
-function forceResync(){clearCache();syncNow();}
+function forceResync(){clearCache();syncNow(true);}   // chiesto dall'utente: salta il freno sui riavvii
 function showErrors(){
   if(!lastErrors.length){alert('Nessun errore registrato nell\'ultimo sync.');return;}
   const sample=lastErrors.slice(0,10).map((e,i)=>`${i+1}. ${e.name}\n   → ${e.msg}`).join('\n\n');

@@ -156,7 +156,7 @@
     <div class="app-title-group"><button class="icon-btn nav-toggle" onclick="toggleNav()" aria-label="Apri menu">☰</button><span class="app-title" id="app-title">Chiusure giornaliere</span><span class="app-badge">live</span></div>
     <div class="header-actions">
       <div class="sync-pill"><div class="pip" id="pip"></div><span id="sync-txt">—</span></div>
-      <div class="icon-btn" onclick="syncNow()">↺</div>
+      <div class="icon-btn" onclick="syncNow(true)">↺</div>
     </div>
   </div>
 
@@ -414,7 +414,7 @@
       </div>
 
       <div class="settings-head">Sincronizzazione</div>
-      <button class="settings-btn" onclick="syncNow()">↺ Sincronizza ora</button>
+      <button class="settings-btn" onclick="syncNow(true)">↺ Sincronizza ora</button>
       <button class="settings-btn" onclick="forceResync()">⟳ Ricarica tutto (svuota cache)</button>
       <button class="settings-btn" onclick="showErrors()">🔍 Mostra errori sync</button>
 

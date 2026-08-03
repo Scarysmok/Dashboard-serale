@@ -6,8 +6,14 @@
 // Vuoto = nessuna informazione, quindi si scarica tutto (comportamento di prima).
 let _dsVersions = {};
 
-async function syncNow(){
+// `force=true` per i giri chiesti esplicitamente dall'utente (bottone ↺,
+// pull-to-refresh, forceResync): saltano il freno sui riavvii.
+async function syncNow(force=false){
   if(_syncing) return;   // un solo giro per volta: evita contatore doppio e download duplicati
+  // Freno sui riavvii: un giro che fallisce dopo pochi ms libera subito il mutex
+  // e il trigger successivo riparte immediatamente (il 03/08 si sono visti 9
+  // cicli di fila in console). Dopo un fallimento aspetto SYNC_RETRY_MS.
+  if(!force && _lastSyncFail && Date.now()-_lastSyncFail < SYNC_RETRY_MS) return;
   _syncing=true;
   try{
   setPip('spin','Sincronizzazione…');
@@ -48,6 +54,7 @@ async function syncNow(){
       fetchStoreCheckMailConfig(),
     ]);
     _coldRetry=false;   // Promise.all riuscito → rete ok, riarmo il retry cold-start
+    _lastSyncFail=0;    // e sblocco il freno sui riavvii
     targetsByKey = targets;
     segnalazioniByKey = segnalazioni;
     segnalazioniConfig = segnCfg;
@@ -158,12 +165,15 @@ async function syncNow(){
     renderAll();
   }catch(e){
     console.error(e);
+    _lastSyncFail=Date.now();   // vedi il freno in cima a syncNow
     // "Failed to fetch" = errore di rete (tipico cold start di Render, che dorme
     // dopo 15 min di inattività). Non è un guasto: niente popup, mostro solo lo
     // stato nel pill e ritento UNA volta in silenzio; il resto lo copre l'auto-sync.
     const netErr=/failed to fetch|networkerror|load failed/i.test(e.message||'');
     if(netErr){
-      if(!_coldRetry){ _coldRetry=true; setPip('spin','Riconnessione…'); setTimeout(syncNow, 7000); }
+      // force: questo retry è già limitato a uno solo da _coldRetry, il freno
+      // sui riavvii non deve mangiarselo.
+      if(!_coldRetry){ _coldRetry=true; setPip('spin','Riconnessione…'); setTimeout(()=>syncNow(true), 7000); }
       else setPip('','Offline');
     }else{
       setPip('','Errore');
@@ -176,6 +186,8 @@ async function syncNow(){
 // Guard: un solo retry silenzioso per fallimento di rete (evita loop).
 let _coldRetry=false;
 let _syncing=false;   // true mentre un syncNow è in corso (mutex anti-concorrenza)
+let _lastSyncFail=0;  // timestamp dell'ultimo giro fallito (0 = nessuno)
+const SYNC_RETRY_MS=30000;   // attesa minima fra due tentativi dopo un fallimento
 
 async function listFiles(){
   // Il backend conosce folder ID e API key Google (env vars), il browser no
@@ -370,6 +382,13 @@ async function fetchCached(name, path, version){
 // l'elenco chiavi del server con la copia locale e si scarica solo il mancante.
 // Questo evita di ripagare i 4 MB ogni volta che qualcuno parsa una chiusura.
 // Se qualcosa non risponde come previsto, si ricade sul vecchio /pdfcache.
+// Le chiavi mancanti si chiedono a BLOCCHI: un solo POST con tutte (2473 al
+// primo giro) impegna il server ~55 s e il proxy di Render tronca la connessione
+// a ~50 s — Firefox lo segnala come "CORS Missing Allow Origin", ma di CORS non
+// c'entra nulla (diagnosi del 03/08). La risposta non arrivava mai, IndexedDB
+// restava vuoto e al giro dopo mancavano di nuovo tutte le chiavi: ciclo chiuso.
+// Con blocchi da 300 ogni risposta rientra in pochi secondi, ben sotto il limite.
+const PDFCACHE_CHUNK=300;
 async function fetchPdfCache(){
   try{
     const rk = await api('/pdfcache/keys');
@@ -378,6 +397,10 @@ async function fetchPdfCache(){
     const local = await dcacheGet('pdfcache');
     const have = (local && local.data && typeof local.data==='object') ? local.data : {};
     const missing = keys.filter(k => !(k in have));
+    // Stessa stringa di versione che confronta il percorso di fallback
+    // (fetchCached, formato "bump-conteggio"): scrivendone una diversa il
+    // fallback scartava sempre la copia locale e riscaricava i 4 MB interi.
+    const version = _dsVersions.pdfcache || ('keys:'+keys.length);
 
     if(!missing.length){
       // Tutto già in locale: elimino gli eventuali record non più sul server.
@@ -386,9 +409,25 @@ async function fetchPdfCache(){
       return out;
     }
 
-    const rs = await api('/pdfcache/subset', {method:'POST', body: JSON.stringify({keys: missing})});
-    if(!rs.ok) throw new Error('subset non disponibile');
-    const fresh = await rs.json();
+    const fresh = {};
+    const blocchi = Math.ceil(missing.length/PDFCACHE_CHUNK);
+    try{
+      for(let i=0; i<missing.length; i+=PDFCACHE_CHUNK){
+        const chunk = missing.slice(i, i+PDFCACHE_CHUNK);
+        const rs = await api('/pdfcache/subset', {method:'POST', body: JSON.stringify({keys: chunk})});
+        if(!rs.ok) throw new Error('subset non disponibile ('+rs.status+')');
+        const part = await rs.json();
+        if(part && typeof part==='object') Object.assign(fresh, part);
+        console.debug('[pdfcache] blocco', i/PDFCACHE_CHUNK+1, 'di', blocchi, '→', Object.keys(fresh).length, 'record');
+      }
+    }catch(e){
+      // Un blocco è fallito: salvo comunque quelli già arrivati, così il giro
+      // successivo ne chiede meno e si avanza invece di ripartire da zero.
+      // Versione 'partial' di proposito: il fallback non deve prendere per
+      // completa una copia che non lo è.
+      if(Object.keys(fresh).length) await dcachePut('pdfcache', 'partial', {...have, ...fresh});
+      throw e;
+    }
 
     // Ricompongo tenendo solo le chiavi ancora presenti sul server.
     const out = {};
@@ -396,7 +435,9 @@ async function fetchPdfCache(){
       const v = (fresh && fresh[k]!==undefined) ? fresh[k] : have[k];
       if(v!==undefined) out[k] = v;
     });
-    dcachePut('pdfcache', 'keys:'+keys.length, out);   // in background
+    // await, non fire-and-forget: senza attesa i ~4 MB rischiano di non
+    // committare mai in IndexedDB (parsing subito dopo, o pagina uccisa).
+    await dcachePut('pdfcache', version, out);
     console.debug('[pdfcache] scaricati', missing.length, 'record nuovi su', keys.length);
     return out;
   }catch(e){
