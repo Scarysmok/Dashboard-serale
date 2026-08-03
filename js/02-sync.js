@@ -7,6 +7,9 @@
 let _dsVersions = {};
 
 async function syncNow(){
+  if(_syncing) return;   // un solo giro per volta: evita contatore doppio e download duplicati
+  _syncing=true;
+  try{
   setPip('spin','Sincronizzazione…');
   load(true,'Lettura Google Drive…');
   renderSkeletons();
@@ -168,9 +171,11 @@ async function syncNow(){
     }
   }
   load(false);
+  }finally{ _syncing=false; }
 }
 // Guard: un solo retry silenzioso per fallimento di rete (evita loop).
 let _coldRetry=false;
+let _syncing=false;   // true mentre un syncNow è in corso (mutex anti-concorrenza)
 
 async function listFiles(){
   // Il backend conosce folder ID e API key Google (env vars), il browser no
