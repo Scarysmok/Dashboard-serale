@@ -351,6 +351,36 @@ function bsStrip(){
     <span class="bs-dot"></span><span>Best Seller settimanali di negozio</span></div>`;
 }
 
+// Numero di settimana ISO 8601 dalla data di inizio periodo. Verificato contro
+// il calendario sui casi limite: 28/12/2026 → W53, 29/12/2025 → W1 (del 2026),
+// 04/01/2027 → W1. Regola ISO: decide il giovedì della stessa settimana.
+function bsWeekNum(iso){
+  const m = String(iso||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(!m) return null;
+  const d = new Date(Date.UTC(+m[1], +m[2]-1, +m[3]));
+  const day = (d.getUTCDay() + 6) % 7;             // lun=0 … dom=6
+  d.setUTCDate(d.getUTCDate() - day + 3);          // giovedì di questa settimana
+  const firstThu = new Date(Date.UTC(d.getUTCFullYear(), 0, 4));
+  const f = (firstThu.getUTCDay() + 6) % 7;
+  firstThu.setUTCDate(firstThu.getUTCDate() - f + 3);
+  return 1 + Math.round((d - firstThu) / 604800000);
+}
+
+// Etichetta della settimana: la più recente in archivio è "LAST WEEK", le altre
+// portano il numero ISO (richiesta del 03/08).
+function bsWeekLabel(ps, isLast){
+  if(isLast) return 'LAST WEEK';
+  const n = bsWeekNum(ps);
+  return n ? 'W'+n : bsPeriodLabel(ps);
+}
+
+// Periodo in forma breve per la riga secondaria: "20/07 – 26/07".
+function bsWeekRange(w){
+  const short = t => bsPeriodLabel(t).replace(/\/\d{4}$/,'');
+  return w.period_end ? short(w.period_start)+' – '+short(w.period_end)
+                      : bsPeriodLabel(w.period_start);
+}
+
 // Report disponibili raggruppati per settimana: {period_start: [voci indice]}.
 function bsWeeks(){
   const weeks = {};
@@ -371,15 +401,15 @@ function bsHeader(d){
   // ── Selettore settimana: tutte le settimane presenti in archivio.
   let curWeek = '—';
   let weekOpts = '';
-  keys.forEach(ps => {
-    const label = weeks[ps][0].period || bsPeriodLabel(ps);
+  keys.forEach((ps, i) => {
+    const label = bsWeekLabel(ps, i===0);   // keys è ordinato dal più recente
     const sel = ps === curPs;
     if(sel) curWeek = label;
     weekOpts += `<button class="bs-picker-opt${sel?' bs-sel':''}" role="option"
       aria-selected="${sel}" data-week="${bsEsc(ps)}">
       <span class="bs-picker-mark"></span>
       <span class="bs-picker-lab">${bsEsc(label)}</span>
-      <span class="bs-picker-n">${weeks[ps].length} ${weeks[ps].length===1?'negozio':'negozi'}</span></button>`;
+      <span class="bs-picker-n">${bsEsc(bsWeekRange(weeks[ps][0]))}</span></button>`;
   });
 
   // ── Selettore negozio: solo i negozi della settimana selezionata.
