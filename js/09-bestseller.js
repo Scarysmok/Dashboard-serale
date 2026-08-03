@@ -424,8 +424,6 @@ function bsAdminChips(d){
     <input type="file" id="bs-file" accept=".xlsx,.xls" multiple style="display:none">
     <button class="bs-chip-btn" id="bs-import"${BS.busy?' disabled':''}>
       ${BS.busy?'⏳ Importo…':'📥 Importa Excel'}</button>
-    <input type="file" id="bs-photofile" accept=".zip,image/*" multiple style="display:none">
-    <button class="bs-chip-btn" id="bs-photos"${BS.busy?' disabled':''}>🖼 Carica foto</button>
     <button class="bs-chip-btn" id="bs-codes"${BS.busy?' disabled':''}>⬇ Codici senza foto</button>
     ${canDelete?`<button class="bs-chip-btn" id="bs-del">🗑 Elimina settimana</button>`:''}`;
 }
@@ -613,92 +611,16 @@ async function bsImportFiles(files){
   bsLog(`Import concluso: ${ok} ok${ko?`, ${ko} con errori`:''}.`);
 }
 
-// ── Caricamento foto prodotto ───────────────────────────────────────────
-// Si accetta uno ZIP (o una selezione di immagini) con i file rinominati col
-// codice articolo: JY5212.png. Il riconoscimento è tollerante: basta che il
-// nome contenga un codice noto, così vanno bene anche "JY5212_HM1.png" o
-// "foto/JY5212 copia.png".
+// ── Foto prodotto ───────────────────────────────────────────────────────
+// Il caricamento delle foto dall'app è stato RIMOSSO il 03/08: le miniature
+// finivano in MongoDB e hanno saturato la memoria di Render (OOM, app offline).
+// Le foto andranno in una cartella Drive condivisa, caricate a mano, e il
+// backend la leggerà con l'API key che ha già. Fino ad allora i prodotti non
+// hanno il campo `img` e bsImg() lascia il riquadro vuoto.
 //
-// Ogni immagine viene ridotta e compressa QUI, nel browser, prima di partire:
-// il server archivia miniature da poche decine di KB invece dei PNG originali.
-// Lo sfondo viene riempito di bianco perché la vista usa mix-blend-mode
-// multiply (come fa adidas), che sul bianco si fonde col riquadro chiaro.
-const BS_PHOTO_MAX = 400;      // lato lungo della miniatura, in pixel
-const BS_PHOTO_Q = 0.85;       // qualità JPEG
-const BS_PHOTO_BATCH = 15;     // foto per richiesta, per non fare pacchetti enormi
-
-async function bsPickPhotos(files){
-  BS.busy = true; bsPaint();
-  try{
-    // Serve l'elenco dei codici noti per abbinare i nomi dei file.
-    const rc = await api('/bestseller/codes');
-    if(!rc.ok) throw new Error(rc.status===404
-      ? 'endpoint non disponibile: il backend va aggiornato'
-      : 'errore '+rc.status);
-    const known = ((await rc.json()).items || []).map(i => i.code);
-    if(!known.length) throw new Error('nessun report caricato: importa prima gli Excel');
-    const byCode = new Map(known.map(c => [c.toUpperCase(), c]));
-
-    // Raccolgo le immagini: dallo ZIP oppure dai file scelti direttamente.
-    const imgs = [];   // {name, blob}
-    for(const f of files){
-      if(/\.zip$/i.test(f.name)){
-        if(typeof JSZip === 'undefined') throw new Error('JSZip non caricato: ricarica la pagina');
-        bsLog(`Apro ${bsEsc(f.name)}…`);
-        const zip = await JSZip.loadAsync(await f.arrayBuffer());
-        const entries = [];
-        zip.forEach((path, e) => { if(!e.dir && /\.(png|jpe?g|webp)$/i.test(path)) entries.push(e); });
-        for(const e of entries) imgs.push({name: e.name, blob: await e.async('blob')});
-      }else if(/\.(png|jpe?g|webp)$/i.test(f.name)){
-        imgs.push({name: f.name, blob: f});
-      }
-    }
-    if(!imgs.length) throw new Error('nessuna immagine trovata (attesi .png, .jpg o .webp)');
-    bsLog(`Trovate ${imgs.length} immagini, le preparo…`);
-
-    // Abbinamento nome file → codice articolo.
-    let noMatch = 0, done = 0, saved = 0, rejected = 0, shown = false;
-    let batch = [];
-    for(const im of imgs){
-      const code = bsMatchCode(im.name, byCode);
-      if(!code){ noMatch++; continue; }
-      let dataUrl;
-      try{
-        dataUrl = await bsShrink(im.blob);
-      }catch(_){ noMatch++; continue; }
-      batch.push({code, data_url: dataUrl});
-      done++;
-      if(batch.length >= BS_PHOTO_BATCH){
-        const res = await bsSendPhotos(batch);
-        saved += res.written; rejected += res.skipped;
-        if(res.skipped && !shown){
-          shown = true;
-          const why = Object.entries(res.reasons).map(([k,v])=>`${v}× ${k}`).join(', ');
-          const d = batch[0].data_url || '';
-          bsLog(`Il server ha rifiutato ${res.skipped} immagini: ${bsEsc(why)}. `
-            + `Esempio — codice <b>${bsEsc(batch[0].code)}</b>, dato di ${d.length} `
-            + `caratteri che inizia con “${bsEsc(d.slice(0,32))}”.`, true);
-        }
-        batch = [];
-        bsLog(`Caricate ${saved} foto su ${imgs.length - noMatch}…`);
-      }
-    }
-    if(batch.length){
-      const res = await bsSendPhotos(batch);
-      saved += res.written; rejected += res.skipped;
-    }
-
-    bsLog(`Foto salvate: <b>${saved}</b>`
-      + (noMatch ? ` · ${noMatch} file senza codice riconoscibile` : '')
-      + (rejected ? ` · <b>${rejected} rifiutate dal server</b>` : '')
-      + `. Articoli ancora senza foto: ${known.length - saved < 0 ? 0 : known.length - saved}.`);
-  }catch(e){
-    bsLog('Caricamento foto fallito: '+bsEsc(e.message||e), true);
-  }
-  BS.busy = false;
-  BS.data = null;
-  await bsLoadCurrent();
-}
+// Di quella macchina resta solo `bsMatchCode` qui sotto: l'abbinamento
+// nome-file → codice articolo è collaudato su nomi reali e servirà comunque
+// per riconoscere i file nella cartella Drive.
 
 // Cerca un codice noto nel nome del file. Prima prova il nome esatto senza
 // estensione (il caso normale), poi lo cerca come sottostringa.
@@ -711,42 +633,6 @@ function bsMatchCode(path, byCode){
   return null;
 }
 
-// Ridimensiona e comprime nel browser. Sfondo bianco: la vista usa
-// mix-blend-mode multiply, quindi il bianco si fonde col riquadro chiaro.
-function bsShrink(blob){
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(blob);
-    const img = new Image();
-    img.onload = () => {
-      try{
-        const s = Math.min(1, BS_PHOTO_MAX / Math.max(img.width, img.height));
-        const w = Math.max(1, Math.round(img.width * s));
-        const h = Math.max(1, Math.round(img.height * s));
-        const cv = document.createElement('canvas');
-        cv.width = w; cv.height = h;
-        const cx = cv.getContext('2d');
-        cx.fillStyle = '#fff';
-        cx.fillRect(0, 0, w, h);
-        cx.drawImage(img, 0, 0, w, h);
-        resolve(cv.toDataURL('image/jpeg', BS_PHOTO_Q));
-      }catch(e){ reject(e); }
-      finally{ URL.revokeObjectURL(url); }
-    };
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('immagine illeggibile')); };
-    img.src = url;
-  });
-}
-
-async function bsSendPhotos(photos){
-  const r = await api('/bestseller/photos', {method:'POST', body: JSON.stringify({photos})});
-  if(!r.ok) throw new Error('salvataggio foto: errore '+r.status);
-  const j = await r.json();
-  // `written` sono le scritture effettivamente eseguite: è il dato che conta.
-  // `saved` è il conteggio riportato da Mongo e può essere 0 anche a scrittura
-  // avvenuta (documento identico), quindi non lo si usa come verità.
-  return {written: j.written || 0, saved: j.saved || 0,
-          skipped: j.skipped || 0, reasons: j.reasons || {}};
-}
 
 // ── Esportazione codici articolo ────────────────────────────────────────
 // Scarica i codici degli articoli PRIVI di foto, presi da tutti i report (ogni
@@ -860,12 +746,6 @@ function bsBind(){
     const files = [...(e.target.files||[])];
     e.target.value = '';
     if(files.length) bsImportFiles(files);
-  });
-  on('bs-photos','click', () => { const f=document.getElementById('bs-photofile'); if(f) f.click(); });
-  on('bs-photofile','change', e => {
-    const files = [...(e.target.files||[])];
-    e.target.value = '';
-    if(files.length) bsPickPhotos(files);
   });
   on('bs-codes','click', bsDownloadCodes);
   on('bs-del','click', bsDeleteWeek);
