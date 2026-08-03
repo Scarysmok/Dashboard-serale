@@ -628,9 +628,14 @@ async function bsImportFiles(files){
 // L'elenco si chiede una volta per sessione: se aggiungi foto su Drive mentre
 // la pagina è aperta, ricaricala per vederle.
 
-// Miniatura servita da Google, 400px di lato lungo. Richiede che la cartella
-// sia condivisa "chiunque abbia il link".
-const bsDriveThumb = id => 'https://drive.google.com/thumbnail?id='+encodeURIComponent(id)+'&sz=w400';
+// Miniatura del file. Si usa `thumb` (thumbnailLink di Drive): è già generata e
+// servita dalla CDN googleusercontent, quindi il browser la mette in cache e i
+// cambi di vista non ricaricano nulla.
+// Il ripiego drive.google.com/thumbnail vale solo per i file la cui miniatura
+// non è ancora pronta: genera l'immagine al momento e rimbalza su un URL con
+// token sempre diverso, quindi non è mai in cache (~10 s per foto, misurato il
+// 03/08). Se compaiono lentezze, il colpevole è questo ramo.
+const bsThumb = f => f.thumb || ('https://drive.google.com/thumbnail?id='+encodeURIComponent(f.id)+'&sz=w400');
 
 // Aggancia ai prodotti il campo `img`. Non solleva mai: senza foto il modulo
 // funziona identico, con i riquadri vuoti (bsImg torna stringa vuota).
@@ -643,14 +648,14 @@ async function bsAttachPhotos(products){
     }
     if(!BS.photos.length) return;
     const byCode = new Map(products.map(p => [String(p.code||'').toUpperCase(), p.code]));
-    const idByCode = new Map();
+    const srcByCode = new Map();
     for(const f of BS.photos){
       const code = bsMatchCode(f.name, byCode);
-      if(code && !idByCode.has(code)) idByCode.set(code, f.id);
+      if(code && !srcByCode.has(code)) srcByCode.set(code, bsThumb(f));
     }
     for(const p of products){
-      const id = idByCode.get(p.code);
-      if(id) p.img = bsDriveThumb(id);
+      const src = srcByCode.get(p.code);
+      if(src) p.img = src;
     }
   }catch(e){ console.debug('bsAttachPhotos', e); }
 }
