@@ -236,7 +236,7 @@ function bsPaint(){
 
   if(!BS.index || !BS.index.length){
     root.innerHTML = bsStrip() + bsHeader(null) +
-      bsAdminLog() +
+      bsLogBox() +
       bsState('Nessun report caricato',
               admin ? 'Usa “Importa Excel” qui sopra per caricare il primo report.'
                     : 'I best seller compariranno qui appena caricati.') +
@@ -245,7 +245,7 @@ function bsPaint(){
     return;
   }
   if(BS.data && BS.data.error){
-    root.innerHTML = bsStrip() + bsHeader(BS.data) + bsAdminLog() +
+    root.innerHTML = bsStrip() + bsHeader(BS.data) + bsLogBox() +
       bsState('Report non disponibile', BS.data.error) + bsFooter();
     bsBind();
     return;
@@ -329,7 +329,7 @@ function bsPaint(){
       <div class="bs-kpi-v" style="font-size:${k.size}">${bsEsc(k.v)}</div>
       <div class="bs-kpi-s">${bsEsc(k.s)}</div></div>`).join('')}
   </div></div>
-  ${bsAdminLog()}
+  ${bsLogBox()}
   ${list.length>=3?`<section class="bs-section">
     <div class="bs-sechead"><h3>Podio</h3><div class="bs-rule"></div>
       <span class="bs-secmeta">Top 3 · ${BS.sort==='units'?'per pezzi venduti':'per valore netto'}</span></div>
@@ -565,10 +565,20 @@ function bsHeader(d){
         </div>
       </div>
       <div class="bs-chips">
+        ${bsShareChip(d)}
         ${bsAdminChips(d)}
       </div>
     </div>
   </div></header>`;
+}
+
+// Copiare il link lo può fare qualunque utente collegato: serve agli area
+// manager per mandarlo ai negozi senza passare da un admin. Spegnerlo no, resta
+// fra le azioni admin: un link vale per negozio+settimana e potrebbe essere già
+// in mano a tutto il gruppo.
+function bsShareChip(d){
+  if(BS.public || !BS.cur || (d && d.error)) return '';
+  return `<button class="bs-chip-btn" id="bs-link">🔗 Copia link</button>`;
 }
 
 // Azioni admin come pillole accanto al periodo: l'import è l'operazione più
@@ -581,7 +591,6 @@ function bsAdminChips(d){
     <button class="bs-chip-btn" id="bs-import"${BS.busy?' disabled':''}>
       ${BS.busy?'⏳ Importo…':'📥 Importa Excel'}</button>
     <button class="bs-chip-btn" id="bs-codes"${BS.busy?' disabled':''}>⬇ Codici senza foto</button>
-    <button class="bs-chip-btn" id="bs-link"${BS.cur?'':' disabled'}>🔗 Copia link</button>
     <button class="bs-chip-btn" id="bs-unlink"${BS.cur?'':' disabled'}>🔒 Spegni link</button>
     ${canDelete?`<button class="bs-chip-btn" id="bs-del">🗑 Elimina settimana</button>`:''}`;
 }
@@ -630,12 +639,15 @@ function bsModal(p){
 // ── Registro operazioni admin ───────────────────────────────────────────
 // I pulsanti stanno nell'header (vedi bsAdminChips): qui resta solo l'esito
 // degli import, mostrato finché ci sono righe da leggere.
-function bsAdminLog(){
-  if(!bsIsAdmin() || !BS.log.length) return '';
+// Riquadro dei messaggi: import per gli admin, link copiato per tutti. Non è
+// più admin-only, altrimenti chi non è admin premerebbe "Copia link" senza
+// vedere nulla e senza l'URL di riserva se gli appunti non funzionano.
+function bsLogBox(){
+  if(!BS.log.length) return '';
   return `
   <div class="bs-admin"><div class="bs-admin-box">
     <div class="bs-admin-h">
-      <h4>Esito import</h4>
+      <h4>Messaggi</h4>
       <div style="flex:1"></div>
       <button class="bs-btn bs-ghost" id="bs-log-clear">Nascondi</button>
     </div>
