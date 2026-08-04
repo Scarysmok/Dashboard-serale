@@ -1259,10 +1259,8 @@ body{display:flex;flex-direction:column}
 .bs-pname,.bs-mname{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
 .bs-co{flex:0 0 auto;border:2px solid var(--bs-ink);border-radius:2px;padding:1px 2px;
   font-family:'JetBrains Mono',monospace;font-size:8px;font-weight:700;line-height:1}
-.bs-sale{flex:0 0 auto;display:inline-flex;align-items:center;gap:4px;
-  background:var(--bs-red);color:#fff;padding:3px 6px}
-.bs-sale b{font-size:11px;font-weight:900;letter-spacing:-.02em;line-height:1}
-.bs-sale i{font-style:normal;font-size:6.5px;font-weight:900;letter-spacing:.22em;text-transform:uppercase}
+.bs-sale{flex:0 0 auto;background:var(--bs-red);color:#fff;padding:3px 7px;
+  font-size:8px;font-weight:900;letter-spacing:.18em;text-transform:uppercase;line-height:1.25}
 /* interruttori dei due filtri: stessa pillola delle tendine, ma si accende */
 .bs-ftog{padding:0 16px;color:var(--bs-ink)}
 .bs-ftog:hover{border-color:var(--bs-ink)}

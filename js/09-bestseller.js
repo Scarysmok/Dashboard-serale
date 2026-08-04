@@ -538,11 +538,13 @@ async function bsLoadFlags(){
 // Flag di un articolo, sempre un oggetto: così chi lo usa non deve controllare.
 const bsFlag = p => (BS.flags || {})[String(p.code||'').toUpperCase()] || {};
 
-// I due badge accanto al nome. Il chip rosso porta la percentuale vera del file.
+// I due badge accanto al nome. Il chip rosso dice solo SALES: la percentuale
+// resta memorizzata (è il criterio con cui il file marca l'articolo, e regge il
+// filtro) ma non si mostra più, scelta dell'utente del 04/08.
 function bsBadges(p){
   const f = bsFlag(p);
   return (f.carry ? '<span class="bs-co" title="Carry over">CO</span>' : '')
-       + (f.salePct ? `<span class="bs-sale" title="Va a sconto"><b>${f.salePct}%</b><i>off</i></span>` : '');
+       + (f.salePct ? '<span class="bs-sale" title="Va a sconto">Sales</span>' : '');
 }
 
 // Unico punto da cui la pagina pubblica prende i dati: niente api(), niente
