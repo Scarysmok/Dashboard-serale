@@ -175,16 +175,17 @@ async function bsLoadCurrent(){
   BS.data = null;
   try{
     const c = BS.cur;
-    const r = c.aggregate
-      ? await api('/bestseller/aggregate?period_start='+encodeURIComponent(c.period_start))
-      : await api('/bestseller/week?brand='+encodeURIComponent(c.brand)
-                 +'&location='+encodeURIComponent(c.location)
-                 +'&period_start='+encodeURIComponent(c.period_start));
-    if(r.ok){
-      BS.data = await r.json();
-      await bsAttachPhotos(BS.data.products);
-    }
-    else BS.data = {error: 'Errore '+r.status};
+    const path = c.aggregate
+      ? '/bestseller/aggregate?period_start='+encodeURIComponent(c.period_start)
+      : '/bestseller/week?brand='+encodeURIComponent(c.brand)
+        +'&location='+encodeURIComponent(c.location)
+        +'&period_start='+encodeURIComponent(c.period_start);
+    // Stessa cache degli altri insiemi pesanti: IndexedDB + versione da
+    // /datasets/version. L'aggregato è ~550 kB che il backend ricalcola a ogni
+    // richiesta (misurato il 03/08) e la versione cambia solo quando si importa.
+    BS.data = await fetchCached(bsCacheKey(c), path, _dsVersions.bestseller);
+    if(!BS.data || !BS.data.products) BS.data = {error: 'Report non disponibile'};
+    else await bsAttachPhotos(BS.data.products);
   }catch(e){
     BS.data = {error: String(e.message||e)};
   }
@@ -430,6 +431,13 @@ function bsWeekRange(w){
   const short = t => bsPeriodLabel(t).replace(/\/\d{4}$/,'');
   return w.period_end ? short(w.period_start)+' – '+short(w.period_end)
                       : bsPeriodLabel(w.period_start);
+}
+
+// Chiave della copia locale. Deve distinguere ogni selezione, altrimenti una
+// settimana servirebbe i dati di un'altra.
+function bsCacheKey(c){
+  return 'bs:' + (c.aggregate ? 'agg|'+c.period_start
+                              : [c.brand, c.location, c.period_start].join('|'));
 }
 
 // Report disponibili raggruppati per settimana: {period_start: [voci indice]}.
@@ -781,9 +789,16 @@ async function bsAttachPhotos(products){
   try{
     if(!products || !products.length) return;
     if(BS.photos === null){
-      // Nel link pubblico l'elenco arriva già col payload: là non c'è login.
-      let list = (BS.data||{}).photos || null;
-      if(!list){ const r = await api('/bestseller/photos'); list = r.ok ? ((await r.json()).files || []) : []; }
+      // Nel link pubblico l'elenco arriva col payload: bs.html non carica
+      // 02-sync.js, quindi lì fetchCached non esiste e non va nemmeno valutata.
+      let list = BS.public ? ((BS.data||{}).photos || []) : null;
+      if(!list){
+        // Drive non dichiara una versione: uso la data, così l'elenco si
+        // rinfresca una volta al giorno. Le foto le carichi a mano e il tasto ↻
+        // forza comunque il giro completo.
+        list = (await fetchCached('bs:photos', '/bestseller/photos',
+                                  new Date().toISOString().slice(0,10))).files || [];
+      }
       // Ordino per nome: dell'export adidas arrivano più viste per articolo
       // (IA5379_1_…, IA5379_2_…) e sotto si tiene la prima che abbina. Senza
       // ordinamento vincerebbe quella che Drive restituisce per prima, cioè a
