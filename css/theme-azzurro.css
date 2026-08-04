@@ -88,6 +88,13 @@ html.az{
 
 html.az body{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 
+/* Le emoji delle etichette (📅 🌙 ☀️ 📈 📊 📭) stonano con un linguaggio tutto
+   tipografico. In index.html sono avvolte in <i class="az-em"> e qui vengono
+   nascoste: modifica additiva, quindi spegnendo il tema ricompaiono da sole.
+   Dove il testo è scritto con textContent il wrapper non sopravvive e l'emoji
+   è condizionata su AZ nel JS (vedi updateMissingChip, setDateFilter). */
+html.az .az-em{display:none}
+
 /* ───────────────────────────────────────────────────────────────────────────
    1. INTESTAZIONE APP → striscia nera
    Nel design la barra in cima non è più una barra bianca traslucida ma la
@@ -178,11 +185,15 @@ html.az #nav-backdrop{background:rgba(0,0,0,.5)}
    serve toccare il contenitore.
    ─────────────────────────────────────────────────────────────────────────── */
 html.az .az-hero{
-  margin:-16px -16px 0;
   padding:20px 20px calc(var(--az-overlap) + 16px);
   background:#0d0d0d;
   color:#fff;
 }
+/* Nella Dashboard il contenitore .oggi-wrap ha padding 16px: il margine
+   negativo lo annulla esattamente, così il nero va a filo dei bordi senza
+   toccare il contenitore. Negli altri tab l'intestazione sta dentro un div
+   senza padding e non serve. */
+html.az .oggi-wrap > .az-hero{margin:-16px -16px 0}
 html.az .az-hero-top{
   display:flex;align-items:center;justify-content:space-between;
   gap:12px;margin-bottom:18px;min-height:30px;
@@ -524,3 +535,200 @@ html.az .recap-title{
   color:var(--t1);
 }
 html.az .recap-text{font-size:13px;line-height:1.75;color:var(--t2)}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   7. APERTURE / CHIUSURE (sezione 1b)
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* Il toggle Chiusure/Aperture sale sul nero dell'intestazione, come le pillole
+   in alto nel mockup. `!important` sul margin-top perché in index.html quel
+   .seg-wrap ha uno style inline (margin:10px 16px 2px) che vincerebbe. */
+html.az #tab-negozi > .seg-wrap{
+  margin-top:calc(-1 * var(--az-overlap))!important;
+  position:relative;z-index:3;
+  background:transparent;
+  border-color:rgba(255,255,255,.26);
+}
+html.az #tab-negozi > .seg-wrap .seg-btn{color:rgba(255,255,255,.78)}
+html.az #tab-negozi > .seg-wrap .seg-btn.on{background:#fff;color:#0d0d0d}
+
+/* Striscia KPI orizzontale: riquadri piatti, etichetta sotto il numero.
+   Restano tutti e cinque (il mockup ne mostra tre, ma Negozi e Anomalie qui
+   servono e togliere un dato non è un lavoro di grafica). */
+html.az .kpi-scroll{padding:16px 16px 4px}
+html.az .kpi-card{
+  border:none;border-radius:var(--radius-card);
+  background:var(--s1);
+  box-shadow:var(--shadow);
+  padding:16px 16px 14px;
+  display:flex;flex-direction:column;
+  min-width:132px;
+}
+html.az .kpi-card.acc{background:var(--s1)}
+html.az .kpi-l{
+  order:2;margin-top:9px;
+  font-family:var(--label);
+  font-size:8.5px;font-weight:400;
+  letter-spacing:.18em;text-transform:uppercase;
+  color:var(--t3);
+}
+html.az .kpi-v{
+  order:1;
+  font-size:20px;font-weight:900;letter-spacing:-.035em;line-height:1;
+  color:var(--t1);
+}
+html.az .kpi-v.r{color:var(--red)}
+html.az .kpi-s{
+  order:3;margin-top:5px;
+  font-family:var(--label);
+  font-size:8px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--faint);
+}
+
+/* Barra filtri e ricerca su fondo leggermente staccato, come nel mockup */
+html.az #tab-negozi .filter-bar,
+html.az #aperture-view .filter-bar{padding:12px 16px 8px}
+html.az .search-row{padding:0 16px 14px}
+
+/* Intestazione di brand cliccabile (collassa il gruppo) */
+html.az .az-sec-click{cursor:pointer;padding-bottom:2px}
+html.az .az-sec .brand-chev{
+  display:inline-block;font-size:8px;margin-right:8px;
+  transition:transform .15s;color:var(--t3);
+}
+html.az .az-sec-click.collapsed .brand-chev{transform:rotate(-90deg)}
+html.az .az-sec-meta .bad{color:var(--red);font-weight:700}
+
+/* ── La lista delle chiusure: righe, non più schede ──
+   Markup da _azClosureRowHTML / _azMissingRowHTML in js/05-chiusure.js. */
+html.az .az-list{
+  background:var(--s1);
+  border-radius:var(--radius-card);
+  overflow:hidden;
+  box-shadow:var(--shadow);
+  margin:10px 0 4px;
+}
+html.az .az-row{
+  display:flex;align-items:center;gap:10px;
+  padding:14px 16px;
+  border-bottom:1px solid var(--div);
+  cursor:pointer;
+}
+html.az .az-row:last-child{border-bottom:none}
+html.az .az-row:active{background:var(--div2)}
+html.az .az-rank{
+  flex:0 0 26px;text-align:center;
+  font-size:15px;font-weight:900;
+  color:var(--faint);
+}
+html.az .az-rank.first{color:var(--acc)}
+html.az .az-rmain{flex:1;min-width:0}
+html.az .az-rname{
+  display:block;
+  font-size:14px;font-weight:900;
+  text-transform:uppercase;letter-spacing:-.01em;line-height:1.15;
+}
+html.az .az-rmeta{
+  display:flex;flex-wrap:wrap;gap:7px;align-items:center;
+  margin-top:5px;
+  font-family:var(--label);
+  font-size:8.5px;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--t3);
+  line-height:1.5;
+}
+html.az .az-rmeta b{color:var(--t1);font-weight:500}
+html.az .az-rmeta .bad{color:var(--red)}
+html.az .az-rsep{
+  width:2px;height:2px;border-radius:50%;
+  background:#cfccc6;flex:0 0 auto;
+}
+html.az .az-rval{flex:0 0 88px;text-align:right}
+html.az .az-rv{
+  display:block;
+  font-size:16px;font-weight:900;letter-spacing:-.03em;line-height:1;
+}
+html.az .az-rbar{
+  display:block;margin-top:7px;height:3px;
+  background:var(--s3);overflow:hidden;
+}
+html.az .az-rbar i{display:block;height:100%;background:var(--acc)}
+/* Sotto la barra, non in colonna propria: vedi il commento in _azClosureRowHTML */
+html.az .az-rpct{
+  display:block;margin-top:6px;
+  font-family:var(--label);
+  font-size:8.5px;font-weight:500;letter-spacing:.08em;
+  color:var(--t1);
+}
+html.az .az-rpct.low{color:var(--faint)}
+html.az .az-rchev{flex:0 0 10px;text-align:right;color:#cfccc6;font-size:16px}
+/* Negozio senza chiusura: riga spenta */
+html.az .az-row.az-miss{background:var(--div2);cursor:default}
+html.az .az-row.az-miss .az-rname{color:var(--t3)}
+
+/* Subtotale del brand e totale generale: piatti, senza tinte */
+html.az .subtotal-card,
+html.az .grand-total{
+  border:none!important;
+  background:var(--s1)!important;
+  border-radius:var(--radius-card);
+  box-shadow:var(--shadow);
+}
+html.az .sub-cell-l,
+html.az .grand-label,
+html.az .grand-row-l{
+  font-family:var(--label);
+  font-size:9px;font-weight:400;
+  letter-spacing:.16em;text-transform:uppercase;
+  color:var(--t3)!important;
+}
+html.az .sub-cell-v{
+  font-size:17px;font-weight:900;letter-spacing:-.03em;
+  color:var(--t1)!important;
+}
+html.az .sub-cell-net{
+  font-family:var(--label);
+  font-size:8.5px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--faint);
+}
+html.az .grand-label{font-size:11px;font-weight:900;letter-spacing:.18em;color:var(--t1)!important}
+html.az .grand-row-v{
+  font-size:15px;font-weight:900;letter-spacing:-.03em;
+  color:var(--t1)!important;
+}
+
+/* Vista Aperture: le schede restano .store-card, rivestite piatte */
+html.az .store-card{
+  border:none;
+  border-radius:var(--radius-card);
+  box-shadow:var(--shadow);
+}
+html.az .store-card .card-name{
+  font-size:14px;font-weight:900;
+  text-transform:uppercase;letter-spacing:-.01em;
+}
+html.az .card-date,
+html.az .card-cell-l,
+html.az .card-main-l{
+  font-family:var(--label);
+  font-size:9px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--t3);
+}
+html.az .card-main-v{font-size:24px;font-weight:900;letter-spacing:-.035em}
+html.az .card-cell-v{font-size:14px;font-weight:900;letter-spacing:-.02em}
+html.az .tgt-bar-wrap{background:var(--s3);border-radius:0;height:3px}
+html.az .tgt-bar{border-radius:0}
+html.az .tgt-bar.green,html.az .tgt-bar.yellow{background:var(--acc)}
+html.az .tgt-bar.red{background:var(--red)}
+html.az .tgt-bar-lbl{
+  font-family:var(--label);
+  font-size:8.5px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--t3);
+}
+
+/* Stato vuoto */
+html.az .empty-state{padding:48px 16px}
+html.az .empty-text{
+  font-family:var(--label);
+  font-size:10px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--t3);
+}

@@ -16,7 +16,7 @@ function renderAll(){
       const chip=document.getElementById('chip-date');
       if(chip && filterDate){
         const [y,m,dd]=filterDate.split('-');
-        chip.textContent=`📅 ${dd}/${m}/${y}`;
+        chip.textContent=`${AZ?'':'📅 '}${dd}/${m}/${y}`;
         chip.classList.add('on');
       }
     }
@@ -789,10 +789,10 @@ function setDateFilter(date){
   const chip=document.getElementById('chip-date');
   if(date){
     const [y,m,dd]=date.split('-');
-    chip.textContent=`📅 ${dd}/${m}/${y}`;
+    chip.textContent=`${AZ?'':'📅 '}${dd}/${m}/${y}`;
     chip.classList.add('on');
   }else{
-    chip.textContent='📅 Tutte le date';
+    chip.textContent=(AZ?'':'📅 ')+'Tutte le date';
     chip.classList.remove('on');
   }
   renderAll();
@@ -830,5 +830,7 @@ function renderKPI(){
     <div class="kpi-v ${k.cls}">${k.v}</div>
     <div class="kpi-s">${k.s}</div>
   </div>`).join('');
+  // I conteggi appena calcolati alimentano anche il titolo nero della tab.
+  if(typeof _azNegoziHero==='function') _azNegoziHero();
 }
 

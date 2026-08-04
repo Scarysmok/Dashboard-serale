@@ -178,21 +178,25 @@
 
   <!-- TAB NEGOZI (Chiusure + vista Aperture) -->
   <div class="scroll-area" id="tab-negozi" style="display:none">
+    <!-- Intestazione nera del tema azzurro: riempita da _azNegoziHero()
+         (js/05-chiusure.js) con il conteggio della vista attiva. Fuori dal tema
+         resta un div vuoto. -->
+    <div id="negozi-hero"></div>
     <!-- Toggle Chiusure/Aperture: stesso pattern segmented della tab Analisi -->
     <div class="seg-wrap" style="margin:10px 16px 2px">
-      <button class="seg-btn on" id="segn-chiusure" onclick="setVistaNegozi('chiusure')">🌙 Chiusure</button>
-      <button class="seg-btn" id="segn-aperture" onclick="setVistaNegozi('aperture')">☀️ Aperture</button>
+      <button class="seg-btn on" id="segn-chiusure" onclick="setVistaNegozi('chiusure')"><i class="az-em">🌙 </i>Chiusure</button>
+      <button class="seg-btn" id="segn-aperture" onclick="setVistaNegozi('aperture')"><i class="az-em">☀️ </i>Aperture</button>
     </div>
     <div class="kpi-scroll" id="kpi-scroll"></div>
     <div class="filter-bar" id="chiusure-filterbar">
       <button class="date-arrow" id="date-prev" onclick="shiftFilterDate(-1)" aria-label="Giorno precedente">‹</button>
-      <button class="chip" id="chip-date" onclick="openDateFilter()">📅 Tutte le date</button>
+      <button class="chip" id="chip-date" onclick="openDateFilter()"><i class="az-em">📅 </i>Tutte le date</button>
       <button class="date-arrow" id="date-next" onclick="shiftFilterDate(1)" aria-label="Giorno successivo">›</button>
       <button class="chip on" onclick="setChip(this,'all')">Tutti</button>
-      <button class="chip" onclick="setChip(this,'anomalie')">⚠ Anomalie</button>
+      <button class="chip" onclick="setChip(this,'anomalie')"><i class="az-em">⚠ </i>Anomalie</button>
       <button class="chip" onclick="setChip(this,'sconti')">Sconti</button>
       <button class="chip" onclick="setChip(this,'annull')">Annullamenti</button>
-      <button class="chip" id="chip-mancanti" onclick="setChip(this,'mancanti')">📭 Mancanti</button>
+      <button class="chip" id="chip-mancanti" onclick="setChip(this,'mancanti')"><i class="az-em">📭 </i>Mancanti</button>
     </div>
     <div class="search-row" id="chiusure-searchrow">
       <input class="search-field" type="search" placeholder="Cerca negozio o brand…" id="search" oninput="renderCards()" autocorrect="off"/>
@@ -210,7 +214,7 @@
     <div id="aperture-view" style="display:none">
       <div class="filter-bar">
         <button class="date-arrow" onclick="shiftAperturaDate(-1)" aria-label="Giorno precedente">‹</button>
-        <button class="chip on" id="apertura-date-chip">📅 —</button>
+        <button class="chip on" id="apertura-date-chip"><i class="az-em">📅 </i>—</button>
         <button class="date-arrow" onclick="shiftAperturaDate(1)" aria-label="Giorno successivo">›</button>
       </div>
       <div class="cards-list" id="aperture-list"></div>
@@ -228,7 +232,7 @@
   <div class="scroll-area" id="tab-stores" style="display:none">
     <div class="stores-date-bar">
       <button class="date-range-pill" id="date-range-pill" onclick="openCalendar()">
-        <span class="drp-icon">📅</span>
+        <span class="drp-icon az-em">📅</span>
         <span class="drp-text" id="drp-text">Tutte le date</span>
         <span class="drp-reset" id="drp-reset" onclick="event.stopPropagation();resetStoreRange()">×</span>
       </button>
@@ -241,8 +245,8 @@
     <div class="tempo-wrap">
       <div class="analisi-asof" id="asof-tempo"></div>
       <div class="seg-wrap">
-        <button class="seg-btn on" onclick="switchTab('tempo')">📈 Vendite</button>
-        <button class="seg-btn" onclick="switchTab('kpi')">📊 KPI negozio</button>
+        <button class="seg-btn on" onclick="switchTab('tempo')"><i class="az-em">📈 </i>Vendite</button>
+        <button class="seg-btn" onclick="switchTab('kpi')"><i class="az-em">📊 </i>KPI negozio</button>
       </div>
       <!-- Filtri: Brand multi-select + Punto Vendita multi-select + toggle.
            Il pannello dei filtri viene popolato da renderAmFilterPanels()
@@ -297,8 +301,8 @@
 
       <div class="analisi-asof" id="asof-kpi"></div>
       <div class="seg-wrap">
-        <button class="seg-btn" onclick="switchTab('tempo')">📈 Vendite</button>
-        <button class="seg-btn on" onclick="switchTab('kpi')">📊 KPI negozio</button>
+        <button class="seg-btn" onclick="switchTab('tempo')"><i class="az-em">📈 </i>Vendite</button>
+        <button class="seg-btn on" onclick="switchTab('kpi')"><i class="az-em">📊 </i>KPI negozio</button>
       </div>
 
       <!-- Hero + selettore KPI -->
@@ -344,7 +348,7 @@
         <button class="kpi-pill" data-gran="year">Anno</button>
       </div>
       <div class="kpi-pillrow">
-        <button class="kpi-pill" data-range="custom">📅 Giorno / Periodo</button>
+        <button class="kpi-pill" data-range="custom"><i class="az-em">📅 </i>Giorno / Periodo</button>
         <button class="kpi-pill" data-range="wtd">WTD</button>
         <button class="kpi-pill" data-range="mtd">MTD</button>
         <button class="kpi-pill" data-range="ytd">YTD</button>
@@ -364,7 +368,7 @@
 
       <!-- View tabs (Grafico/Heatmap) -->
       <div class="kpi-viewtabs">
-        <button class="kpi-vtab on" data-view="chart">📈 Grafico</button>
+        <button class="kpi-vtab on" data-view="chart"><i class="az-em">📈 </i>Grafico</button>
         <button class="kpi-vtab" data-view="heatmap">🔥 Heatmap</button>
       </div>
 

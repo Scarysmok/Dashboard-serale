@@ -19,6 +19,7 @@ function setVistaNegozi(v){
   const av=document.getElementById('aperture-view');
   if(av) av.style.display=ap?'':'none';
   if(ap) renderAperture();
+  _azNegoziHero();   // il titolo nero dice "N chiusure" o "N aperture"
 }
 
 function _aperturaDays(){
@@ -408,6 +409,84 @@ function _closureCardHTML(r, flat){
     </div>
   </div>`;
 }
+// ── TEMA AZZURRO: la stessa chiusura come RIGA invece che come scheda ──────
+// Il design "Restyle Azzurro" comprime le schede in righe di lista: numero di
+// posizione, nome in maiuscolo, una riga di dettagli, incasso con barra target,
+// percentuale, chevron. _closureCardHTML resta intatto e continua a servire
+// quando il tema è spento (e la vista Aperture, che usa le stesse .store-card).
+//
+// rank: posizione mostrata a sinistra. Nella modalità a gruppi riparte da 1 per
+// ogni brand, come nel mockup; nella modalità ordinata è la posizione globale.
+function _azClosureRowHTML(r, flat, rank){
+  const net=(+r.netSales)||((+r.corrispettivo||0)/1.22);
+  const tgt=+targetsByKey[storeKey(r.brand,r.location)+'|'+(r.dateISO||'')]||0;
+  const ratio=tgt>0?net/tgt*100:0;
+  const bar=tgt>0
+    ? `<span class="az-rbar"><i style="width:${Math.max(2,Math.min(100,ratio))}%"></i></span>`
+    : '';
+  // La percentuale sta sotto la barra, dentro la stessa colonna dell'incasso:
+  // come colonna a sé rubava 52px alla larghezza del nome, e su 390px i nomi
+  // lunghi ("Barletta Corso Vittorio") andavano a capo su tre righe.
+  const pct=tgt>0
+    ? `<span class="az-rpct${ratio<95?' low':''}">${ratio.toLocaleString('it-IT',{maximumFractionDigits:0})}% tgt</span>`
+    : '';
+  // Riga dei dettagli: brand solo in lista piatta (a gruppi è già nel titolo),
+  // poi net e contanti, poi lo stato cassa — rosso solo se non torna.
+  const bits=[];
+  if(flat) bits.push(`<span>${_escHtml(r.brand)}</span>`);
+  bits.push(`<span>Net <b>${fmt(net)}</b></span>`);
+  bits.push(`<span>Cash <b>${fmt(r.contanti)}</b></span>`);
+  if(r.sconti) bits.push('<span>Sconti</span>');
+  if(r.annull) bits.push('<span>Annullamenti</span>');
+  bits.push(r.anomaly
+    ? `<span class="bad">Δ cassa ${fmt(r.diff)}</span>`
+    : '<span>Cassa ok</span>');
+  return `<div class="az-row" onclick="openSheet(${allData.indexOf(r)})">
+    <span class="az-rank${rank===1?' first':''}">${String(rank).padStart(2,'0')}</span>
+    <span class="az-rmain">
+      <span class="az-rname">${_escHtml(r.location)}</span>
+      <span class="az-rmeta">${bits.join('<i class="az-rsep"></i>')}</span>
+    </span>
+    <span class="az-rval"><span class="az-rv">${fmt(r.corrispettivo)}</span>${bar}${pct}</span>
+    <span class="az-rchev">›</span>
+  </div>`;
+}
+// Riga grigia per il negozio che non ha inviato la chiusura.
+function _azMissingRowHTML(s, flat, dateDisp){
+  const sub=flat?`${_escHtml(s.brand)} · chiusura non ricevuta`:'Chiusura non ricevuta';
+  // Nessun onclick: non c'è una chiusura da aprire.
+  return `<div class="az-row az-miss">
+    <span class="az-rank">—</span>
+    <span class="az-rmain">
+      <span class="az-rname">${_escHtml(s.location)}</span>
+      <span class="az-rmeta"><span class="bad">${sub}</span></span>
+    </span>
+    <span class="az-rval"><span class="az-rv">—</span><span class="az-rpct low">${dateDisp||''}</span></span>
+  </div>`;
+}
+// Intestazione nera della tab: cambia col toggle Chiusure/Aperture.
+function _azNegoziHero(){
+  if(!AZ) return;
+  const box=document.getElementById('negozi-hero');
+  if(!box) return;
+  const ap=vistaNegozi==='aperture';
+  let n=0, kicker='Tutte le date';
+  if(ap){
+    n=allAperture.filter(a=>!aperturaDate||a.dateISO===aperturaDate).length;
+    if(aperturaDate) kicker=aperturaDate.split('-').reverse().join('/');
+  }else{
+    n=getFilteredData().length;
+    if(filterDate) kicker=filterDate.split('-').reverse().join('/');
+  }
+  const miss=(!ap&&filterDate)?getMissingStores(filterDate).length:0;
+  box.innerHTML=azHero({
+    kicker,
+    h1:String(n),
+    accent:ap?'aperture':'chiusure',
+    inline:true,
+    claim:miss?`${miss} chiusur${miss===1?'a':'e'} non ricevut${miss===1?'a':'e'}`:''
+  });
+}
 // Ratio % vs target di un record (per l'ordinamento "% Target"). -1 = senza target.
 function _tgtRatio(r){
   const tgt=+targetsByKey[storeKey(r.brand,r.location)+'|'+(r.dateISO||'')]||0;
@@ -458,6 +537,14 @@ function renderCards(){
     else if(sortMode==='tgt')  sorted.sort((a,b)=>_tgtRatio(b)-_tgtRatio(a));
     else if(sortMode==='anom') sorted.sort((a,b)=>(b.anomaly?1:0)-(a.anomaly?1:0)||b.corrispettivo-a.corrispettivo);
     else if(sortMode==='name') sorted.sort((a,b)=>(a.location+a.brand).localeCompare(b.location+b.brand,'it'));
+    if(AZ){
+      // Lista piatta: numerazione globale, il brand entra nella riga dettagli.
+      let i=0;
+      html+='<div class="az-list">';
+      for(const r of sorted) html+=_azClosureRowHTML(r,true,++i);
+      for(const s of missingRows) html+=_azMissingRowHTML(s,true,missDateDisp);
+      html+='</div>';
+    }else{
     for(const r of sorted) html+=_closureCardHTML(r,true);
     for(const s of missingRows){
       const bc=brandColor(s.brand);
@@ -472,6 +559,7 @@ function renderCards(){
         </div>
       </div>`;
     }
+    }   /* fine del ramo senza tema azzurro */
   }else{
     // ── MODALITÀ DEFAULT: gruppi per brand, collassabili dal titolo ──
     const brands={};
@@ -496,11 +584,31 @@ function renderCards(){
       const collapsed=collapsedBrands.has(brand);
       const missLabel=miss.length?` · <span style="color:var(--warn)">${miss.length} mancante${miss.length>1?'i':''}</span>`:'';
       const tBrand=brand.replace(/'/g,"\\'");
+      // Col tema azzurro l'intestazione del brand è tipografica (titoletto,
+      // filo, nota a destra) e mostra il totale sempre, non solo da collassata:
+      // nel mockup è lì che vive "12 negozi · € 92.140".
+      if(AZ){
+        html+=`<div class="az-sec az-sec-click${collapsed?' collapsed':''}" onclick="toggleBrandGroup('${tBrand}')">
+          <span><span class="brand-chev">▼</span>${_escHtml(brand)}</span>
+          <span class="az-sec-rule"></span>
+          <span class="az-sec-meta">${totCount} negoz${totCount===1?'io':'i'}${
+            miss.length?` · <b class="bad">${miss.length} mancant${miss.length>1?'i':'e'}</b>`:''
+          } · ${fmt(bCorr)}</span>
+        </div>`;
+      }else{
       html+=`<div class="brand-header clickable${collapsed?' collapsed':''}" style="background:${bc.tint};border-radius:8px;padding:8px 12px" onclick="toggleBrandGroup('${tBrand}')">
         <span class="brand-label" style="color:${bc.text}"><span class="brand-chev">▼</span>${brand}</span>
         <span class="brand-count" style="color:${bc.text};opacity:.7">${totCount} negoz${totCount===1?'io':'i'}${missLabel}${collapsed?` · ${fmt(bCorr)}`:''}</span>
       </div>`;
-      if(!collapsed){
+      }
+      if(!collapsed && AZ){
+        // Numerazione che riparte da 1 per ogni brand, come nel mockup.
+        let i=0;
+        html+='<div class="az-list">';
+        for(const r of stores) html+=_azClosureRowHTML(r,false,++i);
+        for(const s of miss) html+=_azMissingRowHTML(s,false,missDateDisp);
+        html+='</div>';
+      }else if(!collapsed){
         for(const r of stores) html+=_closureCardHTML(r,false);
         // Card grigie tratteggiate per i negozi che non hanno inviato la chiusura
         for(const s of miss){
@@ -516,7 +624,10 @@ function renderCards(){
           </div>`;
         }
       }
-      // Subtotale: sempre visibile (anche a gruppo collassato) se ci sono dati
+      // Subtotale: sempre visibile (anche a gruppo collassato) se ci sono dati.
+      // Resta anche col tema azzurro: l'intestazione del brand mostra solo il
+      // corrispettivo, mentre qui ci sono NET, contanti e POS del brand, che
+      // altrove non compaiono. Il tema lo riveste piatto (vedi .subtotal-card).
       if(stores.length){
         html+=`<div class="subtotal-card" style="border-color:${bc.strong}40;background:${bc.tint}80">
           <div>

@@ -604,7 +604,7 @@ function updateMissingChip(){
   const chip=document.getElementById('chip-mancanti');
   if(!chip) return;
   if(!filterDate){
-    chip.textContent='📭 Mancanti';
+    chip.textContent=(AZ?'':'📭 ')+'Mancanti';
     chip.classList.add('disabled');
     if(filter==='mancanti'){
       // Se c'era il filtro mancanti attivo e si toglie la data, fallback su 'all'
@@ -615,7 +615,7 @@ function updateMissingChip(){
     }
   }else{
     const n=getMissingStores(filterDate).length;
-    chip.textContent=`📭 Mancanti (${n})`;
+    chip.textContent=`${AZ?'':'📭 '}Mancanti (${n})`;
     chip.classList.remove('disabled');
   }
 }
