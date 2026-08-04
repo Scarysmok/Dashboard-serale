@@ -1248,6 +1248,26 @@ body{display:flex;flex-direction:column}
 .bs-chip-btn:hover{background:#fff;color:var(--bs-ink);border-color:#fff}
 .bs-chip-btn:disabled{opacity:.5;cursor:default;background:transparent;color:rgba(255,255,255,.6)}
 
+/* ── Best Seller · badge saldi e carry over ─────────────────────────────
+   Due informazioni per articolo che arrivano da un file nostro, non dagli
+   export adidas. Il CO è un bordo e due lettere: in CSS invece che immagine,
+   così resta nitido a ogni densità e segue il nero del modulo. Il chip dei
+   saldi è il "chip compatto" del design, ridotto al peso del CO: alla taglia
+   originale (testo 26px) in classifica coprirebbe il prodotto. */
+.bs-rname{display:flex;align-items:center;gap:7px}
+.bs-rn-t{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bs-pname,.bs-mname{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.bs-co{flex:0 0 auto;border:2px solid var(--bs-ink);border-radius:2px;padding:1px 2px;
+  font-family:'JetBrains Mono',monospace;font-size:8px;font-weight:700;line-height:1}
+.bs-sale{flex:0 0 auto;display:inline-flex;align-items:center;gap:4px;
+  background:var(--bs-red);color:#fff;padding:3px 6px}
+.bs-sale b{font-size:11px;font-weight:900;letter-spacing:-.02em;line-height:1}
+.bs-sale i{font-style:normal;font-size:6.5px;font-weight:900;letter-spacing:.22em;text-transform:uppercase}
+/* interruttori dei due filtri: stessa pillola delle tendine, ma si accende */
+.bs-ftog{padding:0 16px;color:var(--bs-ink)}
+.bs-ftog:hover{border-color:var(--bs-ink)}
+.bs-ftog.bs-on{background:var(--bs-ink);color:#fff;border-color:var(--bs-ink)}
+
 /* Giacenza residua (colonna OHQ dell'export): affiancata ai pezzi venduti,
    così si legge in coppia "quanto ho venduto / quanto mi resta".
    A zero diventa rossa con la nota "esaurito". */

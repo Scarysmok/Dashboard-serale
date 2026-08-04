@@ -19,8 +19,10 @@ const BS = {
   cur: null,        // selezione: {brand, location, period_start} | {aggregate:true, period_start}
   data: null,       // report caricato
   photos: null,     // elenco file della cartella Drive foto; null = non ancora chiesto
+  flags: null,      // {codice:{salePct,carry}} dal file saldi; null = non ancora chiesto
   public: false,     // true in bs.html: sola lettura, senza selettori né valore
   query: '', fDiv: '', fGen: '', fCat: '', fSea: '', sort: 'units',
+  fSale: false, fCarry: false,   // interruttori: solo a sconto / solo carry over
   detail: null,     // prodotto aperto nella scheda
   busy: false,
   log: [],
@@ -77,6 +79,26 @@ const BS_COLNAMES = [
 // Senza queste non si può costruire una classifica affidabile.
 const BS_COL_REQUIRED = ['Product Code','Net Sales','SQ','OHQ'];
 const bsNormCol = s => String(s==null?'':s).replace(/\s+/g,' ').trim().toLowerCase();
+
+// ── File saldi e carry over (nostro, non di adidas) ─────────────────────
+// Colonne cercate per NOME, perché nel file c'è una colonna nascosta fra la D e
+// la F: le lettere non sono affidabili. Regole date dall'utente il 04/08:
+// percentuale presente = va a sconto, assente = no; carry over dalla sua colonna.
+const BS_FLAG_CODE  = ['codice','code','product code','sportcode'];
+const BS_FLAG_PCT   = ['%','percentuale','sconto','sconto %','saldo %'];
+const BS_FLAG_CARRY = ['carry over','carryover','carry'];
+
+// Il 30% può arrivare come numero 0,3 (formato percentuale di Excel), come
+// numero 30, o come testo "30%". Fuori da 1..100 → nessuno sconto.
+function bsPct(v){
+  if(v===null || v===undefined || v==='') return null;
+  let n = typeof v === 'number' ? v : parseFloat(String(v).replace('%','').replace(',','.').trim());
+  if(!isFinite(n) || n <= 0) return null;
+  if(n <= 1) n = n * 100;              // 0,3 → 30
+  n = Math.round(n);
+  return (n >= 1 && n <= 100) ? n : null;
+}
+const bsIsSi = v => /^(si|sì|s|yes|y|true|1|x)$/i.test(String(v==null?'':v).trim());
 
 // Codici da escludere dai report: materiale di consumo che nell'export adidas
 // compare come articolo venduto ma non è un prodotto da classifica (buste).
@@ -182,7 +204,7 @@ async function bsLoadCurrent(){
       BS.data = await bsFetchPublic(c.aggregate ? '' : c.brand+'|'+c.location);
       // BS.photos è già in memoria dal primo caricamento: riagganciarle non
       // costa una richiesta, ma senza questa riga il cambio negozio le perde.
-      if(!BS.data.error) await bsAttachPhotos(BS.data.products);
+      if(!BS.data.error){ await bsAttachPhotos(BS.data.products); await bsLoadFlags(); }
       bsPaint();
       return;
     }
@@ -196,7 +218,7 @@ async function bsLoadCurrent(){
     // richiesta (misurato il 03/08) e la versione cambia solo quando si importa.
     BS.data = await fetchCached(bsCacheKey(c), path, _dsVersions.bestseller);
     if(!BS.data || !BS.data.products) BS.data = {error: 'Report non disponibile'};
-    else await bsAttachPhotos(BS.data.products);
+    else { await bsAttachPhotos(BS.data.products); await bsLoadFlags(); }
   }catch(e){
     BS.data = {error: String(e.message||e)};
   }
@@ -209,6 +231,7 @@ function bsFiltered(){
   const list = (BS.data.products||[]).filter(p =>
     (!BS.fDiv || p.div===BS.fDiv) && (!BS.fGen || p.gender===BS.fGen) && (!BS.fCat || p.cat===BS.fCat) &&
     (!BS.fSea || bsSeason(p)===BS.fSea) &&
+    (!BS.fSale  || !!bsFlag(p).salePct) && (!BS.fCarry || !!bsFlag(p).carry) &&
     (!q || (p.name||'').toLowerCase().includes(q) || (p.code||'').toLowerCase().includes(q)));
   return list.slice().sort((a,b)=> BS.sort==='units' ? b.units-a.units : b.net-a.net);
 }
@@ -278,7 +301,7 @@ function bsPaint(){
       </div>
       <div class="bs-pimg">${bsImg(p)}</div>
       <div class="bs-pbody">
-        <div class="bs-pname">${bsEsc(p.name)}</div>
+        <div class="bs-pname">${bsEsc(p.name)}${bsBadges(p)}</div>
         <div class="bs-pmeta">${bsEsc(p.code)} · ${bsEsc(p.gender)} · ${bsEsc(p.cat)}</div>
         <div class="bs-pfoot">
           <div><div class="bs-pnum">${p.units}</div><div class="bs-plab">Pezzi</div></div>
@@ -301,7 +324,7 @@ function bsPaint(){
       <div class="bs-c-rank">${i+1}</div>
       <div class="bs-c-img">${bsImg(p)}</div>
       <div class="bs-c-main">
-        <div class="bs-rname">${bsEsc(p.name)}</div>
+        <div class="bs-rname"><span class="bs-rn-t">${bsEsc(p.name)}</span>${bsBadges(p)}</div>
         <div class="bs-rmeta"><b>${bsEsc(p.code)}</b><span class="bs-minidot"></span>
           <span>${bsEsc(p.div)} · ${bsEsc(p.gender)} · ${bsEsc(p.cat)}</span></div>
       </div>
@@ -319,7 +342,7 @@ function bsPaint(){
     </button>`;
   }).join('');
 
-  const hasF = !!(BS.query||BS.fDiv||BS.fGen||BS.fCat||BS.fSea);
+  const hasF = !!(BS.query||BS.fDiv||BS.fGen||BS.fCat||BS.fSea||BS.fSale||BS.fCarry);
   const opt = (v,cur)=>`<option value="${bsEsc(v)}"${v===cur?' selected':''}>${bsEsc(v)}</option>`;
 
   root.innerHTML = bsStrip() + bsHeader(d) + `
@@ -346,6 +369,8 @@ function bsPaint(){
       ${bsUniq(all.map(p=>p.cat)).map(v=>opt(v,BS.fCat)).join('')}</select>
     <select class="bs-fsel" id="bs-fsea"><option value="">Stagione</option>
       ${bsUniq(all.map(bsSeason)).sort(bsSeasonCmp).map(v=>opt(v,BS.fSea)).join('')}</select>
+    <button class="bs-fsel bs-ftog${BS.fSale?' bs-on':''}" id="bs-fsale">% A sconto</button>
+    <button class="bs-fsel bs-ftog${BS.fCarry?' bs-on':''}" id="bs-fcarry">Carry over</button>
     <div class="bs-sortgrp">
       <button class="bs-sortbtn${BS.sort==='units'?' bs-on':''}" data-sort="units">Pezzi</button>
       <button class="bs-sortbtn${BS.sort==='net'?' bs-on':''}" data-sort="net">Valore</button>
@@ -442,6 +467,82 @@ function bsWeekRange(w){
   const short = t => bsPeriodLabel(t).replace(/\/\d{4}$/,'');
   return w.period_end ? short(w.period_start)+' – '+short(w.period_end)
                       : bsPeriodLabel(w.period_start);
+}
+
+// Legge il file saldi/carry over. Trova la riga di intestazione cercando una
+// colonna che somigli a "Codice": nel file c'è del preambolo sopra, e comunque
+// non si può contare sulla riga fissa.
+function bsParseFlags(ab, fileName){
+  const wb = XLSX.read(ab, {type:'array', cellDates:true});
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:null});
+  const trova = (riga, nomi) => riga.findIndex(c => nomi.includes(bsNormCol(c)));
+
+  let head = -1, iCode = -1;
+  for(let i=0; i<Math.min(rows.length, 30); i++){
+    const k = trova(rows[i]||[], BS_FLAG_CODE);
+    if(k > -1){ head = i; iCode = k; break; }
+  }
+  if(head < 0) throw new Error(`${fileName}: non trovo la colonna "Codice".`);
+  const iPct = trova(rows[head], BS_FLAG_PCT);
+  const iCarry = trova(rows[head], BS_FLAG_CARRY);
+  if(iPct < 0 && iCarry < 0)
+    throw new Error(`${fileName}: non trovo né la colonna "%" né "Carry Over".`);
+
+  const items = [];
+  const visti = new Set();
+  for(let i=head+1; i<rows.length; i++){
+    const r = rows[i]; if(!r) continue;
+    const code = String(r[iCode]==null?'':r[iCode]).trim().toUpperCase();
+    if(!code || visti.has(code)) continue;
+    visti.add(code);
+    items.push({code,
+      salePct: iPct   < 0 ? null : bsPct(r[iPct]),
+      carry:   iCarry < 0 ? false : bsIsSi(r[iCarry])});
+  }
+  if(!items.length) throw new Error(`${fileName}: nessun codice articolo trovato.`);
+  return {items, colonne: {codice: iCode, percentuale: iPct, carry: iCarry}};
+}
+
+// Import del file: sostituisce l'insieme sul server e ricarica i badge.
+async function bsImportFlags(file){
+  BS.busy = true; bsPaint();
+  try{
+    bsLog(`Leggo ${bsEsc(file.name)}…`);
+    const {items} = bsParseFlags(await file.arrayBuffer(), file.name);
+    const r = await api('/bestseller/flags', {method:'PUT', body: JSON.stringify({items})});
+    if(!r.ok) throw new Error('errore '+r.status);
+    const e = await r.json();
+    bsLog(`Importati <b>${e.articoli}</b> articoli · <b>${e.aSconto}</b> a sconto · `
+      + `<b>${e.carryOver}</b> carry over`
+      + (e.duplicati ? ` · ${e.duplicati} codici ripetuti ignorati` : ''), true);
+    BS.flags = null;                 // la prossima pittura li richiede
+    await bsLoadFlags();
+  }catch(err){
+    bsLog('Import saldi fallito: '+bsEsc(err.message||err), true);
+  }
+  BS.busy = false;
+  bsPaint();
+}
+
+// {codice: {salePct, carry}}. Nel link pubblico arrivano col payload.
+async function bsLoadFlags(){
+  if(BS.flags) return BS.flags;
+  if(BS.public){ BS.flags = (BS.data||{}).flags || {}; return BS.flags; }
+  try{
+    BS.flags = await fetchCached('bs:flags', '/bestseller/flags', _dsVersions.bsflags);
+  }catch(e){ console.debug('bsLoadFlags', e); BS.flags = {}; }
+  return BS.flags;
+}
+
+// Flag di un articolo, sempre un oggetto: così chi lo usa non deve controllare.
+const bsFlag = p => (BS.flags || {})[String(p.code||'').toUpperCase()] || {};
+
+// I due badge accanto al nome. Il chip rosso porta la percentuale vera del file.
+function bsBadges(p){
+  const f = bsFlag(p);
+  return (f.carry ? '<span class="bs-co" title="Carry over">CO</span>' : '')
+       + (f.salePct ? `<span class="bs-sale" title="Va a sconto"><b>${f.salePct}%</b><i>off</i></span>` : '');
 }
 
 // Unico punto da cui la pagina pubblica prende i dati: niente api(), niente
@@ -590,6 +691,8 @@ function bsAdminChips(d){
     <input type="file" id="bs-file" accept=".xlsx,.xls" multiple style="display:none">
     <button class="bs-chip-btn" id="bs-import"${BS.busy?' disabled':''}>
       ${BS.busy?'⏳ Importo…':'📥 Importa Excel'}</button>
+    <input type="file" id="bs-flagfile" accept=".xlsx,.xls" style="display:none">
+    <button class="bs-chip-btn" id="bs-flags"${BS.busy?' disabled':''}>🏷 Importa saldi e CO</button>
     <button class="bs-chip-btn" id="bs-codes"${BS.busy?' disabled':''}>⬇ Codici senza foto</button>
     <button class="bs-chip-btn" id="bs-unlink"${BS.cur?'':' disabled'}>🔒 Spegni link</button>
     ${canDelete?`<button class="bs-chip-btn" id="bs-del">🗑 Elimina settimana</button>`:''}`;
@@ -625,7 +728,7 @@ function bsModal(p){
       <div class="bs-mimg">${bsImg(p)}</div>
       <div class="bs-mbody">
         <div class="bs-mrank">${rank>0?'Posizione n° '+rank+' in classifica':'Scheda prodotto'}</div>
-        <div class="bs-mname">${bsEsc(p.name)}</div>
+        <div class="bs-mname">${bsEsc(p.name)}${bsBadges(p)}</div>
         <div class="bs-mmeta">${bsEsc(p.code)} · ${bsEsc(p.div)} · ${bsEsc(p.gender)} · ${bsEsc(p.cat)}</div>
         <div class="bs-hero">${hero.map(h=>`<div>
           <div class="bs-hero-v">${bsEsc(h.v)}</div>
@@ -1020,6 +1123,8 @@ function bsBind(){
   on('bs-fgen','change', e => { BS.fGen = e.target.value; bsPaint(); });
   on('bs-fcat','change', e => { BS.fCat = e.target.value; bsPaint(); });
   on('bs-fsea','change', e => { BS.fSea = e.target.value; bsPaint(); });
+  on('bs-fsale','click', () => { BS.fSale = !BS.fSale; bsPaint(); });
+  on('bs-fcarry','click', () => { BS.fCarry = !BS.fCarry; bsPaint(); });
   on('bs-reset','click', () => { bsResetView(); bsPaint(); });
 
   document.querySelectorAll('#bs-root [data-sort]').forEach(b =>
@@ -1042,6 +1147,12 @@ function bsBind(){
     e.target.value = '';
     if(files.length) bsImportFiles(files);
   });
+  on('bs-flags','click', () => { const f=document.getElementById('bs-flagfile'); if(f) f.click(); });
+  on('bs-flagfile','change', e => {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if(f) bsImportFlags(f);
+  });
   on('bs-codes','click', bsDownloadCodes);
   on('bs-link','click', bsMakeLink);
   on('bs-unlink','click', bsKillLink);
@@ -1053,7 +1164,8 @@ function bsBind(){
 // Azzera vista e filtri quando cambia la selezione: i filtri di una settimana
 // non hanno senso su un'altra (una divisione può non esserci nemmeno).
 function bsResetView(){
-  BS.query=''; BS.fDiv=''; BS.fGen=''; BS.fCat=''; BS.fSea=''; BS.detail=null;
+  BS.query=''; BS.fDiv=''; BS.fGen=''; BS.fCat=''; BS.fSea='';
+  BS.fSale=false; BS.fCarry=false; BS.detail=null;
 }
 
 // Chiude i pannelli aperti, tranne `keep`. Restituisce quanti ne ha chiusi.
