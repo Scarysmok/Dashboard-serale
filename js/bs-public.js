@@ -16,7 +16,8 @@ var ALL_STORES = [];          // usato solo dall'import, che qui non c'è
   BS.token = new URLSearchParams(location.search).get('t') || '';
   if(!BS.token){ root.innerHTML = bsState('Link non valido', 'manca il codice nell\'indirizzo'); return; }
 
-  root.innerHTML = bsState('Carico la classifica…', 'il server si sta svegliando, può richiedere qualche secondo');
+  // Il logo animato è già nell'HTML di bs.html: resta a schermo finché bsPaint
+  // non lo sostituisce con la classifica. Niente da scrivere qui.
   BS.data = await bsFetchPublic('');
   if(BS.data.error){ root.innerHTML = bsState('Classifica non disponibile', BS.data.error); return; }
 
