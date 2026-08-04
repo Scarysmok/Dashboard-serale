@@ -463,6 +463,7 @@ function renderTempo(){
   const allDates = Object.keys(dailySums);
   if(allDates.length === 0){
     targetEl.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-text">Nessun dato per i filtri selezionati</div></div>`;
+    _azTempoHero({});   // svuota il titolo nero: senza dati non ha nulla da dire
     return;
   }
 
@@ -692,6 +693,33 @@ function renderTempo(){
     html += `</div></div>`;
   }
   targetEl.innerHTML = html;
+  _azTempoHero(years);
+}
+
+// Intestazione nera della tab Analisi (sezione 1c del restyle) + pannello
+// bianco che le sale sopra con Net YTD e scostamento dal target.
+// Prende l'anno più recente fra quelli aggregati da renderTempo, che è quello
+// di cui il titolo parla ("ANDAMENTO 2026").
+function _azTempoHero(years){
+  if(!AZ) return;
+  const box = document.getElementById('tempo-hero');
+  if(!box) return;
+  const yr = Object.keys(years||{}).sort().pop();
+  if(!yr){ box.innerHTML=''; return; }
+  const y = years[yr];
+  const inCorso = y.daysFuture > 0 || y.daysPending > 0;
+  const delta = y.tgtPast > 0 ? (y.netPast / y.tgtPast * 100 - 100) : null;
+  const dTxt = delta === null ? '—'
+    : (delta >= 0 ? '+' : '') + delta.toLocaleString('it-IT',{minimumFractionDigits:1,maximumFractionDigits:1}) + '%';
+  box.innerHTML = azHero({
+    kicker: inCorso ? 'Anno in corso' : 'Anno chiuso',
+    h1: 'Andamento',
+    accent: yr,
+    claim: `${y.daysPast} giorni consuntivati${y.daysPending?` · ${y.daysPending} in corso`:''}`
+  }) + `<div class="az-lift az-duo">
+    <div><div class="az-duo-l">Net ${inCorso?'YTD':yr}</div><div class="az-duo-v">${fmt(y.netPast)}</div></div>
+    <div><div class="az-duo-l">vs target</div><div class="az-duo-v${delta!==null&&delta<0?' down':''}">${dTxt}</div></div>
+  </div>`;
 }
 
 // ── HELPER ISO WEEK ──

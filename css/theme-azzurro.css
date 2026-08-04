@@ -725,6 +725,131 @@ html.az .tgt-bar-lbl{
   color:var(--t3);
 }
 
+/* ───────────────────────────────────────────────────────────────────────────
+   8. ANALISI / VENDITE (sezione 1c)
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* Il pannello a due celle che sborda sul nero (Net YTD · vs target) */
+html.az #tempo-hero .az-lift{margin-left:16px;margin-right:16px}
+html.az .az-duo{
+  display:grid;grid-template-columns:1fr 1fr;gap:1px;
+  background:var(--bd);
+}
+html.az .az-duo > div{background:var(--s1);padding:18px 16px}
+html.az .az-duo-l{
+  font-family:var(--label);
+  font-size:8.5px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--t3);
+}
+html.az .az-duo-v{
+  margin-top:11px;
+  font-size:21px;font-weight:900;letter-spacing:-.035em;line-height:1;
+}
+html.az .az-duo-v.down{color:var(--red)}
+
+html.az .tempo-wrap{padding-top:18px}
+html.az .analisi-asof{
+  border-radius:var(--radius-card);
+  background:var(--s1)!important;
+  color:var(--t2)!important;
+  box-shadow:var(--shadow);
+  font-family:var(--label);
+  font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;
+  font-weight:400;
+}
+html.az .analisi-asof b{font-weight:700;color:var(--t1)}
+html.az .analisi-asof.none{color:var(--red)!important}
+
+/* Filtri: pillole, nere quando selezionate */
+html.az .am-filter-btn,
+html.az .tempo-toggle{
+  border-radius:var(--radius-pill);
+  border:1px solid var(--bd2);
+  background:var(--s1);
+  color:var(--t3);
+  font-size:10.5px;font-weight:900;
+  letter-spacing:.1em;text-transform:uppercase;
+  min-height:38px;
+}
+html.az .am-filter-btn.has-sel,
+html.az .tempo-toggle.on{
+  background:#0d0d0d;border-color:#0d0d0d;color:#fff;
+}
+html.az .am-filter-btn .am-count{background:#fff;color:#0d0d0d;font-weight:900}
+html.az .am-filter-btn.has-sel .am-arrow{color:rgba(255,255,255,.7)}
+/* La spunta del toggle diventa superflua: lo stato lo dice il fondo nero */
+html.az .tempo-toggle::before{display:none}
+html.az .am-filter-panel{
+  border:1px solid var(--bd2);
+  border-radius:var(--radius-sm);
+  box-shadow:0 24px 60px -32px rgba(0,0,0,.45);
+}
+html.az .am-filter-grouphead{
+  font-family:var(--label);
+  font-size:8.5px;letter-spacing:.16em;color:var(--t3);
+}
+html.az .am-filter-action{
+  border-radius:var(--radius-pill);
+  font-size:10px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;
+}
+html.az .am-filter-action.primary{background:#0d0d0d}
+
+/* L'albero anno → mesi → giorni come lista */
+html.az .am-card{
+  border:none;border-radius:var(--radius-card);
+  box-shadow:var(--shadow);
+  margin-bottom:12px;
+}
+html.az .am-row-title{
+  font-size:15px;font-weight:900;
+  text-transform:uppercase;letter-spacing:-.01em;
+}
+html.az .am-row-sub{
+  font-family:var(--label);
+  font-size:8.5px;font-weight:400;
+  letter-spacing:.1em;text-transform:uppercase;
+  color:var(--t3);
+  margin-top:4px;
+}
+/* 13px e non 16: la riga dell'anno mostra due importi ("consuntivato / target
+   totale NET") e a 16px su 390px andava a capo, schiacciando il titolo su tre
+   righe. Verificato con render headless. */
+html.az .am-row-net{
+  font-size:13px;font-weight:900;letter-spacing:-.03em;
+  color:var(--t1)!important;
+}
+html.az .am-child-row .am-row-net{font-size:13px}
+html.az .am-day-row .am-row-net{font-size:12px}
+html.az .am-row-tgt{
+  font-family:var(--label);
+  font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--t3);
+}
+/* I badge di scostamento perdono la pastiglia: restano scritte spaziate.
+   Verde e giallo diventano grigio neutro, il rosso resta rosso — è l'unico
+   caso che il design vuole far notare. */
+html.az .am-badge{
+  background:transparent!important;
+  padding:0;border-radius:0;
+  font-family:var(--label);
+  font-size:9px;font-weight:500;
+  letter-spacing:.1em;text-transform:uppercase;
+}
+html.az .am-badge.green,
+html.az .am-badge.muted{color:var(--t3)!important}
+html.az .am-badge.yellow{color:var(--orange)!important}
+html.az .am-badge.red{color:var(--red)!important}
+html.az .am-today-marker{
+  background:var(--acc);border-radius:2px;
+  font-family:var(--label);
+  font-size:8px;letter-spacing:.14em;
+}
+html.az .am-children{background:var(--div2);border-top:1px solid var(--bd)}
+html.az .am-child-row,
+html.az .am-day-row{border-bottom:1px solid var(--div)}
+html.az .am-day-row{background:var(--s1)}
+html.az .am-chev{color:var(--faint);font-size:10px}
+
 /* Stato vuoto */
 html.az .empty-state{padding:48px 16px}
 html.az .empty-text{
