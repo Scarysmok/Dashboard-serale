@@ -10,6 +10,11 @@
   /* Vista pubblica: fuori tutto ciò che riguarda il valore. I numeri non
      arrivano nemmeno dal backend, questo serve a non lasciare celle a zero. */
   .bs-c-net, [data-sort="net"], .bs-pfoot > div:nth-child(3){display:none}
+  /* Nella app html e body hanno height:100% e overflow:hidden, e lo scorrimento
+     lo fa .scroll-area: qui invece la pagina è una pagina normale e deve
+     scorrere lei, altrimenti resta bloccata sul podio. La barra filtri è
+     position:sticky e continua a funzionare, agganciata al viewport. */
+  html, body{height:auto;overflow:visible}
   body{margin:0;background:var(--bs-bg,#f6f5f3)}
 </style>
 </head>
