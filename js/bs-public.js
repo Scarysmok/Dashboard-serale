@@ -34,6 +34,9 @@ var ALL_STORES = [];          // usato solo dall'import, che qui non c'è
       ? BS.data.stores.map(s => Object.assign({}, uno, s))
       : [uno];
     await bsAttachPhotos(BS.data.products);
+    // Anche i badge CO/SALES: i flag arrivano col payload ma senza questa riga
+    // BS.flags resta vuoto e alla prima apertura i badge non compaiono.
+    await bsLoadFlags();
     // Solo bsPaint: aggancia già gli eventi in coda. Chiamare anche bsBind()
     // metteva un secondo listener identico su ogni pulsante, e sul selettore i due
     // si annullavano — il primo apriva il pannello, il secondo lo richiudeva nello

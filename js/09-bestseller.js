@@ -282,16 +282,15 @@ function bsPaint(){
   const max = list.length ? Math.max(...list.map(p=>p.units)) || 1 : 1;
   const totUnits = all.reduce((s,x)=>s+(x.units||0),0);
   const totNet = all.reduce((s,x)=>s+(x.net||0),0);
-  const first = all[0];
+  // Il n° 1 è quello della classifica corrente: cambia con l'ordinamento
+  // (pezzi/valore) e con i filtri, non è il primo dell'array come arriva.
+  const first = list[0];
 
   const kpis = [
     {l:'Prodotti venduti', v:String(all.length), s:'referenze attive', size:'clamp(28px,3vw,40px)'},
     {l:'Pezzi totali', v:totUnits.toLocaleString('it-IT'), s:'unità sell-out', size:'clamp(28px,3vw,40px)'},
-    // Nel link pubblico il valore non arriva nemmeno dal backend.
-    ...(BS.public ? [] : [{l:'Valore netto', v:bsEur(totNet), s:'vendite nette periodo', size:'clamp(24px,2.5vw,34px)'}]),
-    d.aggregate
-      ? {l:'Negozi inclusi', v:String(d.store_count||0), s:'report aggregato', size:'clamp(28px,3vw,40px)'}
-      : {l:'Best seller n°1', v:first?first.name:'—', s:first?first.code:'', size:'clamp(15px,1.6vw,20px)'},
+    {l:'Valore netto', v:bsEur(totNet), s:'vendite nette periodo', size:'clamp(24px,2.5vw,34px)'},
+    {l:'Best seller n°1', v:first?first.name:'—', s:first?first.code:'', size:'clamp(15px,1.6vw,20px)'},
   ];
 
   const podium = list.slice(0,3).map((p,i)=>`
