@@ -22,7 +22,7 @@ const BS = {
   flags: null,      // {codice:{salePct,carry}} dal file saldi; null = non ancora chiesto
   public: false,     // true in bs.html: sola lettura, senza selettori né valore
   query: '', fDiv: '', fGen: '', fCat: '', fSea: '', sort: 'units',
-  fSale: false, fCarry: false,   // interruttori: solo a sconto / solo carry over
+  fSale: '', fCarry: '',   // '' tutti · 'si' solo quelli · 'no' solo gli altri
   detail: null,     // prodotto aperto nella scheda
   busy: false,
   log: [],
@@ -231,7 +231,8 @@ function bsFiltered(){
   const list = (BS.data.products||[]).filter(p =>
     (!BS.fDiv || p.div===BS.fDiv) && (!BS.fGen || p.gender===BS.fGen) && (!BS.fCat || p.cat===BS.fCat) &&
     (!BS.fSea || bsSeason(p)===BS.fSea) &&
-    (!BS.fSale  || !!bsFlag(p).salePct) && (!BS.fCarry || !!bsFlag(p).carry) &&
+    (!BS.fSale  || (BS.fSale==='si'  ? !!bsFlag(p).salePct : !bsFlag(p).salePct)) &&
+    (!BS.fCarry || (BS.fCarry==='si' ? !!bsFlag(p).carry   : !bsFlag(p).carry)) &&
     (!q || (p.name||'').toLowerCase().includes(q) || (p.code||'').toLowerCase().includes(q)));
   return list.slice().sort((a,b)=> BS.sort==='units' ? b.units-a.units : b.net-a.net);
 }
@@ -369,8 +370,12 @@ function bsPaint(){
       ${bsUniq(all.map(p=>p.cat)).map(v=>opt(v,BS.fCat)).join('')}</select>
     <select class="bs-fsel" id="bs-fsea"><option value="">Stagione</option>
       ${bsUniq(all.map(bsSeason)).sort(bsSeasonCmp).map(v=>opt(v,BS.fSea)).join('')}</select>
-    <button class="bs-fsel bs-ftog${BS.fSale?' bs-on':''}" id="bs-fsale">% A sconto</button>
-    <button class="bs-fsel bs-ftog${BS.fCarry?' bs-on':''}" id="bs-fcarry">Carry over</button>
+    <select class="bs-fsel" id="bs-fsale"><option value="">Sconto</option>
+      <option value="si"${BS.fSale==='si'?' selected':''}>A sconto</option>
+      <option value="no"${BS.fSale==='no'?' selected':''}>Non a sconto</option></select>
+    <select class="bs-fsel" id="bs-fcarry"><option value="">Carry over</option>
+      <option value="si"${BS.fCarry==='si'?' selected':''}>Carry over</option>
+      <option value="no"${BS.fCarry==='no'?' selected':''}>Non carry over</option></select>
     <div class="bs-sortgrp">
       <button class="bs-sortbtn${BS.sort==='units'?' bs-on':''}" data-sort="units">Pezzi</button>
       <button class="bs-sortbtn${BS.sort==='net'?' bs-on':''}" data-sort="net">Valore</button>
@@ -1125,8 +1130,8 @@ function bsBind(){
   on('bs-fgen','change', e => { BS.fGen = e.target.value; bsPaint(); });
   on('bs-fcat','change', e => { BS.fCat = e.target.value; bsPaint(); });
   on('bs-fsea','change', e => { BS.fSea = e.target.value; bsPaint(); });
-  on('bs-fsale','click', () => { BS.fSale = !BS.fSale; bsPaint(); });
-  on('bs-fcarry','click', () => { BS.fCarry = !BS.fCarry; bsPaint(); });
+  on('bs-fsale','change', e => { BS.fSale = e.target.value; bsPaint(); });
+  on('bs-fcarry','change', e => { BS.fCarry = e.target.value; bsPaint(); });
   on('bs-reset','click', () => { bsResetView(); bsPaint(); });
 
   document.querySelectorAll('#bs-root [data-sort]').forEach(b =>
@@ -1167,7 +1172,7 @@ function bsBind(){
 // non hanno senso su un'altra (una divisione può non esserci nemmeno).
 function bsResetView(){
   BS.query=''; BS.fDiv=''; BS.fGen=''; BS.fCat=''; BS.fSea='';
-  BS.fSale=false; BS.fCarry=false; BS.detail=null;
+  BS.fSale=''; BS.fCarry=''; BS.detail=null;
 }
 
 // Chiude i pannelli aperti, tranne `keep`. Restituisce quanti ne ha chiusi.

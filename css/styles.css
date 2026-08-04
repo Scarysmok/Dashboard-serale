@@ -1261,10 +1261,6 @@ body{display:flex;flex-direction:column}
   font-family:'JetBrains Mono',monospace;font-size:8px;font-weight:700;line-height:1}
 .bs-sale{flex:0 0 auto;background:var(--bs-red);color:#fff;padding:3px 7px;
   font-size:8px;font-weight:900;letter-spacing:.18em;text-transform:uppercase;line-height:1.25}
-/* interruttori dei due filtri: stessa pillola delle tendine, ma si accende */
-.bs-ftog{padding:0 16px;color:var(--bs-ink)}
-.bs-ftog:hover{border-color:var(--bs-ink)}
-.bs-ftog.bs-on{background:var(--bs-ink);color:#fff;border-color:var(--bs-ink)}
 
 /* Giacenza residua (colonna OHQ dell'export): affiancata ai pezzi venduti,
    così si legge in coppia "quanto ho venduto / quanto mi resta".
