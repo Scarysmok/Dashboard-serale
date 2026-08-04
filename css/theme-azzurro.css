@@ -1,0 +1,526 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   TEMA AZZURRO — restyle UI del 04/08/2026
+   Proposta "Restyle Azzurro.dc.html" (Claude Design, progetto a0c0236f).
+
+   COME SI SPEGNE
+   Tutto qui dentro è annidato sotto `html.az`. Togliere `class="az"` dal tag
+   <html> in index.html riporta l'app esattamente a com'era: questo foglio
+   diventa inerte e non serve rimuovere né il <link> né lo <script>. La stessa
+   classe governa anche le intestazioni nere, che js/00-az.js non emette se la
+   classe non c'è (vedi AZ in quel file).
+
+   IDEA
+   Il modulo Best Seller ha già questo linguaggio (nero, AdihausDIN, maiuscolo,
+   liste su card bianche). Qui lo si estende a tutta l'app cambiando l'accento:
+   AZZURRO #1e88d1 come colore principale, ROSSO #d8322a riservato alle anomalie.
+
+   PERCHÉ FUNZIONA CON POCHE MODIFICHE AL JS
+   styles.css è interamente guidato dai token in :root e usa classi semantiche
+   (.oggi-hero, .oggi-row, .chip, .seg-btn…). Ridefinendo i token e riscrivendo
+   quelle classi si riveste tutta l'app senza rigenerare il markup. Il markup
+   nuovo serve solo per le intestazioni nere, che sono un blocco in più.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+html.az{
+  /* ── Superfici: grigio caldo, non più grigio-azzurro ── */
+  --bg:#f6f5f3;
+  --s1:#ffffff;
+  --s2:#f0eeea;
+  --s3:#eceae6;
+  --bd:#eceae6;
+  --bd2:#dedbd6;
+  --div:#f0eeea;
+  --div2:#faf9f7;
+
+  /* ── Accento: azzurro al posto dell'indaco ── */
+  --acc:#1e88d1;
+  --acc-bg:#e8f2fb;
+  --acc-dk:#1567a4;
+  --blue:#1e88d1;
+
+  /* ── Stati ──
+     Il documento di design usa l'azzurro anche per il positivo e tiene il rosso
+     per le sole anomalie: il verde quindi sparisce e --green punta all'azzurro.
+     --orange resta invece un colore a sé (ocra caldo, in famiglia con lo sfondo)
+     perché su .am-badge distingue "poco sotto target" da "molto sotto target":
+     collassarlo sul rosso avrebbe buttato via quell'informazione. */
+  --green:#1e88d1;
+  --green-bg:#e8f2fb;
+  --green-dk:#1567a4;
+  --red:#d8322a;
+  --red-bg:#fdecec;
+  --red-bd:#f4d7d5;
+  --orange:#a8620f;
+  --orange-bg:#f7f0e4;
+  --warn:#a8620f;
+
+  /* ── Testo ── */
+  --t1:#0d0d0d;
+  --t2:#57544f;
+  --t3:#8a8782;
+  --faint:#b0aca6;
+
+  /* ── Ombre e raggi: card piatte con un filo d'ombra sotto, come nel design,
+        più un'ombra profonda per il pannello che sborda sull'intestazione ── */
+  --shadow:0 1px 0 #e4e2de;
+  --shadow-lift:0 24px 60px -32px rgba(0,0,0,.45);
+  --radius-card:18px;
+  --radius-sm:14px;
+  --radius-tile:12px;
+  --radius-pill:999px;
+
+  /* ── Tipografia ──
+     AdihausDIN è già caricata da styles.css (@font-face, non scoped) e Archivo
+     da index.html: nessun font nuovo da scaricare.
+     --mono resta uguale a --font: nell'app 42 regole leggono var(--mono) su
+     date e importi, e mandarle in monospazio avrebbe cambiato cose non previste.
+     Il monospazio serve solo per le etichettine spaziate, e per quelle c'è
+     --label, usata soltanto qui dentro. */
+  --font:"AdihausDIN","Archivo",Helvetica,Arial,sans-serif;
+  --mono:"AdihausDIN","Archivo",Helvetica,Arial,sans-serif;
+  --label:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
+
+  /* Di quanto il pannello bianco sale sopra l'intestazione nera. Il valore
+     tiene conto del gap di .oggi-wrap: 46 - 14 = 32px di sormonto effettivo,
+     come nel mockup. */
+  --az-overlap:46px;
+}
+
+html.az body{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   1. INTESTAZIONE APP → striscia nera
+   Nel design la barra in cima non è più una barra bianca traslucida ma la
+   parte alta del blocco nero: si fonde con l'intestazione della sezione, che
+   comincia subito sotto con lo stesso fondo.
+   ─────────────────────────────────────────────────────────────────────────── */
+html.az .app-header{
+  background:#0d0d0d;
+  border-bottom:none;
+  backdrop-filter:none;
+  padding:10px 16px;
+  color:#fff;
+}
+html.az .app-title{
+  font-family:var(--label);
+  font-size:10px;
+  font-weight:400;
+  letter-spacing:.2em;
+  text-transform:uppercase;
+  color:#fff;
+}
+/* Il badge "live" diventa un punto azzurro: la parola non serve, il colore sì */
+html.az .app-badge{
+  width:4px;height:4px;padding:0;margin-left:10px;
+  border-radius:50%;
+  background:var(--acc);
+  border:none;
+  font-size:0;
+  color:transparent;
+  flex-shrink:0;
+}
+html.az .sync-pill{
+  background:transparent;
+  border:1px solid rgba(255,255,255,.24);
+  color:rgba(255,255,255,.7);
+  font-family:var(--label);
+  font-size:9px;
+  letter-spacing:.14em;
+  text-transform:uppercase;
+  padding:6px 11px;
+}
+html.az .icon-btn{
+  width:32px;height:32px;
+  border-radius:50%;
+  border:1px solid rgba(255,255,255,.28);
+  background:transparent;
+  color:#fff;
+  font-size:14px;
+}
+html.az .icon-btn:active{background:rgba(255,255,255,.12)}
+html.az .status-bar{background:#0d0d0d}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   2. MENU LATERALE → nero, voce attiva azzurra
+   ─────────────────────────────────────────────────────────────────────────── */
+html.az .side-nav{
+  background:#0d0d0d;
+  border-right:1px solid rgba(255,255,255,.1);
+  backdrop-filter:none;
+  box-shadow:2px 0 24px rgba(0,0,0,.35);
+}
+html.az .side-nav-brand{
+  font-family:var(--label);
+  font-size:9px;
+  letter-spacing:.2em;
+  text-transform:uppercase;
+  color:rgba(255,255,255,.4);
+}
+html.az .nav-item{
+  color:rgba(255,255,255,.66);
+  border-radius:var(--radius-pill);
+  font-weight:700;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+  font-size:11px;
+}
+html.az .nav-item:active{background:rgba(255,255,255,.1)}
+html.az .nav-item.active{
+  background:#fff;
+  color:#0d0d0d;
+}
+html.az #nav-backdrop{background:rgba(0,0,0,.5)}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   3. INTESTAZIONE DI SEZIONE (.az-hero) — il blocco nero col titolo gigante
+   Emesso da azHero() in js/00-az.js. Va a filo dei bordi: .oggi-wrap e simili
+   hanno padding 16px e il margine negativo lo annulla esattamente, così non
+   serve toccare il contenitore.
+   ─────────────────────────────────────────────────────────────────────────── */
+html.az .az-hero{
+  margin:-16px -16px 0;
+  padding:20px 20px calc(var(--az-overlap) + 16px);
+  background:#0d0d0d;
+  color:#fff;
+}
+html.az .az-hero-top{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:12px;margin-bottom:18px;min-height:30px;
+}
+html.az .az-hero-kicker{
+  font-family:var(--label);
+  font-size:9.5px;letter-spacing:.24em;text-transform:uppercase;
+  color:rgba(255,255,255,.5);
+}
+html.az .az-h1{
+  font-size:clamp(38px,11vw,58px);
+  line-height:.84;
+  font-weight:900;
+  letter-spacing:-.035em;
+  text-transform:uppercase;
+  margin:13px 0 0;
+}
+html.az .az-h1 em{font-style:normal;color:var(--acc)}
+/* Quando il titolo racconta un problema, l'accento passa al rosso */
+html.az .az-h1 em.bad{color:var(--red)}
+html.az .az-hero-claim{
+  margin-top:16px;
+  font-family:var(--label);
+  font-size:9.5px;letter-spacing:.22em;text-transform:uppercase;
+  color:rgba(255,255,255,.45);
+  line-height:1.7;
+}
+/* Pillole di stato/azione dentro l'intestazione (Ieri, ↺ Sync, Brand · tutti…) */
+html.az .az-hero-pills{display:flex;flex-wrap:wrap;gap:7px;margin-top:16px}
+html.az .az-hpill{
+  border:1px solid rgba(255,255,255,.24);
+  border-radius:var(--radius-pill);
+  padding:6px 13px;
+  font-family:var(--label);
+  font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;
+  color:rgba(255,255,255,.8);
+  background:transparent;
+  cursor:pointer;
+}
+html.az .az-hpill.on{background:#fff;border-color:#fff;color:#0d0d0d}
+
+/* Il primo pannello bianco sale sopra il nero */
+html.az .az-lift{
+  margin-top:calc(-1 * var(--az-overlap));
+  position:relative;
+  z-index:3;
+  border-radius:20px;
+  background:var(--s1);
+  box-shadow:var(--shadow-lift);
+  overflow:hidden;
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   4. INTESTAZIONE DI BLOCCO — titoletto + filo + nota a destra
+   Riveste .oggi-sec-title (già nel markup) e la .az-sec emessa da azSec().
+   ─────────────────────────────────────────────────────────────────────────── */
+html.az .oggi-sec-title,
+html.az .az-sec{
+  display:flex;align-items:baseline;gap:14px;
+  padding:14px 2px 0;
+  font-size:12px;font-weight:900;
+  letter-spacing:.18em;text-transform:uppercase;
+  color:var(--t1);
+}
+html.az .oggi-sec-title::after,
+html.az .az-sec > .az-sec-rule{
+  content:'';flex:1;height:1px;background:var(--bd2);
+}
+html.az .az-sec > .az-sec-meta{
+  font-family:var(--label);
+  font-size:9.5px;font-weight:400;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--t3);
+  flex:0 0 auto;
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   5. CONTROLLI — pillole nere, segmenti, ricerca a capsula
+   ─────────────────────────────────────────────────────────────────────────── */
+html.az .chip{
+  border:1px solid var(--bd2);
+  background:var(--s1);
+  color:var(--t3);
+  font-size:10.5px;font-weight:900;
+  letter-spacing:.1em;text-transform:uppercase;
+  padding:0 14px;height:38px;
+  display:flex;align-items:center;
+}
+html.az .chip.on{background:#0d0d0d;border-color:#0d0d0d;color:#fff}
+/* Le anomalie restano rosse anche da spente: è l'unico filtro che segnala */
+html.az .chip#chip-mancanti.on,
+html.az .chip.az-bad.on{background:var(--red);border-color:var(--red);color:#fff}
+
+html.az .seg-wrap{
+  background:var(--s1);
+  border:1px solid var(--bd2);
+  border-radius:var(--radius-pill);
+  padding:4px;
+}
+html.az .seg-btn{
+  border-radius:var(--radius-pill);
+  font-size:10.5px;font-weight:900;
+  letter-spacing:.1em;text-transform:uppercase;
+  color:var(--t3);
+  padding:10px 8px;
+}
+html.az .seg-btn.on{background:#0d0d0d;color:#fff;box-shadow:none}
+
+html.az .search-field{
+  border-radius:var(--radius-pill);
+  border:1px solid var(--bd2);
+  height:42px;padding:0 18px 0 40px;
+  font-size:13px;font-weight:700;
+}
+html.az .search-field::placeholder{color:var(--faint);font-weight:700}
+html.az .sort-select{
+  border-radius:var(--radius-pill);
+  border:1px solid var(--bd2);
+  font-size:10.5px;font-weight:900;
+  letter-spacing:.08em;text-transform:uppercase;
+  color:var(--t2);
+}
+html.az .date-arrow{
+  border-radius:50%;
+  border:1px solid var(--bd2);
+  background:var(--s1);
+  color:var(--t1);
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   6. DASHBOARD (sezione 1a)
+   ─────────────────────────────────────────────────────────────────────────── */
+html.az .oggi-wrap{gap:14px}
+
+/* Il pannello bianco unico: corrispettivo + confronti + tris net/contanti/anomalie */
+html.az .oggi-top{
+  margin-top:calc(-1 * var(--az-overlap));
+  position:relative;z-index:3;
+  background:var(--s1);
+  border-radius:20px;
+  box-shadow:var(--shadow-lift);
+  overflow:hidden;
+}
+html.az .oggi-top .oggi-hero{
+  border:none;border-radius:0;box-shadow:none;
+  padding:20px 18px;
+  border-bottom:1px solid var(--bd);
+}
+html.az .oggi-hero-l{
+  font-family:var(--label);
+  font-size:9.5px;font-weight:400;
+  letter-spacing:.2em;text-transform:uppercase;
+  color:var(--t3);
+}
+html.az .oggi-hero-top{gap:12px;margin-top:12px}
+html.az .oggi-hero-v{
+  font-size:38px;font-weight:900;
+  letter-spacing:-.04em;line-height:1;margin:0;
+}
+/* Il delta non è più una pastiglia colorata: testo nero sottolineato in azzurro
+   se sopra, rosso se sotto. */
+html.az .oggi-hero-delta{
+  background:transparent!important;
+  padding:0 0 2px;border-radius:0;
+  font-family:var(--label);
+  font-size:11px;font-weight:700;
+  color:var(--t1);
+  border-bottom:2px solid var(--acc);
+}
+html.az .oggi-hero-delta.down{color:var(--red);border-bottom-color:var(--red)}
+
+html.az .oggi-hero-split{
+  margin:16px -18px -20px;
+  padding:0;
+  border-top:1px solid var(--bd);
+  display:grid;grid-template-columns:1fr 1fr;gap:1px;
+  background:var(--bd);
+}
+html.az .oggi-hero-split .ohs-cell{
+  background:var(--s1);padding:15px 18px;
+}
+html.az .oggi-hero-split .ohs-cell + .ohs-cell{border-left:none;padding-left:18px}
+html.az .ohs-l{
+  font-family:var(--label);
+  font-size:8.5px;font-weight:400;
+  letter-spacing:.16em;text-transform:uppercase;
+  color:var(--t3);
+}
+html.az .ohs-v{
+  font-size:17px;font-weight:900;letter-spacing:-.03em;margin-top:6px;
+}
+html.az .ohs-v.up{color:var(--t1)}
+html.az .ohs-v.down{color:var(--red)}
+
+/* Tris net sales / contanti / anomalie: celle a filo, divise da 1px.
+   Nessun border-top: il filo lo mette già .oggi-hero col suo border-bottom,
+   altrimenti se ne vedrebbero due appaiati. */
+html.az .oggi-top .oggi-grid{
+  gap:1px;background:var(--bd);
+}
+html.az .oggi-top .oggi-mini{
+  border:none;border-radius:0;
+  background:var(--s1);
+  padding:15px 14px;
+  display:flex;flex-direction:column-reverse;
+  gap:7px;
+}
+html.az .oggi-mini-l{
+  font-family:var(--label);
+  font-size:8.5px;font-weight:400;
+  letter-spacing:.16em;text-transform:uppercase;
+  color:var(--t3);
+  margin:0;
+}
+html.az .oggi-mini-v{
+  font-size:19px;font-weight:900;letter-spacing:-.03em;line-height:1;
+}
+html.az .oggi-top .oggi-mini.alert{background:var(--s1)}
+
+/* Ricezione: le due card Aperture / Chiusure */
+html.az .oggi-duo{gap:12px}
+html.az .oggi-duo-card{
+  border:none;border-radius:var(--radius-card);
+  padding:18px 16px;
+  box-shadow:var(--shadow);
+}
+html.az .odc-l{
+  font-family:var(--label);
+  font-size:9.5px;font-weight:400;
+  letter-spacing:.18em;text-transform:uppercase;
+  color:var(--t3);
+}
+html.az .odc-v{
+  font-size:32px;font-weight:900;letter-spacing:-.04em;line-height:1;margin-top:12px;
+}
+html.az .odc-tot{font-size:16px;font-weight:700;color:var(--faint)}
+html.az .oggi-prog{height:3px;border-radius:2px;background:var(--s3);margin-top:12px}
+html.az .oggi-prog-fill{border-radius:2px}
+html.az .oggi-prog-fill.green,
+html.az .oggi-prog-fill.acc{background:var(--acc)}
+html.az .odc-ok,
+html.az .odc-miss{
+  margin-top:10px;
+  font-family:var(--label);
+  font-size:9.5px;font-weight:400;
+  letter-spacing:.12em;text-transform:uppercase;
+}
+html.az .odc-ok{color:var(--t3)}
+html.az .odc-miss{color:var(--red)}
+
+/* Liste (Da controllare, negozi non attesi, …) */
+html.az .oggi-list{
+  border:none;border-radius:var(--radius-card);
+  box-shadow:var(--shadow);
+}
+html.az .oggi-row{
+  gap:14px;padding:13px 16px;
+  border-bottom:1px solid var(--div);
+}
+html.az .oggi-row-icon{
+  flex:0 0 26px;width:26px;height:26px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:14px;
+}
+/* Segnale d'allarme del design al posto delle emoji: quadrato rosso pieno per
+   l'anomalia di cassa (c'è un dato e non torna), solo contornato per la
+   chiusura mai arrivata (il dato manca). Vedi renderOggi in 04-dashboard.js. */
+html.az .oggi-row-icon.az-alarm{
+  background:var(--red);
+  border:2px solid var(--red);
+  border-radius:4px;
+  color:#fff;
+  font-size:16px;font-weight:900;line-height:1;
+}
+html.az .oggi-row-icon.az-alarm-out{background:transparent;color:var(--red)}
+html.az .oggi-row-name{
+  font-size:14px;font-weight:900;
+  text-transform:uppercase;letter-spacing:-.01em;
+  line-height:1.15;
+  white-space:normal;
+}
+html.az .oggi-row-name .orn-brand{
+  font-family:var(--label);
+  font-size:9px;font-weight:400;
+  letter-spacing:.14em;
+  color:var(--t3);
+  margin-bottom:4px;
+}
+html.az .oggi-row-val{
+  font-size:15px;font-weight:900;letter-spacing:-.03em;
+}
+html.az .oggi-row-val.bad{color:var(--red)}
+html.az .oggi-row-val.warn{color:var(--red)}
+html.az .oggi-empty-ok{
+  padding:18px 16px;
+  font-family:var(--label);
+  font-size:10px;font-weight:400;
+  letter-spacing:.14em;text-transform:uppercase;
+  color:var(--t3);
+}
+html.az .oggi-unexpected{
+  border:1px dashed var(--bd2);
+  border-radius:var(--radius-card);
+}
+
+/* Per brand: barre azzurre, valore in alto a destra */
+html.az .oggi-brandbar{
+  border:none;border-radius:var(--radius-card);
+  box-shadow:var(--shadow);
+  padding:18px 16px!important;
+  gap:16px;
+}
+html.az .oggi-bb-row{flex-wrap:wrap;gap:0}
+html.az .oggi-bb-name{
+  flex:1 1 auto;
+  font-size:13px;font-weight:900;
+  letter-spacing:.04em;
+  color:var(--t1)!important;
+}
+html.az .oggi-bb-val{
+  flex:0 0 auto;text-align:right;
+  font-size:15px;font-weight:900;letter-spacing:-.03em;
+  color:var(--t1);
+}
+html.az .oggi-bb-track{
+  flex:1 1 100%;height:4px;border-radius:0;
+  background:var(--s3);margin-top:8px;
+}
+html.az .oggi-bb-fill{border-radius:0;background:var(--acc)!important}
+
+/* Recap giornata */
+html.az .recap-card{
+  border:none;border-radius:var(--radius-card);
+  box-shadow:var(--shadow);
+  padding:16px;
+}
+html.az .recap-title{
+  font-size:12px;font-weight:900;
+  letter-spacing:.18em;text-transform:uppercase;
+  color:var(--t1);
+}
+html.az .recap-text{font-size:13px;line-height:1.75;color:var(--t2)}

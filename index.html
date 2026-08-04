@@ -1,5 +1,9 @@
 <!DOCTYPE html>
-<html lang="it">
+<!-- class="az" = tema azzurro acceso (restyle 04/08/2026).
+     È l'unico interruttore: togliere `class="az"` rende inerte
+     css/theme-azzurro.css e spegne le intestazioni nere di js/00-az.js,
+     riportando l'app esattamente alla grafica precedente. -->
+<html lang="it" class="az">
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
@@ -34,6 +38,9 @@
      fallback ravvicinato, JetBrains Mono per le etichette tecniche). -->
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="css/styles.css"/>
+<!-- Tema azzurro: deve stare DOPO styles.css perché ne ridefinisce i token
+     :root e riscrive le classi. Attivo solo se <html> ha class="az". -->
+<link rel="stylesheet" href="css/theme-azzurro.css"/>
 </head>
 <body>
 
@@ -512,6 +519,9 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
 <script>if(typeof Chart==='undefined'){document.write('<scr'+'ipt src="https://unpkg.com/chart.js@4.4.0/dist/chart.umd.js"></scr'+'ipt>')}</script>
 <script>if(typeof Chart==='undefined'){document.write('<scr'+'ipt src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.js"></scr'+'ipt>')}</script>
+<!-- Primitive del tema azzurro (azHero/azSec). Prima di tutti: definisce solo
+     funzioni e la costante AZ, non dipende dagli altri moduli. -->
+<script src="js/00-az.js"></script>
 <script src="js/01-config.js"></script>
 <script src="js/02-sync.js"></script>
 <script src="js/03-parser-pdf.js"></script>

@@ -120,19 +120,22 @@ function renderOggi(){
     </div>`}).join('') : ''}
   </div>` : '';
 
-  // "Da controllare": anomalie di cassa + chiusure mancanti, cliccabili
+  // "Da controllare": anomalie di cassa + chiusure mancanti, cliccabili.
+  // Col tema azzurro le emoji lasciano il posto al segnale tipografico del
+  // design: quadrato rosso pieno per l'anomalia di cassa, solo contornato per
+  // la chiusura che non è arrivata.
   let checkRows='';
   for(const r of anomalie){
     const idx=allData.indexOf(r);
     checkRows+=`<div class="oggi-row" onclick="openSheet(${idx})">
-      <span class="oggi-row-icon">⚠️</span>
+      <span class="oggi-row-icon${AZ?' az-alarm':''}">${AZ?'!':'⚠️'}</span>
       <span class="oggi-row-name"><span class="orn-brand">${r.brand}</span>${r.location}</span>
       <span class="oggi-row-val bad">Δ ${fmt(r.diff)}</span>
     </div>`;
   }
   for(const s of missing){
     checkRows+=`<div class="oggi-row" onclick="oggiGoChiusure(true)">
-      <span class="oggi-row-icon">📭</span>
+      <span class="oggi-row-icon${AZ?' az-alarm az-alarm-out':''}">${AZ?'!':'📭'}</span>
       <span class="oggi-row-name"><span class="orn-brand">${s.brand}</span>${s.location}</span>
       <span class="oggi-row-val warn">mancante</span>
     </div>`;
@@ -170,8 +173,12 @@ function renderOggi(){
   const splitCell=(d,label)=> d
     ? `<div class="ohs-cell"><div class="ohs-l">${label}</div><div class="ohs-v ${d.pct-100>=0?'up':'down'}">${pctStr(d.pct-100)}</div></div>`
     : `<div class="ohs-cell"><div class="ohs-l">${label}</div><div class="ohs-v muted">—</div></div>`;
+  // Col tema azzurro il titolo della giornata sta già nell'intestazione nera:
+  // qui ripeterlo sarebbe la stessa frase due volte, quindi la card dichiara
+  // cos'è il numero che mostra.
+  const heroLabel = AZ ? 'Corrispettivo giornata' : `${riepTitle} · 🌙 ${dateLabel}`;
   const hero = `<div class="oggi-hero">
-    <div class="oggi-hero-l">${riepTitle} · 🌙 ${dateLabel}</div>
+    <div class="oggi-hero-l">${heroLabel}</div>
     <div class="oggi-hero-top"><span class="oggi-hero-v">${fmt(totCorr)}</span>${heroDelta}</div>
     <div class="oggi-hero-split">${splitCell(tgtD,'vs target')}${splitCell(pyD,'vs anno scorso')}</div>
   </div>`;
@@ -204,18 +211,32 @@ function renderOggi(){
   }
   const recapCard=`<div class="recap-card${_recapOpen?' open':''}" onclick="toggleRecap()">
     <div class="recap-head">
-      <span class="recap-title">🗒️ Recap giornata <span class="recap-caret">${_recapOpen?'▴':'▾'}</span></span>
+      <span class="recap-title">${AZ?'':'🗒️ '}Recap giornata <span class="recap-caret">${_recapOpen?'▴':'▾'}</span></span>
     </div>
     ${_recapOpen?`<div class="recap-text">${_escHtml(_dailyRecapText)}</div>`:''}
   </div>`;
 
+  // Intestazione nera del tema azzurro: "CHIUSURE / 2 AGOSTO" col conteggio
+  // sotto. Fuori dal tema azHero() restituisce '' e non cambia nulla.
+  const azTitolo=azHero({
+    kicker:riepTitle,
+    h1:'Chiusure',
+    accent:`${jd.getDate()} ${MESI[jd.getMonth()].toLowerCase()}`,
+    claim:`${recs.length} negozi su ${expectedCount}`+(apD?` · ${apD.received} aperture`:'')
+  });
+  // .oggi-top raggruppa corrispettivo + confronti + tris in un unico pannello
+  // bianco che sale sopra il nero. Senza tema è un div senza stile: invisibile.
   el.innerHTML=`
+    ${azTitolo}
+    <div class="oggi-top">
     ${hero}
     <div class="oggi-grid">
       <div class="oggi-mini"><div class="oggi-mini-l">Net sales</div><div class="oggi-mini-v">${fmt(totNet)}</div></div>
       <div class="oggi-mini"><div class="oggi-mini-l">Contanti</div><div class="oggi-mini-v">${fmt(totCash)}</div></div>
       <div class="oggi-mini${anomalie.length?' alert':''}"><div class="oggi-mini-l">Anomalie</div><div class="oggi-mini-v">${anomalie.length}</div></div>
     </div>
+    </div>
+    ${azSec('Ricezione',`${String(jd.getDate()).padStart(2,'0')}/${String(jd.getMonth()+1).padStart(2,'0')}`)}
     ${duo}
     ${apD?apD.missingListHTML:''}
     ${apD?apD.countersListHTML:''}
