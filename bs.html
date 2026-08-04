@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Best Seller</title>
+<link rel="stylesheet" href="css/styles.css">
+<style>
+  /* Vista pubblica: fuori tutto ciò che riguarda il valore. I numeri non
+     arrivano nemmeno dal backend, questo serve a non lasciare celle a zero. */
+  .bs-c-net, [data-sort="net"], .bs-pfoot > div:nth-child(3){display:none}
+  body{margin:0;background:var(--bs-bg,#f6f5f3)}
+</style>
+</head>
+<body>
+<div id="bs-root"></div>
+<script src="js/09-bestseller.js"></script>
+<script src="js/bs-public.js"></script>
+</body>
+</html>

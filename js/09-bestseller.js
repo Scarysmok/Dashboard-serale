@@ -19,6 +19,7 @@ const BS = {
   cur: null,        // selezione: {brand, location, period_start} | {aggregate:true, period_start}
   data: null,       // report caricato
   photos: null,     // elenco file della cartella Drive foto; null = non ancora chiesto
+  public: false,     // true in bs.html: sola lettura, senza selettori né valore
   query: '', fDiv: '', fGen: '', fCat: '', fSea: '', sort: 'units',
   detail: null,     // prodotto aperto nella scheda
   busy: false,
@@ -250,7 +251,8 @@ function bsPaint(){
   const kpis = [
     {l:'Prodotti venduti', v:String(all.length), s:'referenze attive', size:'clamp(28px,3vw,40px)'},
     {l:'Pezzi totali', v:totUnits.toLocaleString('it-IT'), s:'unità sell-out', size:'clamp(28px,3vw,40px)'},
-    {l:'Valore netto', v:bsEur(totNet), s:'vendite nette periodo', size:'clamp(24px,2.5vw,34px)'},
+    // Nel link pubblico il valore non arriva nemmeno dal backend.
+    ...(BS.public ? [] : [{l:'Valore netto', v:bsEur(totNet), s:'vendite nette periodo', size:'clamp(24px,2.5vw,34px)'}]),
     d.aggregate
       ? {l:'Negozi inclusi', v:String(d.store_count||0), s:'report aggregato', size:'clamp(28px,3vw,40px)'}
       : {l:'Best seller n°1', v:first?first.name:'—', s:first?first.code:'', size:'clamp(15px,1.6vw,20px)'},
@@ -486,6 +488,15 @@ function bsHeader(d){
       <span class="bs-picker-lab">${bsEsc(txt)}</span></button>`;
   });
 
+  // Link pubblico: il destinatario non ha l'archivio, quindi le etichette
+  // vengono dal report stesso e i due selettori restano inerti (senza voci il
+  // pulsante nasce già disabilitato).
+  if(BS.public){
+    curWeek = d ? bsWeekLabel(d.period_start) : '—';
+    curStore = d ? (d.brand+' · '+d.location) : '—';
+    weekOpts = storeOpts = '';
+  }
+
   return `
   <header class="bs-header"><div class="bs-header-in">
     <div class="bs-brandcol">
@@ -539,6 +550,8 @@ function bsAdminChips(d){
     <button class="bs-chip-btn" id="bs-import"${BS.busy?' disabled':''}>
       ${BS.busy?'⏳ Importo…':'📥 Importa Excel'}</button>
     <button class="bs-chip-btn" id="bs-codes"${BS.busy?' disabled':''}>⬇ Codici senza foto</button>
+    <button class="bs-chip-btn" id="bs-link"${BS.cur?'':' disabled'}>🔗 Copia link</button>
+    <button class="bs-chip-btn" id="bs-unlink"${BS.cur?'':' disabled'}>🔒 Spegni link</button>
     ${canDelete?`<button class="bs-chip-btn" id="bs-del">🗑 Elimina settimana</button>`:''}`;
 }
 
@@ -768,8 +781,9 @@ async function bsAttachPhotos(products){
   try{
     if(!products || !products.length) return;
     if(BS.photos === null){
-      const r = await api('/bestseller/photos');
-      const list = r.ok ? ((await r.json()).files || []) : [];
+      // Nel link pubblico l'elenco arriva già col payload: là non c'è login.
+      let list = (BS.data||{}).photos || null;
+      if(!list){ const r = await api('/bestseller/photos'); list = r.ok ? ((await r.json()).files || []) : []; }
       // Ordino per nome: dell'export adidas arrivano più viste per articolo
       // (IA5379_1_…, IA5379_2_…) e sotto si tiene la prima che abbina. Senza
       // ordinamento vincerebbe quella che Drive restituisce per prima, cioè a
@@ -788,6 +802,43 @@ async function bsAttachPhotos(products){
       if(src) p.img = src;
     }
   }catch(e){ console.debug('bsAttachPhotos', e); }
+}
+
+// ── Link pubblico da mandare ai negozi ──────────────────────────────────
+// I ragazzi non hanno credenziali: il link apre bs.html, che legge la classifica
+// da /public/bestseller senza login. Il token vale per la selezione corrente e
+// si spegne cancellandolo. Dal link non passano valore, margine, sconti e ASP:
+// li esclude il backend, non la pagina.
+function bsLinkSel(){
+  const c = BS.cur || {};
+  return {period_start: c.period_start || '', brand: c.brand || '',
+          location: c.location || '', aggregate: !!c.aggregate};
+}
+
+async function bsMakeLink(){
+  if(!BS.cur) return;
+  try{
+    const r = await api('/bestseller/link', {method:'POST', body: JSON.stringify(bsLinkSel())});
+    if(!r.ok) throw new Error('errore '+r.status);
+    const url = location.origin + '/bs.html?t=' + encodeURIComponent((await r.json()).token);
+    try{ await navigator.clipboard.writeText(url); bsLog('Link copiato negli appunti:', true); }
+    catch(_){ bsLog('Link pronto (copialo da qui):', true); }
+    bsLog(`<b>${bsEsc(url)}</b>`, true);
+  }catch(e){ bsLog('Non riesco a creare il link: '+bsEsc(e.message||e), true); }
+}
+
+async function bsKillLink(){
+  if(!BS.cur) return;
+  const s = bsLinkSel();
+  const q = `?period_start=${encodeURIComponent(s.period_start)}&brand=${encodeURIComponent(s.brand)}`
+          + `&location=${encodeURIComponent(s.location)}&aggregate=${s.aggregate}`;
+  try{
+    const r = await api('/bestseller/link'+q, {method:'DELETE'});
+    if(!r.ok) throw new Error('errore '+r.status);
+    const n = (await r.json()).deleted || 0;
+    bsLog(n ? 'Link spento: chi ce l\'ha non vede più questa classifica.'
+            : 'Nessun link attivo per questa selezione.', true);
+  }catch(e){ bsLog('Non riesco a spegnere il link: '+bsEsc(e.message||e), true); }
 }
 
 // Cerca un codice noto nel nome del file. Prima prova il nome esatto senza
@@ -942,6 +993,8 @@ function bsBind(){
     if(files.length) bsImportFiles(files);
   });
   on('bs-codes','click', bsDownloadCodes);
+  on('bs-link','click', bsMakeLink);
+  on('bs-unlink','click', bsKillLink);
   on('bs-del','click', bsDeleteWeek);
   on('bs-log-clear','click', () => { BS.log = []; bsPaint(); });
   on('bs-reload','click', () => { BS.index = null; BS.data = null; renderBestSeller(); });
