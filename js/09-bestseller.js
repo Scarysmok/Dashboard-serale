@@ -175,6 +175,17 @@ async function bsLoadCurrent(){
   BS.data = null;
   try{
     const c = BS.cur;
+    if(BS.public){
+      // Link pubblico: nessun login, nessuna cache locale (bs.html non carica
+      // 02-sync.js). Il token decide cosa si può chiedere: se apre tutta la
+      // settimana il destinatario cambia negozio, altrimenti resta sul suo.
+      BS.data = await bsFetchPublic(c.aggregate ? '' : c.brand+'|'+c.location);
+      // BS.photos è già in memoria dal primo caricamento: riagganciarle non
+      // costa una richiesta, ma senza questa riga il cambio negozio le perde.
+      if(!BS.data.error) await bsAttachPhotos(BS.data.products);
+      bsPaint();
+      return;
+    }
     const path = c.aggregate
       ? '/bestseller/aggregate?period_start='+encodeURIComponent(c.period_start)
       : '/bestseller/week?brand='+encodeURIComponent(c.brand)
@@ -433,6 +444,17 @@ function bsWeekRange(w){
                       : bsPeriodLabel(w.period_start);
 }
 
+// Unico punto da cui la pagina pubblica prende i dati: niente api(), niente
+// cache, solo il token. `store` vuoto = aggregato. Se il token è di un singolo
+// negozio il server ignora `store`, quindi da qui non si esce dal permesso.
+async function bsFetchPublic(store){
+  const q = store ? '&store='+encodeURIComponent(store) : '';
+  const r = await fetch(API_BASE+'/public/bestseller?t='+encodeURIComponent(BS.token||'')+q);
+  if(r.status === 404) return {error:'Link non più valido: chiedi al tuo area manager un link aggiornato'};
+  if(!r.ok) return {error:'Errore '+r.status};
+  return await r.json();
+}
+
 // Chiave della copia locale. Deve distinguere ogni selezione, altrimenti una
 // settimana servirebbe i dati di un'altra.
 function bsCacheKey(c){
@@ -496,13 +518,14 @@ function bsHeader(d){
       <span class="bs-picker-lab">${bsEsc(txt)}</span></button>`;
   });
 
-  // Link pubblico: il destinatario non ha l'archivio, quindi le etichette
-  // vengono dal report stesso e i due selettori restano inerti (senza voci il
-  // pulsante nasce già disabilitato).
+  // Link pubblico: c'è una sola settimana, quindi quel selettore resta inerte
+  // (senza voci il pulsante nasce già disabilitato) e l'etichetta viene dal
+  // report. Il selettore negozio invece resta vivo se il token apre tutta la
+  // settimana: BS.index contiene i negozi che il link permette di vedere.
   if(BS.public){
     curWeek = d ? bsWeekLabel(d.period_start) : '—';
-    curStore = d ? (d.brand+' · '+d.location) : '—';
-    weekOpts = storeOpts = '';
+    weekOpts = '';
+    if(inWeek.length < 2) storeOpts = '';
   }
 
   return `
