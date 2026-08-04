@@ -1081,13 +1081,13 @@ body{display:flex;flex-direction:column}
   border-bottom:1px solid var(--bs-line);margin-top:clamp(32px,4vw,52px)}
 .bs-tools-in{max-width:1240px;margin:0 auto;padding:14px clamp(20px,5vw,56px);display:flex;
   flex-wrap:wrap;gap:10px;align-items:center}
-.bs-search{flex:1 1 240px;display:flex;align-items:center;gap:10px;background:#fff;
+.bs-search{flex:1 1 200px;display:flex;align-items:center;gap:10px;background:#fff;
   border:1px solid var(--bs-line);border-radius:999px;padding:0 18px;height:44px}
 .bs-search span{color:var(--bs-faint);font-size:14px}
 .bs-search input{flex:1;border:0;outline:none;background:transparent;font-size:14px;font-weight:600;
   letter-spacing:-.01em;color:var(--bs-ink);min-width:0}
 .bs-fsel{height:44px;appearance:none;border:1px solid var(--bs-line);border-radius:999px;background:#fff;
-  padding:0 34px 0 16px;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;cursor:pointer}
+  padding:0 18px;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;cursor:pointer}
 .bs-sortgrp{display:flex;height:44px;background:#fff;border:1px solid var(--bs-line);border-radius:999px;
   padding:4px;gap:4px}
 .bs-sortbtn{border:0;border-radius:999px;background:transparent;color:var(--bs-muted);padding:0 16px;
