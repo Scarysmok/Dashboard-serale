@@ -14,28 +14,32 @@ var ALL_STORES = [];          // usato solo dall'import, che qui non c'è
   const root = document.getElementById('bs-root');
   BS.public = true;
   BS.token = new URLSearchParams(location.search).get('t') || '';
-  if(!BS.token){ root.innerHTML = bsState('Link non valido', 'manca il codice nell\'indirizzo'); return; }
+  // Il velo col logo è già a schermo (sta nell'HTML): la dissolvenza parte nel
+  // finally, così scopre anche i messaggi di errore invece di restare sopra.
+  try{
+    if(!BS.token){ root.innerHTML = bsState('Link non valido', 'manca il codice nell\'indirizzo'); return; }
 
-  // Il logo animato è già nell'HTML di bs.html: resta a schermo finché bsPaint
-  // non lo sostituisce con la classifica. Niente da scrivere qui.
-  BS.data = await bsFetchPublic('');
-  if(BS.data.error){ root.innerHTML = bsState('Classifica non disponibile', BS.data.error); return; }
+    BS.data = await bsFetchPublic('');
+    if(BS.data.error){ root.innerHTML = bsState('Classifica non disponibile', BS.data.error); return; }
 
-  BS.cur = {brand: BS.data.brand, location: BS.data.location,
-            period_start: BS.data.period_start, aggregate: !!BS.data.aggregate};
-  // bsPaint mostra "Nessun report caricato" se l'archivio è vuoto. Qui l'indice
-  // contiene ciò che il link permette di vedere: i negozi della settimana se il
-  // token è "tutti i negozi", altrimenti solo il proprio.
-  const uno = {brand: BS.data.brand, location: BS.data.location,
-               period_start: BS.data.period_start, period: BS.data.period,
-               period_end: BS.data.period_end};
-  BS.index = (BS.data.stores || []).length
-    ? BS.data.stores.map(s => Object.assign({}, uno, s))
-    : [uno];
-  await bsAttachPhotos(BS.data.products);
-  // Solo bsPaint: aggancia già gli eventi in coda. Chiamare anche bsBind()
-  // metteva un secondo listener identico su ogni pulsante, e sul selettore i due
-  // si annullavano — il primo apriva il pannello, il secondo lo richiudeva nello
-  // stesso clic. Era il motivo per cui i negozi non si potevano cambiare.
-  bsPaint();
+    BS.cur = {brand: BS.data.brand, location: BS.data.location,
+              period_start: BS.data.period_start, aggregate: !!BS.data.aggregate};
+    // bsPaint mostra "Nessun report caricato" se l'archivio è vuoto. Qui l'indice
+    // contiene ciò che il link permette di vedere: i negozi della settimana se il
+    // token è "tutti i negozi", altrimenti solo il proprio.
+    const uno = {brand: BS.data.brand, location: BS.data.location,
+                 period_start: BS.data.period_start, period: BS.data.period,
+                 period_end: BS.data.period_end};
+    BS.index = (BS.data.stores || []).length
+      ? BS.data.stores.map(s => Object.assign({}, uno, s))
+      : [uno];
+    await bsAttachPhotos(BS.data.products);
+    // Solo bsPaint: aggancia già gli eventi in coda. Chiamare anche bsBind()
+    // metteva un secondo listener identico su ogni pulsante, e sul selettore i due
+    // si annullavano — il primo apriva il pannello, il secondo lo richiudeva nello
+    // stesso clic. Era il motivo per cui i negozi non si potevano cambiare.
+    bsPaint();
+  }finally{
+    document.querySelector('.bsload')?.classList.add('bsload-off');
+  }
 })();

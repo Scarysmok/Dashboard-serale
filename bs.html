@@ -18,24 +18,23 @@
   body{margin:0;background:var(--bs-bg,#f6f5f3)}
 
   /* ── Caricamento ──────────────────────────────────────────────────────
-     Le tre strisce entrano una dopo l'altra e poi pulsano. Sta nell'HTML e non
-     in JS: è già a schermo alla prima pittura e bsPaint la sostituisce quando
-     arrivano i dati. Il testo eredita AdihausDIN da #tab-bestseller, quindi
-     niente Tailwind e niente import di font. */
-  .bsload{min-height:70vh;display:flex;flex-direction:column;align-items:center;
-    justify-content:center;gap:clamp(32px,6vw,64px);overflow:hidden}
+     Velo a schermo intero sopra la pagina: la classifica si disegna sotto e
+     quando è pronta il velo si dissolve, come lo splash della dashboard
+     rappresentanti (opacity + visibility:hidden, nessun JS per l'animazione).
+     Il testo eredita AdihausDIN da #tab-bestseller: niente Tailwind e niente
+     import di font. */
+  .bsload{position:fixed;inset:0;z-index:60;background:var(--bs-bg);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:clamp(32px,6vw,64px);overflow:hidden;
+    transition:opacity .55s ease, visibility 0s .55s}
+  .bsload-off{opacity:0;visibility:hidden}
   .bsload-logo{width:500px;max-width:80vw}
   .bsload-logo svg{width:100%;height:auto;fill:currentColor}
-  .bsload-stripe{opacity:0;transform-origin:center bottom;transform-box:fill-box;
-    animation:bsload-in .5s cubic-bezier(.175,.885,.32,1.275) forwards,
-              bsload-pulse 1.2s ease-in-out infinite .5s}
-  .bsload-s1{animation-delay:.05s,.55s}
-  .bsload-s2{animation-delay:.15s,.65s}
-  .bsload-s3{animation-delay:.25s,.75s}
-  @keyframes bsload-in{
-    0%{transform:scale(0) rotate(-45deg) translateY(60px);opacity:0}
-    70%{transform:scale(1.2) rotate(8deg) translateY(-15px);opacity:1}
-    100%{transform:scale(1) rotate(0) translateY(0);opacity:1}}
+  .bsload-stripe{transform-origin:center bottom;transform-box:fill-box;
+    animation:bsload-pulse 1.2s ease-in-out infinite}
+  .bsload-s1{animation-delay:0s}
+  .bsload-s2{animation-delay:.15s}
+  .bsload-s3{animation-delay:.3s}
   @keyframes bsload-pulse{
     0%,100%{transform:scale(1);filter:brightness(1)}
     50%{transform:scale(1.08);filter:brightness(1.4)}}
@@ -47,10 +46,11 @@
   .bsload-txt{font-size:10px;letter-spacing:.5em;text-transform:uppercase;font-weight:700;
     animation:bsload-txt 2s ease-in-out infinite}
   @keyframes bsload-txt{0%,100%{opacity:.2}50%{opacity:.5}}
-  /* Chi ha chiesto meno animazioni vede il logo fermo, non niente. */
+  /* Chi ha chiesto meno animazioni vede il logo fermo e il velo sparire di
+     colpo, non una pagina bloccata. */
   @media (prefers-reduced-motion:reduce){
     .bsload-stripe,.bsload-bar i,.bsload-txt{animation:none}
-    .bsload-stripe{opacity:1}}
+    .bsload{transition:none}}
 </style>
 </head>
 <body>
@@ -58,8 +58,10 @@
      sono dichiarate su #tab-bestseller in styles.css. Senza questo antenato non
      risolvono e la pagina esce bianca su bianco. -->
 <div id="tab-bestseller">
-  <div id="bs-root">
-    <div class="bsload">
+  <div id="bs-root"></div>
+  <!-- Fuori da #bs-root di proposito: bsPaint riscrive quel nodo, e da dentro il
+       velo verrebbe cancellato di colpo invece di dissolversi. -->
+  <div class="bsload">
       <div class="bsload-logo">
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 725 500" role="img" aria-label="Caricamento">
           <g transform="translate(-60,-430)">
@@ -79,7 +81,6 @@
       </div>
       <div class="bsload-bar"><i></i></div>
       <span class="bsload-txt">Performance is loading</span>
-    </div>
   </div>
 </div>
 <script src="js/09-bestseller.js"></script>
