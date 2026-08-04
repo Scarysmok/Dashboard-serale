@@ -29,6 +29,12 @@ var ALL_STORES = [];          // usato solo dall'import, che qui non c'è
   }
   BS.cur = {brand: BS.data.brand, location: BS.data.location,
             period_start: BS.data.period_start, aggregate: !!BS.data.aggregate};
+  // bsPaint mostra "Nessun report caricato" se l'archivio è vuoto: qui l'unico
+  // report disponibile è questo, quindi l'indice contiene solo lui. Le etichette
+  // dei selettori le rende comunque bsHeader dal report (BS.public).
+  BS.index = [{brand: BS.data.brand, location: BS.data.location,
+               period_start: BS.data.period_start, period: BS.data.period,
+               period_end: BS.data.period_end}];
   await bsAttachPhotos(BS.data.products);
   bsPaint();
   bsBind();

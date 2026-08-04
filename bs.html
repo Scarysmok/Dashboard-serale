@@ -14,7 +14,12 @@
 </style>
 </head>
 <body>
-<div id="bs-root"></div>
+<!-- L'id serve: le variabili di colore del modulo (--bs-ink, --bs-bg, --bs-red)
+     sono dichiarate su #tab-bestseller in styles.css. Senza questo antenato non
+     risolvono e la pagina esce bianca su bianco. -->
+<div id="tab-bestseller">
+  <div id="bs-root"></div>
+</div>
 <script src="js/09-bestseller.js"></script>
 <script src="js/bs-public.js"></script>
 </body>
