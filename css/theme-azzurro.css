@@ -561,6 +561,32 @@ html.az .recap-text{font-size:13px;line-height:1.75;color:var(--t2)}
    7. APERTURE / CHIUSURE (sezione 1b)
    ─────────────────────────────────────────────────────────────────────────── */
 
+/* ══ PROVA FONT — San Francisco solo in questa sezione (04/08/2026) ══════════
+   Serve a confrontare dal vivo: Aperture/Chiusure in SF Pro, le altre cinque
+   sezioni restano in AdihausDIN.
+
+   Perché serve anche `font-family` e non basta ridefinire --font: body dichiara
+   font-family:var(--font), quindi i discendenti EREDITANO il valore già
+   risolto (AdihausDIN) e non rileggono la variabile. Dichiarandola qui, la
+   sezione la risolve col --font locale e la passa a tutto il sottoalbero.
+
+   Le etichettine restano in JetBrains Mono (--label, intatta): sono un ruolo a
+   sé, e cambiarle avrebbe confuso il confronto.
+
+   È uno swap puro: nessuna misura o crenatura ritoccata, così la differenza che
+   vedi è del carattere e non di aggiustamenti miei. Nota che SF Pro a peso 900
+   è il ~9% più largo di AdihausDIN, che è un DIN condensato: i nomi lunghi dei
+   negozi hanno meno spazio e su schermo stretto vanno a capo prima.
+
+   PER TENERLA su tutta l'app: sposta le due righe --font/--mono nel blocco
+   html.az in cima e cancella questo blocco.
+   PER BUTTARLA: cancella questo blocco. ══════════════════════════════════════ */
+html.az #tab-negozi{
+  --font:-apple-system,"SF Pro Display","SF Pro Text",BlinkMacSystemFont,system-ui,sans-serif;
+  --mono:-apple-system,"SF Pro Display","SF Pro Text",BlinkMacSystemFont,system-ui,sans-serif;
+  font-family:var(--font);
+}
+
 /* Il toggle Chiusure/Aperture sale sul nero dell'intestazione, come le pillole
    in alto nel mockup. `!important` sul margin-top perché in index.html quel
    .seg-wrap ha uno style inline (margin:10px 16px 2px) che vincerebbe. */
