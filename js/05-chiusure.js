@@ -485,7 +485,8 @@ function _azNegoziHero(){
     h1:String(n),
     accent:ap?'aperture':'chiusure',
     inline:true,
-    claim:miss?`${miss} chiusur${miss===1?'a':'e'} non ricevut${miss===1?'a':'e'}`:''
+    claim:miss?`${miss} chiusur${miss===1?'a':'e'} non ricevut${miss===1?'a':'e'}`:'',
+    claimBad:!!miss   // è l'unica cosa su cui agire: non può essere la più spenta
   });
 }
 // Ratio % vs target di un record (per l'ordinamento "% Target"). -1 = senza target.

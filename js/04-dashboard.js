@@ -817,7 +817,7 @@ function renderKPI(){
   // non possono mai discordare.
   const missCount = filterDate ? getMissingStores(filterDate).length : 0;
   const negSub=filterDate
-    ? `inviate · ${missCount} mancanti su ${expectedCount}`
+    ? `inviate · ${missCount} mancant${missCount===1?'e':'i'} su ${expectedCount}`
     : 'PDF caricati';
   document.getElementById('kpi-scroll').innerHTML=[
     {l:'Negozi',v:filterDate?`${Math.max(0,expectedCount-missCount)}/${expectedCount}`:d.length,cls:'y',s:negSub},

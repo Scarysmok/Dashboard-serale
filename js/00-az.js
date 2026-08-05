@@ -25,6 +25,9 @@ var AZ = document.documentElement.classList.contains('az');
 //   bad     true → l'accento è rosso invece che azzurro (il titolo dice un
 //           problema: "3 DA SISTEMARE"). Il rosso resta riservato a questo.
 //   claim   riga di contesto sotto il titolo        ("28 negozi su 30")
+//   claimBad true → la riga di contesto segnala un problema (una chiusura che
+//           non è arrivata): diventa rossa e più chiara. Senza questo era la
+//           scritta più spenta della pagina, cioè l'opposto di quello che serve.
 //   inline  true → accento sulla stessa riga del titolo, non a capo
 //           (serve per "28 CHIUSURE", dove il numero è il titolo)
 //
@@ -41,7 +44,7 @@ function azHero(o){
       ${o.kicker?`<div class="az-hero-kicker">${esc(o.kicker)}</div>`:'<span></span>'}
     </div>
     <h1 class="az-h1">${h1}${sep}${acc}</h1>
-    ${o.claim?`<div class="az-hero-claim">${esc(o.claim)}</div>`:''}
+    ${o.claim?`<div class="az-hero-claim${o.claimBad?' bad':''}">${esc(o.claim)}</div>`:''}
   </div>`;
 }
 

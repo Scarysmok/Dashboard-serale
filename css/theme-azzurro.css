@@ -80,6 +80,20 @@ html.az{
   --mono:"AdihausDIN","Archivo",Helvetica,Arial,sans-serif;
   --label:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,monospace;
 
+  /* ── Scala delle etichette in monospazio ──
+     Il documento di design è disegnato a larghezza telefono (400px), dove 8,5px
+     è proporzionalmente grande. L'app si usa da desktop, dove quelle misure non
+     crescono e le etichette diventano illeggibili: qui la scala è alzata di
+     ~2px rispetto al mockup. Sono tre token e non valori sparsi, così ritoccare
+     la leggibilità è cambiare tre numeri.
+     --label-ink è il grigio del testo del documento (#6b6862): 5,10:1 sul fondo
+     dell'app, contro i 3,28:1 di --t3 e i 2,26:1 di --faint, che a questi corpi
+     erano sotto ogni soglia utile. */
+  --fs-lab:10.5px;    /* etichetta principale */
+  --fs-lab-s:10px;    /* etichetta piccola */
+  --fs-lab-xs:9px;    /* nota di terzo livello */
+  --label-ink:#6b6862;
+
   /* Di quanto il pannello bianco sale sopra l'intestazione nera. Il valore
      tiene conto del gap di .oggi-wrap: 46 - 14 = 32px di sormonto effettivo,
      come nel mockup. */
@@ -110,7 +124,7 @@ html.az .app-header{
 }
 html.az .app-title{
   font-family:var(--label);
-  font-size:10px;
+  font-size:var(--fs-lab);
   font-weight:400;
   letter-spacing:.2em;
   text-transform:uppercase;
@@ -131,7 +145,7 @@ html.az .sync-pill{
   border:1px solid rgba(255,255,255,.24);
   color:rgba(255,255,255,.7);
   font-family:var(--label);
-  font-size:9px;
+  font-size:var(--fs-lab-s);
   letter-spacing:.14em;
   text-transform:uppercase;
   padding:6px 11px;
@@ -158,7 +172,7 @@ html.az .side-nav{
 }
 html.az .side-nav-brand{
   font-family:var(--label);
-  font-size:9px;
+  font-size:var(--fs-lab-s);
   letter-spacing:.2em;
   text-transform:uppercase;
   color:rgba(255,255,255,.4);
@@ -200,7 +214,7 @@ html.az .az-hero-top{
 }
 html.az .az-hero-kicker{
   font-family:var(--label);
-  font-size:9.5px;letter-spacing:.24em;text-transform:uppercase;
+  font-size:var(--fs-lab);letter-spacing:.24em;text-transform:uppercase;
   color:rgba(255,255,255,.5);
 }
 html.az .az-h1{
@@ -217,9 +231,16 @@ html.az .az-h1 em.bad{color:var(--red)}
 html.az .az-hero-claim{
   margin-top:16px;
   font-family:var(--label);
-  font-size:9.5px;letter-spacing:.22em;text-transform:uppercase;
-  color:rgba(255,255,255,.45);
+  font-size:var(--fs-lab);letter-spacing:.18em;text-transform:uppercase;
+  color:rgba(255,255,255,.62);
   line-height:1.7;
+}
+/* La riga di contesto che segnala un problema (una chiusura non arrivata) non
+   può essere la scritta più spenta della pagina: è l'unica su cui agire. */
+html.az .az-hero-claim.bad{
+  color:#ff6b61;
+  font-weight:500;
+  letter-spacing:.14em;
 }
 /* Pillole di stato/azione dentro l'intestazione (Ieri, ↺ Sync, Brand · tutti…) */
 html.az .az-hero-pills{display:flex;flex-wrap:wrap;gap:7px;margin-top:16px}
@@ -228,7 +249,7 @@ html.az .az-hpill{
   border-radius:var(--radius-pill);
   padding:6px 13px;
   font-family:var(--label);
-  font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;
+  font-size:var(--fs-lab);letter-spacing:.13em;text-transform:uppercase;
   color:rgba(255,255,255,.8);
   background:transparent;
   cursor:pointer;
@@ -264,8 +285,8 @@ html.az .az-sec > .az-sec-rule{
 }
 html.az .az-sec > .az-sec-meta{
   font-family:var(--label);
-  font-size:9.5px;font-weight:400;letter-spacing:.14em;text-transform:uppercase;
-  color:var(--t3);
+  font-size:var(--fs-lab);font-weight:400;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--label-ink);
   flex:0 0 auto;
 }
 
@@ -343,9 +364,9 @@ html.az .oggi-top .oggi-hero{
 }
 html.az .oggi-hero-l{
   font-family:var(--label);
-  font-size:9.5px;font-weight:400;
+  font-size:var(--fs-lab);font-weight:400;
   letter-spacing:.2em;text-transform:uppercase;
-  color:var(--t3);
+  color:var(--label-ink);
 }
 html.az .oggi-hero-top{gap:12px;margin-top:12px}
 html.az .oggi-hero-v{
@@ -377,9 +398,9 @@ html.az .oggi-hero-split .ohs-cell{
 html.az .oggi-hero-split .ohs-cell + .ohs-cell{border-left:none;padding-left:18px}
 html.az .ohs-l{
   font-family:var(--label);
-  font-size:8.5px;font-weight:400;
+  font-size:var(--fs-lab-s);font-weight:400;
   letter-spacing:.16em;text-transform:uppercase;
-  color:var(--t3);
+  color:var(--label-ink);
 }
 html.az .ohs-v{
   font-size:17px;font-weight:900;letter-spacing:-.03em;margin-top:6px;
@@ -402,9 +423,9 @@ html.az .oggi-top .oggi-mini{
 }
 html.az .oggi-mini-l{
   font-family:var(--label);
-  font-size:8.5px;font-weight:400;
+  font-size:var(--fs-lab-s);font-weight:400;
   letter-spacing:.16em;text-transform:uppercase;
-  color:var(--t3);
+  color:var(--label-ink);
   margin:0;
 }
 html.az .oggi-mini-v{
@@ -421,9 +442,9 @@ html.az .oggi-duo-card{
 }
 html.az .odc-l{
   font-family:var(--label);
-  font-size:9.5px;font-weight:400;
+  font-size:var(--fs-lab);font-weight:400;
   letter-spacing:.18em;text-transform:uppercase;
-  color:var(--t3);
+  color:var(--label-ink);
 }
 html.az .odc-v{
   font-size:32px;font-weight:900;letter-spacing:-.04em;line-height:1;margin-top:12px;
@@ -437,7 +458,7 @@ html.az .odc-ok,
 html.az .odc-miss{
   margin-top:10px;
   font-family:var(--label);
-  font-size:9.5px;font-weight:400;
+  font-size:var(--fs-lab);font-weight:400;
   letter-spacing:.12em;text-transform:uppercase;
 }
 html.az .odc-ok{color:var(--t3)}
@@ -476,9 +497,9 @@ html.az .oggi-row-name{
 }
 html.az .oggi-row-name .orn-brand{
   font-family:var(--label);
-  font-size:9px;font-weight:400;
+  font-size:var(--fs-lab-s);font-weight:400;
   letter-spacing:.14em;
-  color:var(--t3);
+  color:var(--label-ink);
   margin-bottom:4px;
 }
 html.az .oggi-row-val{
@@ -489,9 +510,9 @@ html.az .oggi-row-val.warn{color:var(--red)}
 html.az .oggi-empty-ok{
   padding:18px 16px;
   font-family:var(--label);
-  font-size:10px;font-weight:400;
+  font-size:var(--fs-lab);font-weight:400;
   letter-spacing:.14em;text-transform:uppercase;
-  color:var(--t3);
+  color:var(--label-ink);
 }
 html.az .oggi-unexpected{
   border:1px dashed var(--bd2);
@@ -568,9 +589,9 @@ html.az .kpi-card.acc{background:var(--s1)}
 html.az .kpi-l{
   order:2;margin-top:9px;
   font-family:var(--label);
-  font-size:8.5px;font-weight:400;
+  font-size:var(--fs-lab-s);font-weight:400;
   letter-spacing:.18em;text-transform:uppercase;
-  color:var(--t3);
+  color:var(--label-ink);
 }
 html.az .kpi-v{
   order:1;
@@ -581,8 +602,8 @@ html.az .kpi-v.r{color:var(--red)}
 html.az .kpi-s{
   order:3;margin-top:5px;
   font-family:var(--label);
-  font-size:8px;letter-spacing:.12em;text-transform:uppercase;
-  color:var(--faint);
+  font-size:var(--fs-lab-xs);letter-spacing:.12em;text-transform:uppercase;
+  color:var(--label-ink);
 }
 
 /* Barra filtri e ricerca su fondo leggermente staccato, come nel mockup */
@@ -637,8 +658,8 @@ html.az .az-rmeta{
   display:flex;flex-wrap:wrap;gap:8px;align-items:center;
   margin-top:5px;
   font-family:var(--label);
-  font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;
-  color:var(--t3);
+  font-size:var(--fs-lab);letter-spacing:.08em;text-transform:uppercase;
+  color:var(--label-ink);
   line-height:1.5;
 }
 html.az .az-rmeta b{
@@ -671,7 +692,7 @@ html.az .az-rbar i{display:block;height:100%;background:var(--acc)}
 html.az .az-rpct{
   display:block;margin-top:6px;
   font-family:var(--label);
-  font-size:8.5px;font-weight:500;letter-spacing:.08em;
+  font-size:var(--fs-lab-s);font-weight:500;letter-spacing:.08em;
   color:var(--t1);
 }
 html.az .az-rpct.low{color:var(--faint)}
@@ -692,9 +713,9 @@ html.az .sub-cell-l,
 html.az .grand-label,
 html.az .grand-row-l{
   font-family:var(--label);
-  font-size:9px;font-weight:400;
+  font-size:var(--fs-lab-s);font-weight:400;
   letter-spacing:.16em;text-transform:uppercase;
-  color:var(--t3)!important;
+  color:var(--label-ink)!important;
 }
 html.az .sub-cell-v{
   font-size:17px;font-weight:900;letter-spacing:-.03em;
@@ -702,8 +723,8 @@ html.az .sub-cell-v{
 }
 html.az .sub-cell-net{
   font-family:var(--label);
-  font-size:8.5px;letter-spacing:.12em;text-transform:uppercase;
-  color:var(--faint);
+  font-size:var(--fs-lab-s);letter-spacing:.12em;text-transform:uppercase;
+  color:var(--label-ink);
 }
 html.az .grand-label{font-size:11px;font-weight:900;letter-spacing:.18em;color:var(--t1)!important}
 html.az .grand-row-v{
@@ -725,8 +746,8 @@ html.az .card-date,
 html.az .card-cell-l,
 html.az .card-main-l{
   font-family:var(--label);
-  font-size:9px;letter-spacing:.14em;text-transform:uppercase;
-  color:var(--t3);
+  font-size:var(--fs-lab-s);letter-spacing:.14em;text-transform:uppercase;
+  color:var(--label-ink);
 }
 html.az .card-main-v{font-size:24px;font-weight:900;letter-spacing:-.035em}
 html.az .card-cell-v{font-size:14px;font-weight:900;letter-spacing:-.02em}
@@ -736,8 +757,8 @@ html.az .tgt-bar.green,html.az .tgt-bar.yellow{background:var(--acc)}
 html.az .tgt-bar.red{background:var(--red)}
 html.az .tgt-bar-lbl{
   font-family:var(--label);
-  font-size:8.5px;letter-spacing:.12em;text-transform:uppercase;
-  color:var(--t3);
+  font-size:var(--fs-lab-s);letter-spacing:.12em;text-transform:uppercase;
+  color:var(--label-ink);
 }
 
 /* ───────────────────────────────────────────────────────────────────────────
@@ -753,8 +774,8 @@ html.az .az-duo{
 html.az .az-duo > div{background:var(--s1);padding:18px 16px}
 html.az .az-duo-l{
   font-family:var(--label);
-  font-size:8.5px;letter-spacing:.18em;text-transform:uppercase;
-  color:var(--t3);
+  font-size:var(--fs-lab-s);letter-spacing:.18em;text-transform:uppercase;
+  color:var(--label-ink);
 }
 html.az .az-duo-v{
   margin-top:11px;
@@ -769,7 +790,7 @@ html.az .analisi-asof{
   color:var(--t2)!important;
   box-shadow:var(--shadow);
   font-family:var(--label);
-  font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;
+  font-size:var(--fs-lab);letter-spacing:.14em;text-transform:uppercase;
   font-weight:400;
 }
 html.az .analisi-asof b{font-weight:700;color:var(--t1)}
@@ -801,7 +822,7 @@ html.az .am-filter-panel{
 }
 html.az .am-filter-grouphead{
   font-family:var(--label);
-  font-size:8.5px;letter-spacing:.16em;color:var(--t3);
+  font-size:var(--fs-lab-s);letter-spacing:.16em;color:var(--label-ink);
 }
 html.az .am-filter-action{
   border-radius:var(--radius-pill);
@@ -821,9 +842,9 @@ html.az .am-row-title{
 }
 html.az .am-row-sub{
   font-family:var(--label);
-  font-size:8.5px;font-weight:400;
+  font-size:var(--fs-lab-s);font-weight:400;
   letter-spacing:.1em;text-transform:uppercase;
-  color:var(--t3);
+  color:var(--label-ink);
   margin-top:4px;
 }
 /* 13px e non 16: la riga dell'anno mostra due importi ("consuntivato / target
@@ -837,8 +858,8 @@ html.az .am-child-row .am-row-net{font-size:13px}
 html.az .am-day-row .am-row-net{font-size:12px}
 html.az .am-row-tgt{
   font-family:var(--label);
-  font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;
-  color:var(--t3);
+  font-size:var(--fs-lab-s);letter-spacing:.1em;text-transform:uppercase;
+  color:var(--label-ink);
 }
 /* I badge di scostamento perdono la pastiglia: restano scritte spaziate.
    Verde e giallo diventano grigio neutro, il rosso resta rosso — è l'unico
@@ -847,7 +868,7 @@ html.az .am-badge{
   background:transparent!important;
   padding:0;border-radius:0;
   font-family:var(--label);
-  font-size:9px;font-weight:500;
+  font-size:var(--fs-lab-s);font-weight:500;
   letter-spacing:.1em;text-transform:uppercase;
 }
 html.az .am-badge.green,
@@ -857,7 +878,7 @@ html.az .am-badge.red{color:var(--red)!important}
 html.az .am-today-marker{
   background:var(--acc);border-radius:2px;
   font-family:var(--label);
-  font-size:8px;letter-spacing:.14em;
+  font-size:var(--fs-lab-xs);letter-spacing:.14em;
 }
 html.az .am-children{background:var(--div2);border-top:1px solid var(--bd)}
 html.az .am-child-row,
@@ -880,7 +901,7 @@ html.az #storecheck-content > .seg-wrap .seg-btn{color:rgba(255,255,255,.78)}
 html.az #storecheck-content > .seg-wrap .seg-btn.on{background:#fff;color:#0d0d0d}
 html.az .seg-count{
   background:var(--red);color:#fff;
-  font-family:var(--label);font-size:8px;font-weight:700;
+  font-family:var(--label);font-size:var(--fs-lab-xs);font-weight:700;
 }
 html.az #storecheck-content > .seg-wrap .seg-btn.on .seg-count{background:var(--red)}
 
@@ -902,13 +923,13 @@ html.az .sc-hi-name{
 }
 html.az .sc-hi-name .orn-brand{
   font-family:var(--label);
-  font-size:9px;font-weight:400;letter-spacing:.18em;
-  color:var(--t3);margin-bottom:5px;
+  font-size:var(--fs-lab-s);font-weight:400;letter-spacing:.18em;
+  color:var(--label-ink);margin-bottom:5px;
 }
 html.az .sc-hi-meta{
   font-family:var(--label);
-  font-size:9px;letter-spacing:.14em;text-transform:uppercase;
-  color:var(--t3);
+  font-size:var(--fs-lab-s);letter-spacing:.14em;text-transform:uppercase;
+  color:var(--label-ink);
   text-align:right;
 }
 /* Ogni non conformità porta la barretta rossa del mockup a sinistra.
@@ -927,14 +948,14 @@ html.az .sc-hi-issue:last-child{border-bottom:none}
 html.az .sc-hi-issue .malf-sollecito{
   display:block;
   font-family:var(--label);
-  font-size:9px;font-weight:400;letter-spacing:.14em;text-transform:uppercase;
-  color:var(--t3);
+  font-size:var(--fs-lab-s);font-weight:400;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--label-ink);
   margin:0 0 4px;
 }
 html.az .sc-hi-note{
   font-family:var(--label);
-  font-size:9px;font-weight:400;letter-spacing:.1em;text-transform:none;
-  color:var(--t3);
+  font-size:var(--fs-lab-s);font-weight:400;letter-spacing:.1em;text-transform:none;
+  color:var(--label-ink);
 }
 
 /* Elenco per data */
@@ -964,20 +985,20 @@ html.az .sc-title{
 }
 html.az .sc-title .orn-brand{
   font-family:var(--label);
-  font-size:9px;font-weight:400;letter-spacing:.14em;
-  color:var(--t3);margin-bottom:4px;
+  font-size:var(--fs-lab-s);font-weight:400;letter-spacing:.14em;
+  color:var(--label-ink);margin-bottom:4px;
 }
 html.az .sc-sub{
   font-family:var(--label);
-  font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;
-  color:var(--t3);margin-top:4px;
+  font-size:var(--fs-lab-s);letter-spacing:.1em;text-transform:uppercase;
+  color:var(--label-ink);margin-top:4px;
 }
 html.az .sc-score{font-size:16px;font-weight:900;letter-spacing:-.03em}
 html.az .sc-badge{
   background:transparent;border:1px solid var(--red);
   color:var(--red);
   font-family:var(--label);
-  font-size:8px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;
+  font-size:var(--fs-lab-xs);font-weight:500;letter-spacing:.12em;text-transform:uppercase;
   padding:4px 9px;
 }
 
@@ -997,7 +1018,7 @@ html.az .date-range-pill{
   background:transparent;
   color:rgba(255,255,255,.85);
   font-family:var(--label);
-  font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;
+  font-size:var(--fs-lab);letter-spacing:.14em;text-transform:uppercase;
   height:42px;
 }
 /* .drp-text ha color:var(--t1), cioè nero: sulla pillola che sta sul nero
@@ -1023,8 +1044,8 @@ html.az .stores-brand-hd-label{
 }
 html.az .stores-brand-hd-count{
   font-family:var(--label);
-  font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;
-  color:var(--t3)!important;opacity:1!important;
+  font-size:var(--fs-lab);letter-spacing:.14em;text-transform:uppercase;
+  color:var(--label-ink)!important;opacity:1!important;
 }
 html.az .store-row{
   border-bottom:1px solid var(--div);
@@ -1043,9 +1064,9 @@ html.az .store-row-arrow{color:#cfccc6}
 html.az .srt{
   background:transparent!important;
   border:1px solid var(--bd2)!important;
-  color:var(--t3)!important;
+  color:var(--label-ink)!important;
   font-family:var(--label);
-  font-size:8.5px;font-weight:500;letter-spacing:.12em;
+  font-size:var(--fs-lab-s);font-weight:500;letter-spacing:.12em;
   padding:5px 11px;
 }
 html.az .srt.sched{border-color:var(--red)!important;color:var(--red)!important}
@@ -1055,7 +1076,7 @@ html.az .stores-summary .ssum-card{
 }
 html.az .stores-summary .ssum-l{
   font-family:var(--label);
-  font-size:8.5px;font-weight:400;letter-spacing:.16em;
+  font-size:var(--fs-lab-s);font-weight:400;letter-spacing:.16em;
 }
 html.az .stores-summary .ssum-v{
   font-size:21px;font-weight:900;letter-spacing:-.035em;
@@ -1068,7 +1089,7 @@ html.az .stores-summary .ssum-v.r{color:var(--red)}
 html.az .store-popup{border-radius:20px;box-shadow:var(--shadow-lift)}
 html.az .spu-brand{
   font-family:var(--label);
-  font-size:9px;font-weight:400;letter-spacing:.18em;
+  font-size:var(--fs-lab-s);font-weight:400;letter-spacing:.18em;
 }
 html.az .spu-title{
   font-size:20px;font-weight:900;
@@ -1077,8 +1098,8 @@ html.az .spu-title{
 html.az .spu-sub,
 html.az .spu-btn-l{
   font-family:var(--label);
-  font-size:9px;font-weight:400;letter-spacing:.14em;text-transform:uppercase;
-  color:var(--t3);
+  font-size:var(--fs-lab-s);font-weight:400;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--label-ink);
 }
 html.az .spu-btn{
   border:none;background:var(--s2);
@@ -1129,8 +1150,8 @@ html.az .settings-label{
 }
 html.az .settings-value{
   font-family:var(--label);
-  font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;
-  color:var(--t3);
+  font-size:var(--fs-lab);letter-spacing:.12em;text-transform:uppercase;
+  color:var(--label-ink);
 }
 /* I bottoni diventano righe di lista con la freccia a destra */
 html.az .settings-btn{
@@ -1160,6 +1181,6 @@ html.az .settings-btn.danger::after{color:#e3b4b1}
 html.az .empty-state{padding:48px 16px}
 html.az .empty-text{
   font-family:var(--label);
-  font-size:10px;letter-spacing:.16em;text-transform:uppercase;
-  color:var(--t3);
+  font-size:var(--fs-lab);letter-spacing:.16em;text-transform:uppercase;
+  color:var(--label-ink);
 }
