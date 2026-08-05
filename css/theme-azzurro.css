@@ -1210,3 +1210,59 @@ html.az .empty-text{
   font-size:var(--fs-lab);letter-spacing:.16em;text-transform:uppercase;
   color:var(--label-ink);
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   12. FRASI ≠ ETICHETTE  (correzione del 05/08/2026, variante "C")
+   ═══════════════════════════════════════════════════════════════════════════
+   Il monospazio spaziato e maiuscolo era stato applicato a tutto il testo
+   piccolo, comprese le FRASI. Su un'etichetta di una o due parole funziona
+   ("NET", "CORRISPETTIVO"); su una frase somma tre tasse sulla leggibilità:
+     · il maiuscolo toglie la forma della parola (niente lettere alte e basse)
+     · il monospazio dà a "i" la stessa larghezza di "m" e rompe il ritmo
+     · la spaziatura larga separa le lettere, così non si raggruppano in parole
+   Su "31 GIORNI" non si nota, su "CONSUNTIVO + PREVISIONALE" sì.
+
+   Il criterio: il MONOSPAZIO resta alle etichette (il nome di un campo) e alle
+   date; passano al font principale le FRASI e i VALORI, cioè tutto quello che
+   si legge invece di essere solo riconosciuto. Restano piccoli e maiuscoli:
+   il linguaggio del tema non cambia, cambia solo la famiglia e la spaziatura.
+
+   Questo blocco sta in fondo di proposito: ha la stessa specificità delle
+   regole di sezione qui sopra e deve vincere sull'ordine.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+html.az .am-row-sub,          /* "consuntivo + previsionale" · Analisi        */
+html.az .kpi-s,               /* "inviate · 1 mancante su 33" · Chiusure      */
+html.az .az-hero-claim,       /* riga sotto il titolo nero · tutte            */
+html.az .analisi-asof,        /* "Consuntivi aggiornati al 04/08/2026"        */
+html.az .sc-sub,              /* "M. Rossi · 32 punti" · Store Check          */
+html.az .sc-hi-meta,          /* "28/07 · M. Rossi" · Store Check             */
+html.az .sc-hi-note,          /* la citazione del negozio · Store Check       */
+html.az .oggi-empty-ok,       /* "Tutto in ordine: nessuna anomalia…"         */
+html.az .tgt-bar-lbl,         /* "Target € 11.900 · 104% raggiunto"           */
+html.az .empty-text,          /* "Nessun dato per i filtri selezionati"       */
+html.az .grand-label,         /* "Totale · 28 negozi inviati · 2 mancanti"    */
+html.az .settings-value,      /* i valori della tab Altro                     */
+html.az .sub-cell-net,        /* "NET € 33.792"                               */
+html.az .odc-ok,
+html.az .odc-miss,            /* "tutte ricevute" · "2 mancanti ›"            */
+html.az .az-sec > .az-sec-meta,  /* "8 negozi · € 41.226"                     */
+html.az .spu-sub,             /* sottotitolo del popup negozio                */
+html.az .stores-brand-hd-count,  /* "12 negozi"                               */
+html.az .am-badge,            /* "−1,5% vs TGT (parziale)"                    */
+html.az .az-rpct,             /* "104% tgt" sotto la barra                    */
+html.az .oggi-hero-delta{     /* "+6,4%" accanto al corrispettivo             */
+  font-family:var(--font);
+  font-size:11px;
+  font-weight:500;
+  letter-spacing:.03em;
+}
+/* Le poche che vogliono una misura propria */
+html.az .az-hero-claim{font-size:12px;letter-spacing:.04em}
+html.az .analisi-asof{font-size:12px}
+html.az .sc-hi-note{font-weight:400;font-style:italic;letter-spacing:0}
+html.az .oggi-empty-ok{font-size:12px;letter-spacing:.02em}
+html.az .grand-label{font-size:11px;font-weight:700;letter-spacing:.06em}
+html.az .oggi-hero-delta{font-size:12px;font-weight:700;letter-spacing:0}
+html.az .az-rpct{font-size:10px}
+html.az .am-badge{font-weight:700}
