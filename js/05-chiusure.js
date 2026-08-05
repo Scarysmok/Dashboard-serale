@@ -79,12 +79,12 @@ function renderAperture(){
   if(!list) return;
   const days=_aperturaDays();
   if(!days.length){
-    if(chip) chip.textContent='📅 —';
+    if(chip) chip.textContent=(AZ?'':'📅 ')+'—';
     list.innerHTML='<div style="padding:40px 24px;text-align:center;color:var(--t3)"><div style="font-size:32px;margin-bottom:10px">☀️</div><div style="font-size:13px">Nessuna checklist di apertura ancora ricevuta.</div></div>';
     return;
   }
   if(!aperturaDate || !days.includes(aperturaDate)) aperturaDate=days[days.length-1];
-  if(chip) chip.textContent='📅 '+aperturaDate.split('-').reverse().join('/');
+  if(chip) chip.textContent=(AZ?'':'📅 ')+aperturaDate.split('-').reverse().join('/');
 
   const recs=allAperture.filter(a=>a.dateISO===aperturaDate);
   // Stesso negozio con più PDF nello stesso giorno (es. checklist corretta e
