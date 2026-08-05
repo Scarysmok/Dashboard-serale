@@ -276,6 +276,7 @@ function switchTab(t){
   if(t==='kpi')renderKpiAll();
   if(t==='template')renderTemplateEditor();
   if(t==='storecheck')renderStoreCheck();
+  if(t==='settings')_azAltroHero();   // la tab Altro è markup statico: il titolo nero va riempito qui
   if(t==='scmail')renderScMailEditor();
   if(t==='bestseller')renderBestSeller();
   // Scelta una sezione, richiudo la sidebar (torna alla barretta con l'hamburger)

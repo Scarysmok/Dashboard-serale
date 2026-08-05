@@ -73,7 +73,7 @@
       <div class="spu-sub" id="spu-sub"></div>
     </div>
     <div class="spu-btns" id="spu-btns"></div>
-    <button class="spu-btn-versamenti" id="spu-btn-versamenti" onclick="openStoreVersamenti()">🏦 Versamenti e saldo cassa</button>
+    <button class="spu-btn-versamenti" id="spu-btn-versamenti" onclick="openStoreVersamenti()"><i class="az-em">🏦 </i>Versamenti e saldo cassa</button>
     <button class="spu-close" onclick="closeStorePopup()">Chiudi</button>
   </div>
 </div>
@@ -230,6 +230,9 @@
 
   <!-- TAB NEGOZI (lista negozi + popup metriche + calendario range) -->
   <div class="scroll-area" id="tab-stores" style="display:none">
+    <!-- Intestazione nera "30 NEGOZI": riempita da _azStoresHero() in
+         js/07-negozi-altro.js. Vuota fuori dal tema azzurro. -->
+    <div id="stores-hero"></div>
     <div class="stores-date-bar">
       <button class="date-range-pill" id="date-range-pill" onclick="openCalendar()">
         <span class="drp-icon az-em">📅</span>
@@ -417,6 +420,9 @@
 
   <!-- TAB ALTRO (impostazioni + dati + amministrazione) -->
   <div class="scroll-area" id="tab-settings" style="display:none">
+    <!-- Intestazione nera "ALTRO & DATI": riempita da _azAltroHero(), chiamata
+         da switchTab. Vuota fuori dal tema azzurro. -->
+    <div id="settings-hero"></div>
     <div class="settings-inner">
       <div class="settings-head">Stato</div>
       <div class="settings-section">
@@ -430,7 +436,7 @@
       <div class="settings-head">Sincronizzazione</div>
       <button class="settings-btn" onclick="syncNow(true)">↺ Sincronizza ora</button>
       <button class="settings-btn" onclick="forceResync()">⟳ Ricarica tutto (svuota cache)</button>
-      <button class="settings-btn" onclick="showErrors()">🔍 Mostra errori sync</button>
+      <button class="settings-btn" onclick="showErrors()"><i class="az-em">🔍 </i>Mostra errori sync</button>
 
       <div class="settings-head">Dati</div>
       <button class="settings-btn" onclick="exportCSV()">↓ Esporta CSV</button>
@@ -448,15 +454,15 @@
            dati Excel precedenti, ma non tocca i PDF GoAudits che restano fallback per i giorni
            non coperti dall'Excel). -->
       <input type="file" id="historical-cur-upload-input" accept=".xlsx,.xls" style="display:none" onchange="uploadHistoricalExcel(event, 'consuntivi')"/>
-      <button class="settings-btn" id="btn-historical-cur-upload" style="display:none" onclick="document.getElementById('historical-cur-upload-input').click()">💰 Consuntivi nuovi</button>
+      <button class="settings-btn" id="btn-historical-cur-upload" style="display:none" onclick="document.getElementById('historical-cur-upload-input').click()"><i class="az-em">💰 </i>Consuntivi nuovi</button>
       <!-- Il bottone "Importa consuntivi da Drive" vive nel banner verde della tab
            Analisi (vedi updateConsuntivoLabel), non qui: richiesta utente 03/07. -->
 
       <!-- Amministrazione: visibile solo agli admin via applyRoleVisibility() -->
       <div class="settings-head" id="head-admin" style="display:none">Amministrazione</div>
-      <button class="settings-btn nav-like" id="btn-account-open" style="display:none" onclick="switchTab('account')"><span>👥 Gestione utenti</span><span class="sbn-arrow">›</span></button>
-      <button class="settings-btn nav-like" id="btn-template-open" style="display:none" onclick="switchTab('template')"><span>✉️ Template segnalazioni</span><span class="sbn-arrow">›</span></button>
-      <button class="settings-btn nav-like" id="btn-scmail-open" style="display:none" onclick="switchTab('scmail')"><span>✉️ Template email store check</span><span class="sbn-arrow">›</span></button>
+      <button class="settings-btn nav-like" id="btn-account-open" style="display:none" onclick="switchTab('account')"><span><i class="az-em">👥 </i>Gestione utenti</span><span class="sbn-arrow">›</span></button>
+      <button class="settings-btn nav-like" id="btn-template-open" style="display:none" onclick="switchTab('template')"><span><i class="az-em">✉️ </i>Template segnalazioni</span><span class="sbn-arrow">›</span></button>
+      <button class="settings-btn nav-like" id="btn-scmail-open" style="display:none" onclick="switchTab('scmail')"><span><i class="az-em">✉️ </i>Template email store check</span><span class="sbn-arrow">›</span></button>
 
       <div class="settings-head">Sessione</div>
       <button class="settings-btn danger" onclick="doLogout()">⎋ Disconnetti</button>

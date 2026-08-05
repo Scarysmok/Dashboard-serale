@@ -57,6 +57,48 @@ function renderStores(){
     html+=`</div>`;
   }
   document.getElementById('stores-list').innerHTML=html;
+  _azStoresHero();
+}
+
+// ── TEMA AZZURRO: intestazioni nere di Negozi (1e) e Altro (1f) ────────────
+// Intestazione della tab Negozi: "30 NEGOZI" con la composizione della rete.
+// Rifà il conteggio invece di riusarlo da renderStores perché lì è dentro il
+// ciclo per brand: qui serve il totale, e su 30 negozi il costo è nullo.
+function _azStoresHero(){
+  if(!AZ) return;
+  const box=document.getElementById('stores-hero');
+  if(!box) return;
+  const oggi=_isoToday();
+  let attivi=0, programmati=0, spenti=0;
+  for(const s of ALL_STORES){
+    if(!isStoreMonitored(s.brand,s.location)){ spenti++; continue; }
+    const af=storeActiveFrom(s.brand,s.location);
+    (af && af>oggi) ? programmati++ : attivi++;
+  }
+  const parti=[`${attivi} attiv${attivi===1?'o':'i'}`];
+  if(programmati) parti.push(`${programmati} programmat${programmati===1?'o':'i'}`);
+  if(spenti) parti.push(`${spenti} non attiv${spenti===1?'o':'i'}`);
+  box.innerHTML=azHero({
+    kicker:'Rete di vendita',
+    h1:String(ALL_STORES.length),
+    accent:'negozi',
+    inline:true,
+    claim:parti.join(' · ')
+  });
+}
+// Intestazione della tab Altro: "ALTRO & DATI" con l'utente collegato.
+function _azAltroHero(){
+  if(!AZ) return;
+  const box=document.getElementById('settings-hero');
+  if(!box) return;
+  const u=(auth&&auth.user)||{};
+  const chi=[u.email||u.username||'—', u.role==='admin'?'Admin':(u.role||'')].filter(Boolean).join(' · ');
+  box.innerHTML=azHero({
+    kicker:'Impostazioni',
+    h1:'Altro',
+    accent:'& dati',
+    claim:chi
+  });
 }
 
 // Mantengo il vecchio renderStores per compatibilità con il resto del codice
@@ -875,7 +917,7 @@ function renderStoreCheck(){
       return `<div class="sc-hi-card">
         <div class="sc-hi-head" onclick="openStoreCheckPdf(${idx})">
           <div class="sc-hi-name"><span class="orn-brand">${_escHtml(c.brand)}</span>${_escHtml(c.location)}</div>
-          <div class="sc-hi-meta">${_scDD(c.dateISO)}${c.areaManager?' · '+_escHtml(c.areaManager):''} 📄</div>
+          <div class="sc-hi-meta">${_scDD(c.dateISO)}${c.areaManager?' · '+_escHtml(c.areaManager):''} <i class="az-em">📄</i></div>
         </div>
         <div class="sc-hi-issues">${issues}</div>
       </div>`;
@@ -895,7 +937,7 @@ function renderStoreCheck(){
     const rows=byDate.get(iso);
     const open=_scDatesOpen.has(iso);
     list+=`<div class="sc-date-h clickable" onclick="toggleScDate('${iso}')">
-      <span>📅 ${_scDD(iso)} · ${rows.length} store check</span><span>${open?'▴':'▾'}</span>
+      <span><i class="az-em">📅 </i>${_scDD(iso)} · ${rows.length} store check</span><span>${open?'▴':'▾'}</span>
     </div>`;
     if(!open) continue;
     for(const c of rows){
@@ -915,10 +957,23 @@ function renderStoreCheck(){
   // Toggle vista (come Chiusure/Aperture): "Da sistemare" (highlights) · "Tutte".
   const badge=problem.length?` <span class="seg-count">${problem.length}</span>`:'';
   const seg=`<div class="seg-wrap" style="margin:10px 16px 6px">
-    <button class="seg-btn${scVista==='highlights'?' on':''}" onclick="setScVista('highlights')">⚠️ Da sistemare${badge}</button>
-    <button class="seg-btn${scVista==='tutte'?' on':''}" onclick="setScVista('tutte')">📋 Tutte</button>
+    <button class="seg-btn${scVista==='highlights'?' on':''}" onclick="setScVista('highlights')"><i class="az-em">⚠️ </i>Da sistemare${badge}</button>
+    <button class="seg-btn${scVista==='tutte'?' on':''}" onclick="setScVista('tutte')"><i class="az-em">📋 </i>Tutte</button>
   </div>`;
-  el.innerHTML=seg+(scVista==='tutte'?list:hi);
+  // Intestazione nera (sezione 1d del restyle). Qui il numero racconta un
+  // problema, quindi l'accento è rosso e non azzurro: è il solo caso in cui il
+  // design usa il rosso nel titolo.
+  const nonConf=problem.reduce((a,c)=>a+(c.noCount||0),0);
+  const azTitolo=azHero({
+    kicker:'Ultima checklist per negozio',
+    h1:String(problem.length),
+    accent:'da sistemare',
+    bad:true,
+    inline:true,
+    claim:`Su ${latestByStore.size} negoz${latestByStore.size===1?'io':'i'}`+
+          (nonConf?` · ${nonConf} non conformità`:'')
+  });
+  el.innerHTML=azTitolo+seg+(scVista==='tutte'?list:hi);
 }
 
 // Apre il PDF intero nell'overlay via anteprima nativa Drive (zero rendering).

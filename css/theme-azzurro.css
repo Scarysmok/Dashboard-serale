@@ -850,6 +850,297 @@ html.az .am-day-row{border-bottom:1px solid var(--div)}
 html.az .am-day-row{background:var(--s1)}
 html.az .am-chev{color:var(--faint);font-size:10px}
 
+/* ───────────────────────────────────────────────────────────────────────────
+   9. STORE CHECK (sezione 1d)
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* Il toggle "Da sistemare / Tutte" sale sul nero, come in Aperture/Chiusure */
+html.az #storecheck-content > .seg-wrap{
+  margin-top:calc(-1 * var(--az-overlap))!important;
+  position:relative;z-index:3;
+  background:transparent;
+  border-color:rgba(255,255,255,.26);
+}
+html.az #storecheck-content > .seg-wrap .seg-btn{color:rgba(255,255,255,.78)}
+html.az #storecheck-content > .seg-wrap .seg-btn.on{background:#fff;color:#0d0d0d}
+html.az .seg-count{
+  background:var(--red);color:#fff;
+  font-family:var(--label);font-size:8px;font-weight:700;
+}
+html.az #storecheck-content > .seg-wrap .seg-btn.on .seg-count{background:var(--red)}
+
+html.az .sc-hi-card{
+  border:none;border-radius:var(--radius-card);
+  box-shadow:var(--shadow);
+  margin:0 16px 12px;
+}
+html.az .sc-hi-card:first-of-type{margin-top:14px}
+html.az .sc-hi-head{
+  background:var(--s1);
+  border-bottom:1px solid var(--bd);
+  padding:16px 16px 14px;
+  align-items:flex-start;
+}
+html.az .sc-hi-name{
+  font-size:16px;font-weight:900;
+  text-transform:uppercase;letter-spacing:-.02em;line-height:1.1;
+}
+html.az .sc-hi-name .orn-brand{
+  font-family:var(--label);
+  font-size:9px;font-weight:400;letter-spacing:.18em;
+  color:var(--t3);margin-bottom:5px;
+}
+html.az .sc-hi-meta{
+  font-family:var(--label);
+  font-size:9px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--t3);
+  text-align:right;
+}
+/* Ogni non conformità porta la barretta rossa del mockup a sinistra.
+   La barretta è un border-left e non un ::before in flex: il markup è
+   `<span resp> domanda <span nota>` senza un contenitore interno, e in un flex
+   ogni pezzo diventava una colonna sua — la domanda finiva incolonnata su tre
+   righe con la nota di fianco. Da blocco, il testo torna a scorrere normale. */
+html.az .sc-hi-issue{
+  padding:13px 16px;
+  border-left:4px solid var(--red);
+  border-bottom:1px solid var(--div);
+  font-size:13px;font-weight:900;
+  text-transform:uppercase;letter-spacing:-.01em;line-height:1.3;
+}
+html.az .sc-hi-issue:last-child{border-bottom:none}
+html.az .sc-hi-issue .malf-sollecito{
+  display:block;
+  font-family:var(--label);
+  font-size:9px;font-weight:400;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--t3);
+  margin:0 0 4px;
+}
+html.az .sc-hi-note{
+  font-family:var(--label);
+  font-size:9px;font-weight:400;letter-spacing:.1em;text-transform:none;
+  color:var(--t3);
+}
+
+/* Elenco per data */
+html.az .sc-date-h.clickable{
+  border-bottom:none;
+  padding:20px 18px 8px;
+  font-size:12px;font-weight:900;
+  letter-spacing:.18em;text-transform:uppercase;
+  color:var(--t1);
+}
+/* Le .sc-row non hanno un contenitore comune nel markup (sono sorelle libere,
+   separate dalle intestazioni di data), quindi non si possono arrotondare come
+   un'unica card: ognuna diventa una riga bianca a sé, come le voci della tab
+   Altro. Va a filo con lo stesso margine laterale del resto. */
+html.az .sc-row{
+  border-bottom:none;
+  margin:0 16px 8px;
+  padding:14px 16px;
+  gap:12px;
+  background:var(--s1);
+  border-radius:var(--radius-card);
+  box-shadow:var(--shadow);
+}
+html.az .sc-title{
+  font-size:14px;font-weight:900;
+  text-transform:uppercase;letter-spacing:-.01em;line-height:1.15;
+}
+html.az .sc-title .orn-brand{
+  font-family:var(--label);
+  font-size:9px;font-weight:400;letter-spacing:.14em;
+  color:var(--t3);margin-bottom:4px;
+}
+html.az .sc-sub{
+  font-family:var(--label);
+  font-size:8.5px;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--t3);margin-top:4px;
+}
+html.az .sc-score{font-size:16px;font-weight:900;letter-spacing:-.03em}
+html.az .sc-badge{
+  background:transparent;border:1px solid var(--red);
+  color:var(--red);
+  font-family:var(--label);
+  font-size:8px;font-weight:500;letter-spacing:.12em;text-transform:uppercase;
+  padding:4px 9px;
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   10. NEGOZI (sezione 1e)
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* La barra della data sale sul nero */
+html.az .stores-date-bar{
+  margin-top:calc(-1 * var(--az-overlap));
+  position:relative;z-index:3;
+  padding:0 16px 14px;
+}
+html.az .date-range-pill{
+  border-radius:var(--radius-pill);
+  border:1px solid rgba(255,255,255,.26);
+  background:transparent;
+  color:rgba(255,255,255,.85);
+  font-family:var(--label);
+  font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;
+  height:42px;
+}
+/* .drp-text ha color:var(--t1), cioè nero: sulla pillola che sta sul nero
+   restava invisibile. Deve ereditare il bianco dal bottone. */
+html.az .date-range-pill .drp-text{
+  color:inherit;
+  font-size:9.5px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;
+}
+html.az .date-range-pill .drp-reset{color:rgba(255,255,255,.6)}
+html.az .stores-brand-block{
+  border:none;border-radius:var(--radius-card);
+  box-shadow:var(--shadow);
+  margin:0 16px 14px;
+}
+html.az .stores-brand-hd{
+  background:var(--s1)!important;
+  border-bottom:1px solid var(--bd);
+  padding:15px 16px;
+}
+html.az .stores-brand-hd-label{
+  font-size:13px;font-weight:900;letter-spacing:.18em;
+  color:var(--t1)!important;
+}
+html.az .stores-brand-hd-count{
+  font-family:var(--label);
+  font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--t3)!important;opacity:1!important;
+}
+html.az .store-row{
+  border-bottom:1px solid var(--div);
+  padding:14px 16px;
+}
+html.az .store-row.inactive-row{background:var(--div2)}
+html.az .store-row-name{
+  font-size:14px;font-weight:900;
+  text-transform:uppercase;letter-spacing:-.01em;
+}
+html.az .store-row-name.dimmed{color:var(--faint)}
+html.az .store-row-arrow{color:#cfccc6}
+/* I badge di stato perdono la tinta: contorno e scritta spaziata.
+   "Attivo" è la normalità e resta grigio; il rosso lo prende solo il negozio
+   programmato, che è l'unico che chiede attenzione. */
+html.az .srt{
+  background:transparent!important;
+  border:1px solid var(--bd2)!important;
+  color:var(--t3)!important;
+  font-family:var(--label);
+  font-size:8.5px;font-weight:500;letter-spacing:.12em;
+  padding:5px 11px;
+}
+html.az .srt.sched{border-color:var(--red)!important;color:var(--red)!important}
+html.az .stores-summary .ssum-card{
+  border:none;border-radius:var(--radius-card);
+  box-shadow:var(--shadow);
+}
+html.az .stores-summary .ssum-l{
+  font-family:var(--label);
+  font-size:8.5px;font-weight:400;letter-spacing:.16em;
+}
+html.az .stores-summary .ssum-v{
+  font-size:21px;font-weight:900;letter-spacing:-.035em;
+  color:var(--t1);
+}
+html.az .stores-summary .ssum-v.g{color:var(--t1)}
+html.az .stores-summary .ssum-v.r{color:var(--red)}
+
+/* Popup del negozio */
+html.az .store-popup{border-radius:20px;box-shadow:var(--shadow-lift)}
+html.az .spu-brand{
+  font-family:var(--label);
+  font-size:9px;font-weight:400;letter-spacing:.18em;
+}
+html.az .spu-title{
+  font-size:20px;font-weight:900;
+  text-transform:uppercase;letter-spacing:-.02em;
+}
+html.az .spu-sub,
+html.az .spu-btn-l{
+  font-family:var(--label);
+  font-size:9px;font-weight:400;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--t3);
+}
+html.az .spu-btn{
+  border:none;background:var(--s2);
+  border-radius:var(--radius-sm);
+}
+html.az .spu-btn-v{font-size:17px;font-weight:900;letter-spacing:-.03em}
+html.az .spu-btn-versamenti,
+html.az .spu-close{
+  border-radius:var(--radius-pill);
+  border:1px solid var(--bd2);
+  background:var(--s1);
+  font-size:10.5px;font-weight:900;
+  letter-spacing:.1em;text-transform:uppercase;
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   11. ALTRO (sezione 1f)
+   Il markup era già quello del mockup — gruppi con titolo e righe con freccia:
+   qui cambia solo la veste.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+html.az .settings-inner{padding-top:0}
+/* Il primo gruppo sale sul nero come pannello bianco */
+html.az .settings-inner > .settings-head:first-child{
+  margin-top:calc(-1 * var(--az-overlap));
+  position:relative;z-index:3;
+  color:#fff;
+}
+html.az .settings-head{
+  display:flex;align-items:baseline;gap:14px;
+  padding:22px 2px 10px;
+  font-size:12px;font-weight:900;
+  letter-spacing:.18em;text-transform:uppercase;
+  color:var(--t1);
+}
+html.az .settings-head::after{content:'';flex:1;height:1px;background:var(--bd2)}
+html.az .settings-inner > .settings-head:first-child::after{background:rgba(255,255,255,.24)}
+html.az .settings-section{
+  border:none;border-radius:var(--radius-card);
+  background:var(--s1);
+  box-shadow:var(--shadow);
+  overflow:hidden;
+}
+html.az .settings-row{border-bottom:1px solid var(--div);padding:14px 16px}
+html.az .settings-label{
+  font-size:14px;font-weight:900;
+  text-transform:uppercase;letter-spacing:-.01em;
+}
+html.az .settings-value{
+  font-family:var(--label);
+  font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--t3);
+}
+/* I bottoni diventano righe di lista con la freccia a destra */
+html.az .settings-btn{
+  border:none;
+  background:var(--s1);
+  border-radius:var(--radius-card);
+  box-shadow:var(--shadow);
+  padding:16px;
+  text-align:left;
+  font-size:14px;font-weight:900;
+  text-transform:uppercase;letter-spacing:-.01em;
+  display:flex;align-items:center;justify-content:space-between;gap:14px;
+}
+html.az .settings-btn::after{content:'›';color:#cfccc6;font-size:16px;font-weight:400}
+/* Chi ha già la freccia nel markup non ne vuole una seconda */
+html.az .settings-btn.nav-like::after{content:none}
+html.az .settings-btn.nav-like .sbn-arrow{color:#cfccc6}
+html.az .settings-btn:active{background:var(--div2)}
+html.az .settings-btn.danger{
+  background:var(--s1);
+  border:none;
+  color:var(--red);
+}
+html.az .settings-btn.danger::after{color:#e3b4b1}
+
 /* Stato vuoto */
 html.az .empty-state{padding:48px 16px}
 html.az .empty-text{
