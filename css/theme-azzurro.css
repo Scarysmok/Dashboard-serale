@@ -1280,18 +1280,26 @@ html.az .am-badge{font-weight:700}
    lo raggiunge. Sono in js/06-analisi.js, nella tavolozza AZC.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/* Le tre tessere Ingressi / CR / UPT salgono sul nero dell'intestazione */
+/* Le tre tessere Ingressi / CR / UPT NON salgono sul nero.
+   Ci avevo messo il margine negativo come negli altri tab, ma qui non stanno
+   subito sotto l'intestazione: in mezzo ci sono la barra dei consuntivi e i
+   pulsanti Vendite/KPI. Salendo di 46px ci finivano sopra e, con z-index, li
+   coprivano — i pulsanti diventavano incliccabili. Negli altri tab l'elemento
+   che sale è sempre il primo dopo l'intestazione; qui non c'è, quindi niente
+   sormonto e l'intestazione chiude con un padding normale (vedi sotto).
+   Segnalato dall'utente il 05/08/2026. */
+html.az #kpi-hero .az-hero{padding-bottom:24px}
 html.az #tab-kpi .kpi-tabs{
-  margin-top:calc(-1 * var(--az-overlap));
-  position:relative;z-index:3;
-  padding:0 16px 10px;
+  padding:14px 16px 10px;
   gap:10px;
 }
 html.az .kpi-tab{
   border:none;
   border-radius:var(--radius-card);
   background:var(--s1);
-  box-shadow:var(--shadow-lift);
+  /* Ombra piatta e non --shadow-lift: quell'ombra profonda serviva quando le
+     tessere sormontavano il nero, cosa che non fanno più. */
+  box-shadow:var(--shadow);
   padding:16px 14px;
   align-items:flex-start;
   text-align:left;
