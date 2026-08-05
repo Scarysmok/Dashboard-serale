@@ -628,16 +628,31 @@ html.az .az-rname{
   font-size:14px;font-weight:900;
   text-transform:uppercase;letter-spacing:-.01em;line-height:1.15;
 }
+/* Riga dei dettagli: monospazio SOLO per le etichette (NET, CASH, CASSA OK),
+   che è il ruolo che ha nel linguaggio Best Seller. I numeri tornano in
+   AdihausDIN, più grandi e più scuri: erano il dato che conta ma erano anche la
+   cosa meno leggibile della riga — cifre monospaziate a 8,5px in grigio chiaro,
+   con un contrasto di ~3,5:1, sotto il minimo per un corpo così piccolo. */
 html.az .az-rmeta{
-  display:flex;flex-wrap:wrap;gap:7px;align-items:center;
+  display:flex;flex-wrap:wrap;gap:8px;align-items:center;
   margin-top:5px;
   font-family:var(--label);
-  font-size:8.5px;letter-spacing:.06em;text-transform:uppercase;
+  font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;
   color:var(--t3);
   line-height:1.5;
 }
-html.az .az-rmeta b{color:var(--t1);font-weight:500}
-html.az .az-rmeta .bad{color:var(--red)}
+html.az .az-rmeta b{
+  font-family:var(--font);
+  font-size:12.5px;font-weight:700;letter-spacing:-.01em;
+  color:var(--t1);
+}
+/* Lo scostamento di cassa è l'unica anomalia della riga: stesso corpo dei
+   numeri, così si legge senza dover mettere a fuoco. */
+html.az .az-rmeta .bad{
+  font-family:var(--font);
+  font-size:11.5px;font-weight:700;letter-spacing:0;
+  color:var(--red);
+}
 html.az .az-rsep{
   width:2px;height:2px;border-radius:50%;
   background:#cfccc6;flex:0 0 auto;
