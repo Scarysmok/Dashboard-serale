@@ -235,12 +235,20 @@ html.az .az-hero-claim{
   color:rgba(255,255,255,.62);
   line-height:1.7;
 }
-/* La riga di contesto che segnala un problema (una chiusura non arrivata) non
-   può essere la scritta più spenta della pagina: è l'unica su cui agire. */
-html.az .az-hero-claim.bad{
+/* Solo la parte che segnala un problema va in rosso, non tutta la riga:
+   colorando tutto sembravano un problema anche "32 chiusure su 33" e
+   "27 aperture", e il rosso non indicava più niente. Il rosso è schiarito
+   perché #d8322a sul nero dà 4,08:1, sotto soglia, contro 6,97:1. */
+html.az .az-hero-claim .bad{
   color:#ff6b61;
-  font-weight:500;
-  letter-spacing:.14em;
+  font-weight:700;
+}
+/* Punto di separazione fra la parte neutra e l'avviso */
+html.az .az-claim-sep{
+  display:inline-block;vertical-align:middle;
+  width:3px;height:3px;border-radius:50%;
+  background:rgba(255,255,255,.35);
+  margin:0 10px;
 }
 /* Pillole di stato/azione dentro l'intestazione (Ieri, ↺ Sync, Brand · tutti…) */
 html.az .az-hero-pills{display:flex;flex-wrap:wrap;gap:7px;margin-top:16px}

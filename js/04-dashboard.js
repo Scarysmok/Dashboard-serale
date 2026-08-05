@@ -224,9 +224,15 @@ function renderOggi(){
     kicker:riepTitle,
     h1:'Chiusure',
     accent:`${jd.getDate()} ${MESI[jd.getMonth()].toLowerCase()}`,
-    claimBad:missing.length>0,
-    claim:`${recs.length} negozi su ${expectedCount}`+(apD?` · ${apD.received} aperture`:'')
-      +(missing.length?` · ${missing.length} mancant${missing.length===1?'e':'i'}`:'')
+    // "chiusure su N" e non "negozi su N": quello che manca è una chiusura, e
+    // dicendo "negozi" il conteggio dei mancanti diventava ambiguo (mancante
+    // una chiusura o un'apertura?). L'avviso va nel campo alert, in rosso da
+    // solo: prima era rossa tutta la riga, comprese le parti che vanno bene.
+    claim:`${recs.length} chiusur${recs.length===1?'a':'e'} su ${expectedCount}`
+      +(apD?` · ${apD.received} apertur${apD.received===1?'a':'e'}`:''),
+    alert:missing.length
+      ? `${missing.length} chiusur${missing.length===1?'a':'e'} non arrivat${missing.length===1?'a':'e'}`
+      : ''
   });
   // .oggi-top raggruppa corrispettivo + confronti + tris in un unico pannello
   // bianco che sale sopra il nero. Senza tema è un div senza stile: invisibile.

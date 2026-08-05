@@ -24,10 +24,13 @@ var AZ = document.documentElement.classList.contains('az');
 //   accent  seconda riga, colorata                 ("2 agosto")
 //   bad     true → l'accento è rosso invece che azzurro (il titolo dice un
 //           problema: "3 DA SISTEMARE"). Il rosso resta riservato a questo.
-//   claim   riga di contesto sotto il titolo        ("28 negozi su 30")
-//   claimBad true → la riga di contesto segnala un problema (una chiusura che
-//           non è arrivata): diventa rossa e più chiara. Senza questo era la
-//           scritta più spenta della pagina, cioè l'opposto di quello che serve.
+//   claim   riga di contesto sotto il titolo   ("28 chiusure su 30 · 30 aperture")
+//   alert   la parte che segnala un problema, in rosso, in coda al claim
+//           ("1 chiusura non arrivata"). È separata dal claim di proposito:
+//           colorare tutta la riga faceva sembrare un problema anche la parte
+//           che va bene, e così il rosso non indicava più nulla. Va scritta per
+//           esteso — "1 mancante" non dice di cosa, se nella stessa riga si
+//           contano sia chiusure sia aperture.
 //   inline  true → accento sulla stessa riga del titolo, non a capo
 //           (serve per "28 CHIUSURE", dove il numero è il titolo)
 //
@@ -44,7 +47,9 @@ function azHero(o){
       ${o.kicker?`<div class="az-hero-kicker">${esc(o.kicker)}</div>`:'<span></span>'}
     </div>
     <h1 class="az-h1">${h1}${sep}${acc}</h1>
-    ${o.claim?`<div class="az-hero-claim${o.claimBad?' bad':''}">${esc(o.claim)}</div>`:''}
+    ${(o.claim||o.alert)?`<div class="az-hero-claim">${o.claim?esc(o.claim):''}${
+      o.alert?`${o.claim?'<i class="az-claim-sep"></i>':''}<b class="bad">${esc(o.alert)}</b>`:''
+    }</div>`:''}
   </div>`;
 }
 
