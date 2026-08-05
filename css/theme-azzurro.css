@@ -614,7 +614,7 @@ html.az .search-row{padding:0 16px 14px}
 /* Intestazione di brand cliccabile (collassa il gruppo) */
 html.az .az-sec-click{cursor:pointer;padding-bottom:2px}
 html.az .az-sec .brand-chev{
-  display:inline-block;font-size:8px;margin-right:8px;
+  display:inline-block;font-size:10px;margin-right:8px;
   transition:transform .15s;color:var(--t3);
 }
 html.az .az-sec-click.collapsed .brand-chev{transform:rotate(-90deg)}
@@ -1025,7 +1025,7 @@ html.az .date-range-pill{
    restava invisibile. Deve ereditare il bianco dal bottone. */
 html.az .date-range-pill .drp-text{
   color:inherit;
-  font-size:9.5px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;
+  font-size:var(--fs-lab);font-weight:500;letter-spacing:.14em;text-transform:uppercase;
 }
 html.az .date-range-pill .drp-reset{color:rgba(255,255,255,.6)}
 html.az .stores-brand-block{

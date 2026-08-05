@@ -218,11 +218,15 @@ function renderOggi(){
 
   // Intestazione nera del tema azzurro: "CHIUSURE / 2 AGOSTO" col conteggio
   // sotto. Fuori dal tema azHero() restituisce '' e non cambia nulla.
+  // Il "N su M" nascondeva le chiusure mancanti dentro un dettaglio grigio:
+  // se ce ne sono, la riga le dice e diventa rossa, come nella tab Chiusure.
   const azTitolo=azHero({
     kicker:riepTitle,
     h1:'Chiusure',
     accent:`${jd.getDate()} ${MESI[jd.getMonth()].toLowerCase()}`,
+    claimBad:missing.length>0,
     claim:`${recs.length} negozi su ${expectedCount}`+(apD?` · ${apD.received} aperture`:'')
+      +(missing.length?` · ${missing.length} mancant${missing.length===1?'e':'i'}`:'')
   });
   // .oggi-top raggruppa corrispettivo + confronti + tris in un unico pannello
   // bianco che sale sopra il nero. Senza tema è un div senza stile: invisibile.
