@@ -243,6 +243,18 @@ html.az .az-hero-claim .bad{
   color:#ff6b61;
   font-weight:700;
 }
+/* Avviso cliccabile: porta all'elenco di quello che manca. La sottolineatura
+   serve a dire che si può toccare — su un fondo nero, in maiuscolo spaziato,
+   il solo cambio di colore non basta a farlo sembrare un comando. */
+html.az .az-hero-claim .bad.az-go{
+  cursor:pointer;
+  border-bottom:1px solid rgba(255,107,97,.5);
+  padding-bottom:2px;
+}
+html.az .az-hero-claim .bad.az-go:active{
+  color:#fff;
+  border-bottom-color:rgba(255,255,255,.6);
+}
 /* Punto di separazione fra la parte neutra e l'avviso */
 html.az .az-claim-sep{
   display:inline-block;vertical-align:middle;

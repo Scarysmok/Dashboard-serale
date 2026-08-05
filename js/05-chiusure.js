@@ -486,8 +486,18 @@ function _azNegoziHero(){
     accent:ap?'aperture':'chiusure',
     inline:true,
     // In rosso e da solo: è l'unica cosa su cui agire (vedi alert in azHero).
-    alert:miss?`${miss} chiusur${miss===1?'a':'e'} non ricevut${miss===1?'a':'e'}`:''
+    alert:miss?`${miss} chiusur${miss===1?'a':'e'} non ricevut${miss===1?'a':'e'}`:'',
+    // Qui siamo già nella tab giusta: basta accendere il filtro "Mancanti",
+    // senza passare da oggiGoChiusure, che riallineerebbe la data a quella
+    // della Dashboard e farebbe saltare il giorno che si sta guardando.
+    alertGo:miss?'azVaiMancanti()':''
   });
+}
+// Accende il filtro "Mancanti" sul giorno già selezionato. setChip esce da solo
+// se non c'è una data filtrata, ma qui l'avviso compare solo quando c'è.
+function azVaiMancanti(){
+  const chip=document.getElementById('chip-mancanti');
+  if(chip) setChip(chip,'mancanti');
 }
 // Ratio % vs target di un record (per l'ordinamento "% Target"). -1 = senza target.
 function _tgtRatio(r){

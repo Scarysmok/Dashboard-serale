@@ -31,6 +31,11 @@ var AZ = document.documentElement.classList.contains('az');
 //           che va bene, e così il rosso non indicava più nulla. Va scritta per
 //           esteso — "1 mancante" non dice di cosa, se nella stessa riga si
 //           contano sia chiusure sia aperture.
+//   alertGo espressione JS da eseguire al clic sull'avviso: lo rende cliccabile
+//           e ci aggiunge una freccia, così dall'avviso si va a vedere cosa
+//           manca invece di doverlo cercare a mano. Deve essere una stringa
+//           letterale scritta qui nel codice, NON un dato: finisce dentro un
+//           attributo onclick e non viene filtrata.
 //   inline  true → accento sulla stessa riga del titolo, non a capo
 //           (serve per "28 CHIUSURE", dove il numero è il titolo)
 //
@@ -48,7 +53,9 @@ function azHero(o){
     </div>
     <h1 class="az-h1">${h1}${sep}${acc}</h1>
     ${(o.claim||o.alert)?`<div class="az-hero-claim">${o.claim?esc(o.claim):''}${
-      o.alert?`${o.claim?'<i class="az-claim-sep"></i>':''}<b class="bad">${esc(o.alert)}</b>`:''
+      o.alert?`${o.claim?'<i class="az-claim-sep"></i>':''}<b class="bad${
+        o.alertGo?' az-go':''}"${o.alertGo?` onclick="${o.alertGo}"`:''}>${esc(o.alert)}${
+        o.alertGo?' &rarr;':''}</b>`:''
     }</div>`:''}
   </div>`;
 }

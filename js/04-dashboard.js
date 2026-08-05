@@ -232,7 +232,11 @@ function renderOggi(){
       +(apD?` · ${apD.received} apertur${apD.received===1?'a':'e'}`:''),
     alert:missing.length
       ? `${missing.length} chiusur${missing.length===1?'a':'e'} non arrivat${missing.length===1?'a':'e'}`
-      : ''
+      : '',
+    // Dall'avviso si va direttamente all'elenco dei negozi che non hanno
+    // inviato, invece di dover cercare quali sono: oggiGoChiusure allinea la
+    // data, passa alla tab Chiusure e accende il filtro "Mancanti".
+    alertGo:missing.length?'oggiGoChiusure(true)':''
   });
   // .oggi-top raggruppa corrispettivo + confronti + tris in un unico pannello
   // bianco che sale sopra il nero. Senza tema è un div senza stile: invisibile.
