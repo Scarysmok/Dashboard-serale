@@ -286,7 +286,7 @@
               </div>
             </div>
           </div>
-          <button onclick="openExportDialog('andamento')" style="flex-shrink:0;white-space:nowrap;background:#2563eb;color:#fff;border:0;border-radius:8px;padding:8px 12px;font:700 12px Nunito;cursor:pointer">⬇ Esporta XLS</button>
+          <button class="az-xls" onclick="openExportDialog('andamento')" style="flex-shrink:0;white-space:nowrap;background:#2563eb;color:#fff;border:0;border-radius:8px;padding:8px 12px;font:700 12px Nunito;cursor:pointer">⬇ Esporta XLS</button>
         </div>
         <div class="tempo-compare">
           <button class="tempo-toggle on" id="tc-tgt" onclick="toggleCompare('tgt',this)">vs Target</button>
@@ -303,6 +303,9 @@
        Vista alternativa Heatmap (negozi × tempo) e ranking negozi a sparkline.
        Tap su una riga della classifica → bottom-sheet con i 3 mini-chart. -->
   <div class="scroll-area" id="tab-kpi" style="display:none">
+    <!-- Intestazione nera: riempita da _azKpiHero() in js/06-analisi.js.
+         Vuota fuori dal tema azzurro. -->
+    <div id="kpi-hero"></div>
     <div class="kpi-wrap">
 
       <div class="analisi-asof" id="asof-kpi"></div>
@@ -344,7 +347,7 @@
           </button>
           <div class="kfpanel" id="kfp-store" style="left:120px"></div>
         </div>
-        <button onclick="openExportDialog('kpi')" style="flex-shrink:0;white-space:nowrap;background:#2563eb;color:#fff;border:0;border-radius:8px;padding:8px 12px;font:700 12px Nunito;cursor:pointer">⬇ Esporta XLS</button>
+        <button class="az-xls" onclick="openExportDialog('kpi')" style="flex-shrink:0;white-space:nowrap;background:#2563eb;color:#fff;border:0;border-radius:8px;padding:8px 12px;font:700 12px Nunito;cursor:pointer">⬇ Esporta XLS</button>
       </div>
 
       <!-- Granularità + range -->

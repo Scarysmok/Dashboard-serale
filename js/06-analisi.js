@@ -805,6 +805,15 @@ const kpiState = {
   compare: new Set(['py']), // 'py' | 'brand' | 'prev'
   sort: 'val'               // 'val' | 'name'
 };
+// Tavolozza dei grafici. Chart.js disegna su canvas: il CSS non lo raggiunge,
+// quindi i colori vanno qui. Condizionata su AZ, così a tema spento tornano
+// esattamente quelli di prima.
+const AZC = AZ
+  ? {main:'#1e88d1', py:'#8a8782', brand:'#0d0d0d', prev:'#a8620f',
+     grid:'#eceae6', font:'AdihausDIN', fill:'#1e88d120'}
+  : {main:'#4f5bd5', py:'#8b93a1', brand:'#1f9d55', prev:'#c26a1c',
+     grid:'#eef1f4', font:'Nunito',    fill:'#4f5bd520'};
+
 let kpiChart = null;
 let kpiDrillCharts = [];
 
@@ -1159,8 +1168,8 @@ function kpiRenderChart(){
   const datasets = [{
     label: kpiLabel(kpi),
     data: values,
-    backgroundColor: '#4f5bd5',
-    borderColor: '#4f5bd5',
+    backgroundColor: AZC.main,
+    borderColor: AZC.main,
     borderWidth: 2,
     tension: 0.3,
     fill: false,
@@ -1182,8 +1191,8 @@ function kpiRenderChart(){
       label: 'Anno scorso',
       data: pyData,
       type: 'line',
-      borderColor: '#8b93a1',
-      backgroundColor: '#8b93a1',
+      borderColor: AZC.py,
+      backgroundColor: AZC.py,
       borderDash: [4,4],
       borderWidth: 2,
       tension: 0.3,
@@ -1238,8 +1247,8 @@ function kpiRenderChart(){
       label: 'Media brand',
       data: brandData,
       type: 'line',
-      borderColor: '#1f9d55',
-      backgroundColor: '#1f9d55',
+      borderColor: AZC.brand,
+      backgroundColor: AZC.brand,
       borderDash: [2,3],
       borderWidth: 2,
       tension: 0.3,
@@ -1270,8 +1279,8 @@ function kpiRenderChart(){
       label: 'Periodo prec.',
       data: prevData,
       type: 'line',
-      borderColor: '#c26a1c',
-      backgroundColor: '#c26a1c',
+      borderColor: AZC.prev,
+      backgroundColor: AZC.prev,
       borderDash: [6,3],
       borderWidth: 2,
       tension: 0.3,
@@ -1311,7 +1320,7 @@ function kpiRenderChart(){
         maintainAspectRatio: false,
         interaction: {mode:'index', intersect:false},
         plugins: {
-          legend: {display:true, position:'bottom', labels:{font:{family:'Nunito',size:10}, boxWidth:10, boxHeight:10, padding:8}},
+          legend: {display:true, position:'bottom', labels:{font:{family:AZC.font,size:10}, boxWidth:10, boxHeight:10, padding:8}},
           tooltip: {
             callbacks: {
               label: function(ctx){
@@ -1322,8 +1331,8 @@ function kpiRenderChart(){
           }
         },
         scales: {
-          x: {ticks:{font:{family:'Nunito',size:10}}, grid:{display:false}},
-          y: {ticks:{font:{family:'Nunito',size:10}, callback:v => kpiFmt(v, kpi)}, grid:{color:'#eef1f4'}}
+          x: {ticks:{font:{family:AZC.font,size:10}}, grid:{display:false}},
+          y: {ticks:{font:{family:AZC.font,size:10}, callback:v => kpiFmt(v, kpi)}, grid:{color:AZC.grid}}
         }
       }
     });
@@ -1415,22 +1424,22 @@ function kpiRenderHeatmap(){
   // Range per scala colore globale
   let gMin = Infinity, gMax = -Infinity;
   for(const v of cell.values()){ if(v < gMin) gMin = v; if(v > gMax) gMax = v; }
+  // Scala della heatmap. Col tema azzurro va da ROSSO (valore piu' basso) ad
+  // AZZURRO (piu' alto) passando per un grigio scuro.
+  // Il grigio in mezzo non e' un vezzo: le celle hanno color:#fff, e la scala
+  // di prima partiva da rgb(254,226,226), quasi bianco — il numero dentro le
+  // celle basse era invisibile. Tenendo scuri tutti e tre i capi, il bianco si
+  // legge sempre.
+  const _ramp = AZ
+    ? [[216,50,42], [87,84,79], [30,136,209]]      // #d8322a -> #57544f -> #1e88d1
+    : [[254,226,226], [254,243,199], [22,163,74]]; // la scala precedente
   function color(v){
     if(v == null) return 'var(--s3)';
     const t = (v - gMin) / ((gMax - gMin) || 1);
-    if(t < 0.5){
-      const k = t*2;
-      const r = Math.round(254);
-      const g = Math.round(226 - (226-243)*k);
-      const b = Math.round(226 - (226-199)*k);
-      return `rgb(${r},${g},${b})`;
-    } else {
-      const k = (t-0.5)*2;
-      const r = Math.round(254 - (254-22)*k);
-      const g = Math.round(243 - (243-163)*k);
-      const b = Math.round(199 - (199-74)*k);
-      return `rgb(${r},${g},${b})`;
-    }
+    const [a,b] = t < 0.5 ? [_ramp[0], _ramp[1]] : [_ramp[1], _ramp[2]];
+    const k = t < 0.5 ? t*2 : (t-0.5)*2;
+    const c = a.map((x,i) => Math.round(x + (b[i]-x)*k));
+    return `rgb(${c[0]},${c[1]},${c[2]})`;
   }
 
   // Limito a ultimi 14 bucket per mobile
@@ -1500,7 +1509,7 @@ function openKpiDrill(payload){
       type: 'line',
       data: {labels:series.map(s=>kpiBucketLabel(s.key,kpiState.gran)), datasets:[{
         data: series.map(s => +s.value.toFixed(2)),
-        borderColor:'#4f5bd5', backgroundColor:'#4f5bd520',
+        borderColor:AZC.main, backgroundColor:AZC.fill,
         borderWidth:2, tension:0.3, fill:true, pointRadius:0
       }]},
       options: {
@@ -1683,7 +1692,27 @@ renderKpiAll = function(){
   kpiBindEvents();
   kpiUpdateFilterUI();
   _renderKpiAllOriginal();
+  _azKpiHero();
 };
+
+// Intestazione nera della tab KPI negozio. La tab non era fra le sei del
+// documento di design, quindi era rimasta senza: aggiunta il 05/08/2026 per
+// allinearla alle altre (segnalato dall'utente).
+function _azKpiHero(){
+  if(!AZ) return;
+  const box = document.getElementById('kpi-hero');
+  if(!box) return;
+  const PERIODO = {last:'Ultimo periodo', custom:'Periodo scelto',
+                   wtd:'Settimana in corso', mtd:'Mese in corso', ytd:'Anno in corso'};
+  const nStore = kpiState.stores.size || ALL_STORES.length;
+  box.innerHTML = azHero({
+    kicker: PERIODO[kpiState.range] || 'Periodo',
+    h1: 'KPI',
+    accent: 'negozio',
+    inline: true,
+    claim: `${kpiLabel(kpiState.kpi)} · ${nStore} negoz${nStore===1?'io':'i'}`
+  });
+}
 
 
 // ── EXPORT XLS (Andamento vendite / KPI negozio) ────────────────────────────

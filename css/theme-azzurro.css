@@ -1266,3 +1266,278 @@ html.az .grand-label{font-size:11px;font-weight:700;letter-spacing:.06em}
 html.az .oggi-hero-delta{font-size:12px;font-weight:700;letter-spacing:0}
 html.az .az-rpct{font-size:10px}
 html.az .am-badge{font-weight:700}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   13. KPI NEGOZIO  (aggiunta del 05/08/2026)
+   ═══════════════════════════════════════════════════════════════════════════
+   Questa tab NON era fra le sei del documento di design, quindi era rimasta
+   col tema precedente. Peggio: .kpi-card / .kpi-l / .kpi-v / .kpi-s sono
+   condivise con la striscia KPI delle Chiusure, quindi le tessere in cima si
+   erano rivestite da sole mentre tutto il resto sotto era rimasto indaco —
+   mezza vestita, che si nota più di per niente. Segnalato dall'utente.
+
+   I colori dei grafici non stanno qui: Chart.js disegna su canvas e il CSS non
+   lo raggiunge. Sono in js/06-analisi.js, nella tavolozza AZC.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Le tre tessere Ingressi / CR / UPT salgono sul nero dell'intestazione */
+html.az #tab-kpi .kpi-tabs{
+  margin-top:calc(-1 * var(--az-overlap));
+  position:relative;z-index:3;
+  padding:0 16px 10px;
+  gap:10px;
+}
+html.az .kpi-tab{
+  border:none;
+  border-radius:var(--radius-card);
+  background:var(--s1);
+  box-shadow:var(--shadow-lift);
+  padding:16px 14px;
+  align-items:flex-start;
+  text-align:left;
+}
+html.az .kpi-tab .kt-l{
+  font-family:var(--label);
+  font-size:var(--fs-lab-s);font-weight:400;
+  letter-spacing:.16em;text-transform:uppercase;
+  color:var(--label-ink);
+}
+html.az .kpi-tab .kt-v{
+  font-size:22px;font-weight:900;letter-spacing:-.035em;
+  color:var(--t1);margin-top:9px;
+}
+html.az .kpi-tab .kt-d{
+  font-family:var(--font);
+  font-size:11px;font-weight:500;letter-spacing:.03em;
+  margin-top:5px;
+}
+html.az .kpi-tab .kt-d.up{color:var(--t3)}
+html.az .kpi-tab .kt-d.dn{color:var(--red)}
+html.az .kpi-tab .kt-d.flat{color:var(--faint)}
+/* La tessera scelta si distingue invertendo, non tingendo */
+html.az .kpi-tab.on{background:#0d0d0d}
+html.az .kpi-tab.on .kt-l{color:rgba(255,255,255,.55)}
+html.az .kpi-tab.on .kt-v{color:#fff}
+html.az .kpi-tab.on .kt-d.up{color:rgba(255,255,255,.6)}
+html.az .kpi-tab.on .kt-d.dn{color:#ff6b61}
+
+/* Filtri: stesse pillole di Analisi */
+html.az .kpi-filters{padding:14px 16px 4px}
+html.az .kfbtn{
+  border-radius:var(--radius-pill);
+  border:1px solid var(--bd2);
+  background:var(--s1);
+  color:var(--t3);
+  font-size:10.5px;font-weight:900;
+  letter-spacing:.1em;text-transform:uppercase;
+  min-height:38px;padding:0 14px;
+}
+html.az .kfbtn.has-sel{background:#0d0d0d;border-color:#0d0d0d;color:#fff}
+html.az .kfbtn .kfcnt{background:#fff;color:#0d0d0d;font-weight:900}
+html.az .kfbtn.has-sel .kfarrow{color:rgba(255,255,255,.7)}
+html.az .kfpanel{
+  border:1px solid var(--bd2);
+  border-radius:var(--radius-sm);
+  box-shadow:0 24px 60px -32px rgba(0,0,0,.45);
+}
+html.az .kfactions button{
+  border-radius:var(--radius-pill);
+  font-size:10px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;
+}
+html.az .kfactions button.primary{background:#0d0d0d;border-color:#0d0d0d}
+
+/* Granularità, range e confronti: pillole nere */
+html.az .kpi-pillrow{gap:8px;padding:8px 16px 4px}
+html.az .kpi-pill,
+html.az .kpi-cmp{
+  border-radius:var(--radius-pill);
+  border:1px solid var(--bd2);
+  background:var(--s1);
+  color:var(--t3);
+  font-size:10.5px;font-weight:900;
+  letter-spacing:.1em;text-transform:uppercase;
+  min-height:36px;
+}
+html.az .kpi-pill.on,
+html.az .kpi-cmp.on{background:#0d0d0d;border-color:#0d0d0d;color:#fff}
+/* Come in Analisi, la casella di spunta è superflua: lo stato lo dice il nero */
+html.az .kpi-cmp::before{display:none}
+html.az .kpi-cmprow{gap:8px;padding:8px 16px 14px}
+
+/* Grafico / Heatmap: sottolineatura nera invece che azzurra */
+html.az .kpi-viewtabs{border-bottom:1px solid var(--bd2);padding:0 16px}
+html.az .kpi-vtab{
+  font-size:10.5px;font-weight:900;
+  letter-spacing:.1em;text-transform:uppercase;
+  color:var(--t3);
+  padding:14px 8px;
+}
+html.az .kpi-vtab.on{color:var(--t1);border-bottom-color:#0d0d0d}
+
+html.az .kpi-chart-wrap{
+  border:none;border-radius:var(--radius-card);
+  box-shadow:var(--shadow);
+  margin:14px 16px 0;
+  padding:16px 16px 10px;
+}
+html.az .kpi-chart-title{
+  font-size:12px;font-weight:900;
+  letter-spacing:.18em;text-transform:uppercase;
+  color:var(--t1);
+  margin-bottom:10px;
+}
+html.az .kpi-chart-title .kpi-chart-sum{
+  font-family:var(--font);
+  font-size:11px;font-weight:500;letter-spacing:.03em;text-transform:none;
+  color:var(--t3);
+}
+
+/* Heatmap */
+html.az .kpi-hm-wrap{padding:0 16px}
+html.az .kpi-hm-card{
+  border:none;border-radius:var(--radius-card);
+  box-shadow:var(--shadow);
+  padding:14px;
+}
+html.az .kpi-hm-table th{
+  font-family:var(--label);
+  font-size:var(--fs-lab-xs);letter-spacing:.14em;
+  color:var(--label-ink);
+}
+html.az .kpi-hm-table th.row-h{
+  font-family:var(--font);
+  font-size:11px;font-weight:900;
+  text-transform:uppercase;letter-spacing:-.01em;
+  color:var(--t1);
+}
+html.az .kpi-hm-table td{
+  border-radius:2px;
+  font-family:var(--font);
+  font-size:10px;font-weight:700;
+}
+html.az .kpi-hm-table td.na{background:var(--s3);color:var(--faint)}
+html.az .kpi-hm-legend{
+  font-family:var(--label);
+  font-size:var(--fs-lab-s);letter-spacing:.12em;text-transform:uppercase;
+  color:var(--label-ink);
+}
+/* La legenda segue la scala vera (rosso → grigio scuro → azzurro): vedi _ramp
+   in js/06-analisi.js. Deve dire la stessa cosa del disegno. */
+html.az .kpi-hl-grad{
+  border-radius:2px;
+  background:linear-gradient(to right,#d8322a,#57544f,#1e88d1);
+}
+
+/* Classifica negozi */
+html.az .kpi-rank-wrap{padding:0 16px}
+html.az .kpi-rank-card{
+  border:none;border-radius:var(--radius-card);
+  box-shadow:var(--shadow);
+  padding:0;overflow:hidden;
+  margin-top:14px;
+}
+html.az .kpi-rank-h{
+  padding:16px 16px 10px;
+  font-size:12px;font-weight:900;
+  letter-spacing:.18em;text-transform:uppercase;
+  color:var(--t1);
+}
+html.az .kpi-rank-h .kpi-rank-sort{
+  font-family:var(--label);
+  font-size:var(--fs-lab-s);font-weight:400;
+  letter-spacing:.12em;text-transform:uppercase;
+  color:var(--t3);
+}
+html.az .kpi-rank-row{
+  border-top:1px solid var(--div);
+  padding:13px 16px;gap:12px;
+}
+html.az .kpi-rank-pos{
+  font-family:var(--font);
+  font-size:15px;font-weight:900;
+  color:var(--faint);
+}
+html.az .kpi-rank-row:first-of-type .kpi-rank-pos{color:var(--acc)}
+html.az .kpi-rank-brand{
+  font-family:var(--label);
+  font-size:var(--fs-lab-xs);font-weight:400;
+  letter-spacing:.14em;
+  color:var(--label-ink);
+}
+html.az .kpi-rank-loc{
+  font-size:14px;font-weight:900;
+  text-transform:uppercase;letter-spacing:-.01em;
+  margin-top:3px;
+}
+html.az .kpi-rank-val{
+  font-size:15px;font-weight:900;letter-spacing:-.03em;
+}
+html.az .kpi-rank-delta{
+  font-family:var(--font);
+  font-size:11px;font-weight:500;letter-spacing:.02em;
+}
+html.az .kpi-rank-delta.up{color:var(--t3)}
+html.az .kpi-rank-delta.dn{color:var(--red)}
+html.az .kpi-rank-delta.flat{color:var(--faint)}
+html.az .kpi-rank-empty{
+  font-family:var(--label);
+  font-size:var(--fs-lab);letter-spacing:.14em;text-transform:uppercase;
+  color:var(--label-ink);
+}
+
+/* Scheda di dettaglio del negozio (si apre dalla classifica) */
+html.az .kpi-drill-sheet{border-radius:20px 20px 0 0;box-shadow:var(--shadow-lift)}
+html.az .kpi-drill-name{
+  font-size:20px;font-weight:900;
+  text-transform:uppercase;letter-spacing:-.02em;
+}
+html.az .kpi-drill-brand{
+  font-family:var(--label);
+  font-size:var(--fs-lab-s);font-weight:400;
+  letter-spacing:.18em;
+  color:var(--label-ink);
+}
+html.az .kpi-drill-mini{
+  background:var(--s1);
+  border-radius:var(--radius-card);
+  box-shadow:var(--shadow);
+  padding:14px 16px;
+}
+html.az .kpi-drill-mini-l{
+  font-family:var(--label);
+  font-size:var(--fs-lab-s);font-weight:400;
+  letter-spacing:.16em;
+  color:var(--label-ink);
+}
+html.az .kpi-drill-mini-v{
+  font-size:19px;font-weight:900;letter-spacing:-.03em;
+}
+html.az .kpi-drill-mini-v .dm-delta{
+  font-family:var(--font);
+  font-size:11px;font-weight:500;letter-spacing:.02em;
+}
+html.az .kpi-drill-close{
+  border-radius:var(--radius-pill);
+  border:1px solid var(--bd2);
+  background:var(--s1);
+  font-size:10.5px;font-weight:900;
+  letter-spacing:.1em;text-transform:uppercase;
+}
+/* Il velo dietro la scheda ha un nero azzurrato (rgba(15,17,21,…)) che veniva
+   dalla vecchia palette: lo allineo a quello del menu laterale. */
+html.az .kpi-drill-overlay{background:rgba(0,0,0,.5)}
+
+/* Il bottone "Esporta XLS" (tab Analisi e KPI) ha lo stile scritto dentro
+   l'attributo style — fondo #2563eb, angoli quadrati, Nunito — ed era l'unico
+   elemento rimasto della vecchia grafica in mezzo alle pillole nere.
+   Gli stili inline si battono solo con !important: così l'attributo resta al
+   suo posto e a tema spento il bottone torna esattamente com'era. */
+html.az .az-xls{
+  background:var(--acc)!important;
+  border-radius:var(--radius-pill)!important;
+  padding:0 16px!important;
+  min-height:38px!important;
+  font:900 10.5px var(--font)!important;
+  letter-spacing:.1em!important;
+  text-transform:uppercase!important;
+}
