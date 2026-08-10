@@ -1253,10 +1253,15 @@ body{display:flex;flex-direction:column}
   transform:rotate(42deg)}
 .bs-picker-hint{padding:8px 12px 10px;font-family:'JetBrains Mono',monospace;font-size:10px;
   letter-spacing:.1em;text-transform:uppercase;color:var(--bs-muted)}
-/* L'etichetta della settimana non si accorcia mai: "LAST WEEK" tagliato in
-   "LAST WE…" non si legge, mentre l'intervallo di date può tranquillamente
-   andare a capo. In un pannello stretto quindi si impilano invece di
-   contendersi la riga. */
+/* Il pannello delle settimane non scende sotto i 240px. Largo quanto il
+   pulsante erano 220px e la riga più lunga — casella + "LAST WEEK" + le date —
+   ne chiede 227: mancavano sette pixel, e l'etichetta usciva tagliata
+   ("LAST WE…"). Con 240 le righe stanno tutte su una riga sola e restano
+   allineate fra loro.
+   Numero fisso e non `max-content`: a contenuto la larghezza la detterebbe la
+   frase di aiuto, che su una riga sola ne chiede 301 e allargherebbe il
+   pannello per niente. La frase invece va a capo, che è quello che deve fare. */
+.bs-multi .bs-picker-panel{min-width:240px}
 .bs-multi .bs-picker-opt{flex-wrap:wrap;row-gap:2px}
 .bs-multi .bs-picker-lab{min-width:max-content}
 .bs-multi .bs-picker-n{margin-left:auto}
