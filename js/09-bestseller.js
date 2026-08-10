@@ -35,11 +35,15 @@ const BS = {
   detail: null,     // prodotto aperto nella scheda
   busy: false,
   log: [],
-  // Selezione settimane a spunta: `pending` = ci sono spunte non ancora
-  // applicate (si applicano chiudendo il pannello), `committed` = l'ultimo clic
-  // ha fatto partire quel caricamento, `reopen` = pannello da riaprire dopo il
-  // ridisegno. Vedi bsCommitSel.
-  pending: false, committed: false, reopen: null,
+  // Selezione a spunta: `pending` = ci sono spunte non ancora applicate (si
+  // applicano chiudendo il pannello), `committed` = l'ultimo clic ha fatto
+  // partire quel caricamento, `reopen` = pannello da riaprire dopo il ridisegno.
+  // `draft` = le spunte dei negozi mentre il pannello è aperto, null quando non
+  // se ne stanno facendo. Serve perché in BS.cur.stores l'elenco vuoto vuol dire
+  // "tutti", mentre a pannello aperto si deve poter arrivare a "nessuno
+  // spuntato" — è il passaggio obbligato per svuotare e riprenderne due.
+  // Vedi bsCommitSel.
+  pending: false, committed: false, reopen: null, draft: null,
 };
 
 // Le 28 colonne dell'export adidas, nell'ordine del file. `t` è il formato:
@@ -628,6 +632,13 @@ function bsCurStores(){
   return dentro.length ? dentro : disp;   // selezione ormai vuota → tutti
 }
 
+// Negozi spuntati IN QUESTO MOMENTO, come chiavi: le spunte in corso se il
+// pannello è aperto, altrimenti la selezione applicata. È quello che si disegna;
+// quello che si carica è bsCurStores, che non conosce l'elenco vuoto.
+function bsDraftStores(){
+  return BS.draft !== null ? BS.draft.slice() : bsCurStores().map(bsStoreKey);
+}
+
 // Unico punto in cui si scrive BS.cur: normalizza i due elenchi e ricava da
 // essi period_start, brand/location e aggregate. Scriverli a mano altrove
 // significa prima o poi lasciarli in disaccordo fra loro.
@@ -749,7 +760,7 @@ function bsHeader(d){
   // le settimane spuntate. Se ne possono prendere quanti si vuole e la
   // classifica somma quelli.
   const inWeek = bsStoresIn(curPeriods);
-  const scelti = bsCurStores().map(bsStoreKey);
+  const scelti = bsDraftStores();
   const curStore = bsStoresLabel(inWeek, scelti);
   let storeOpts = '';
   if(inWeek.length > 1){
@@ -1316,15 +1327,15 @@ function bsBind(){
   // Dal link pubblico la scelta resta singola: /public/bestseller accetta un
   // negozio (?store=) o l'insieme che il token apre, non un sottoinsieme
   // qualsiasi. Lì quindi si cambia negozio e si carica subito, come prima.
-  const negozi = (stores) => {
+  const negozi = (chiavi) => {
     if(BS.public){
       BS.pending = false;
-      bsSetCur(Object.assign({}, BS.cur, {stores}));
+      bsSetCur(Object.assign({}, BS.cur, {stores: chiavi}));
       bsResetView();
       bsLoadCurrent();
       return;
     }
-    bsSetCur(Object.assign({}, BS.cur, {stores}));
+    BS.draft = chiavi;
     BS.pending = true;
     bsSyncMarks();
   };
@@ -1334,17 +1345,21 @@ function bsBind(){
       e.stopPropagation();
       const k = b.dataset.val;
       if(BS.public) return negozi([k]);
-      const now = bsCurStores().map(bsStoreKey);
-      const next = now.indexOf(k) > -1 ? now.filter(x => x !== k) : now.concat(k);
-      if(!next.length) return;                       // era l'unico spuntato
-      negozi(next);
+      const now = bsDraftStores();
+      negozi(now.indexOf(k) > -1 ? now.filter(x => x !== k) : now.concat(k));
     }));
 
-  // "★ Tutti i negozi": li prende tutti. Non fa da interruttore come "Tutte le
-  // week", perché il ritorno naturale sarebbe "un negozio solo" e non c'è modo
-  // di sapere quale: si toglie la spunta a quelli che non servono.
+  // "★ Tutti i negozi" fa da interruttore: se ci sono già tutti li toglie tutti,
+  // altrimenti li prende tutti. Svuotare in un clic serve per riprenderne due o
+  // tre senza dover togliere la spunta agli altri sei.
+  // Restare senza nessuno spuntato va bene solo mentre si sceglie: chiudendo
+  // così, bsCommitSel tiene la selezione di prima invece di caricare il vuoto.
   document.querySelectorAll('#bs-root [data-storeall]').forEach(b =>
-    b.addEventListener('click', e => { e.stopPropagation(); negozi([]); }));
+    b.addEventListener('click', e => {
+      e.stopPropagation();
+      const disp = bsStoresIn(bsCurPeriods()).map(bsStoreKey);
+      negozi(bsDraftStores().length === disp.length ? [] : disp);
+    }));
 
   const q = document.getElementById('bs-q');
   if(q) q.addEventListener('input', e => {
@@ -1419,7 +1434,7 @@ function bsSyncMarks(){
   const tutte = document.querySelector('#bs-root [data-weekall]');
   if(tutte) marca(tutte, nSett > 0 && ps.length === nSett);
 
-  const st = bsCurStores().map(bsStoreKey);
+  const st = bsDraftStores();
   document.querySelectorAll('#bs-root [data-val]').forEach(o =>
     marca(o, st.indexOf(o.dataset.val) > -1));
   const nNeg = bsStoresIn(ps).length;
@@ -1445,7 +1460,7 @@ function bsRefreshBtns(){
   };
   testo('week', bsWeeksLabel(ps), (ps.length>1?'Settimane':'Settimana')
     + `<span class="bs-selspan">${bsEsc(bsSpanLabel(ps))}</span>`);
-  const st = bsCurStores().map(bsStoreKey);
+  const st = bsDraftStores();
   testo('store', bsStoresLabel(bsStoresIn(ps), st), st.length>1 ? 'Negozi' : 'Negozio');
 }
 
@@ -1458,6 +1473,14 @@ function bsCommitSel(){
   if(!BS.pending) return;
   BS.pending = false;
   BS.committed = true;
+  const prima = bsCacheKey(BS.cur);
+  // Le spunte dei negozi lasciate a zero non sono una selezione: chi ha svuotato
+  // per riprenderne due e poi ha chiuso senza sceglierne nessuno si tiene quella
+  // di prima, che è meno peggio di una classifica vuota.
+  if(BS.draft !== null){
+    if(BS.draft.length) bsSetCur(Object.assign({}, BS.cur, {stores: BS.draft}));
+    BS.draft = null;
+  }
   bsSetCur(BS.cur);
   // Nessun negozio presente in tutte le settimane scelte: non c'è un totale
   // onesto da mostrare. Torno all'ultima settimana e lo dico, invece di lasciare
@@ -1468,6 +1491,9 @@ function bsCommitSel(){
     bsLog('Nessun negozio ha caricato tutte le settimane scelte: torno all\'ultima.', true);
     if(!bsCurStores().length) return;
   }
+  // Spuntato e despuntato, o bozza buttata: la selezione è quella di prima.
+  // Ridisegno per rimettere a posto le spunte, ma non richiedo mezzo mega.
+  if(bsCacheKey(BS.cur) === prima){ bsPaint(); return; }
   bsResetView();
   bsLoadCurrent();
 }
