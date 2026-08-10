@@ -44,6 +44,7 @@ const BS = {
   // spuntato" — è il passaggio obbligato per svuotare e riprenderne due.
   // Vedi bsCommitSel.
   pending: false, committed: false, reopen: null, draft: null,
+  loadedKey: null,  // chiave della selezione che sta a schermo (vedi bsCommitSel)
 };
 
 // Le 28 colonne dell'export adidas, nell'ordine del file. `t` è il formato:
@@ -210,6 +211,9 @@ async function bsLoadCurrent(){
   const root = document.getElementById('bs-root');
   if(root) root.innerHTML = bsState('Carico il report…','');
   BS.data = null;
+  // Quale selezione sta a schermo: bsCommitSel ci si confronta per non
+  // richiedere al server dati che ha già.
+  BS.loadedKey = bsCacheKey(BS.cur);
   try{
     const c = BS.cur;
     if(BS.public){
@@ -1473,7 +1477,6 @@ function bsCommitSel(){
   if(!BS.pending) return;
   BS.pending = false;
   BS.committed = true;
-  const prima = bsCacheKey(BS.cur);
   // Le spunte dei negozi lasciate a zero non sono una selezione: chi ha svuotato
   // per riprenderne due e poi ha chiuso senza sceglierne nessuno si tiene quella
   // di prima, che è meno peggio di una classifica vuota.
@@ -1491,9 +1494,12 @@ function bsCommitSel(){
     bsLog('Nessun negozio ha caricato tutte le settimane scelte: torno all\'ultima.', true);
     if(!bsCurStores().length) return;
   }
-  // Spuntato e despuntato, o bozza buttata: la selezione è quella di prima.
-  // Ridisegno per rimettere a posto le spunte, ma non richiedo mezzo mega.
-  if(bsCacheKey(BS.cur) === prima){ bsPaint(); return; }
+  // Il confronto è con quello che è A SCHERMO (BS.loadedKey), non con com'era
+  // BS.cur all'inizio di questa funzione: le spunte delle settimane hanno già
+  // modificato BS.cur mentre il pannello era aperto, quindi confrontarlo con sé
+  // stesso dava sempre "non è cambiato niente" e la classifica non si aggiornava
+  // mai al cambio di settimana.
+  if(bsCacheKey(BS.cur) === BS.loadedKey){ bsPaint(); return; }
   bsResetView();
   bsLoadCurrent();
 }
