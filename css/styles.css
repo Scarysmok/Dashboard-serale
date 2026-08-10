@@ -1246,8 +1246,14 @@ body{display:flex;flex-direction:column}
 .bs-picker.bs-open .bs-picker-chev{transform:rotate(180deg);opacity:1}
 .bs-picker-btn[disabled]{opacity:.5;cursor:default}
 
+/* overscroll-behavior: arrivato in fondo alla lista, lo scorrimento si ferma lì
+   invece di passare alla pagina sotto e portarsela via mentre si sta ancora
+   scegliendo. Vale anche quando la lista è corta e non ha nulla da scorrere:
+   resta comunque un contenitore di scorrimento, e `contain` gli impedisce di
+   girare il gesto a chi sta dietro. */
 .bs-picker-panel{position:absolute;top:calc(100% + 10px);left:0;right:0;z-index:40;display:none;
   background:#fff;color:var(--bs-ink);border-radius:16px;overflow:auto;max-height:min(58vh,420px);
+  overscroll-behavior:contain;
   box-shadow:0 30px 70px -28px rgba(0,0,0,.75);padding:6px;
   animation:bsFadeUp .18s cubic-bezier(.2,.7,.3,1) both}
 .bs-picker.bs-open .bs-picker-panel{display:block}

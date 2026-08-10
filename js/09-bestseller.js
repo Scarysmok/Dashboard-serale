@@ -1302,6 +1302,19 @@ function bsBind(){
   document.querySelectorAll('#bs-root .bs-picker').forEach(p => {
     const btn = p.querySelector('.bs-picker-btn');
     if(!btn) return;
+
+    // Scorrendo dentro un pannello, il gesto non deve passare alla pagina sotto
+    // e portarsela via mentre si sta ancora scegliendo. Per i pannelli lunghi
+    // (settimane, negozi, Categoria) ci pensa `overscroll-behavior: contain` nel
+    // CSS. Per quelli corti no: se la lista ci sta tutta, il browser non li
+    // considera scorribili, non applica overscroll-behavior e gira il gesto alla
+    // pagina — e la tendina si comporterebbe in un modo o nell'altro a seconda
+    // di quante voci ha, che è peggio di entrambi. Qui si ferma comunque.
+    const pan = p.querySelector('.bs-picker-panel');
+    if(pan) pan.addEventListener('wheel', e => {
+      if(pan.scrollHeight <= pan.clientHeight) e.preventDefault();
+    }, {passive: false});
+
     btn.addEventListener('click', e => {
       e.stopPropagation();
       BS.committed = false;
