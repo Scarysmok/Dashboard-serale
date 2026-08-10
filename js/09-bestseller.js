@@ -685,6 +685,16 @@ function bsHeader(d){
   // classifica mostra la somma. Il pannello resta aperto mentre si spunta.
   let curWeek = bsWeeksLabel(curPeriods);
   let weekOpts = '';
+  // Scorciatoia per prendere tutto l'archivio in un clic invece di spuntare
+  // sette caselle. Ricliccandola si torna alla sola settimana più recente.
+  if(keys.length > 1){
+    const tutte = curPeriods.length === keys.length;
+    weekOpts += `<button class="bs-picker-opt bs-agg${tutte?' bs-sel':''}" role="option"
+      aria-selected="${tutte}" data-weekall="1">
+      <span class="bs-picker-mark"></span>
+      <span class="bs-picker-lab">★ Tutte le week</span>
+      <span class="bs-picker-n">${keys.length} sett.</span></button>`;
+  }
   keys.forEach(ps => {
     const sel = inSel(ps);
     weekOpts += `<button class="bs-picker-opt${sel?' bs-sel':''}" role="option"
@@ -1240,10 +1250,22 @@ function bsBind(){
       if(!next.length) return;                       // era l'unica spuntata
       bsSetCur(Object.assign({}, BS.cur, {periods: next}));
       BS.pending = true;
-      const on = next.indexOf(ps) > -1;
-      b.classList.toggle('bs-sel', on);
-      b.setAttribute('aria-selected', String(on));
-      bsRefreshWeekBtn();
+      bsSyncWeekMarks();
+    }));
+
+  // "★ Tutte le week": prende tutto l'archivio, e ricliccata torna alla sola
+  // settimana più recente — altrimenti per tornare indietro toccherebbe
+  // despuntarle una per una.
+  document.querySelectorAll('#bs-root [data-weekall]').forEach(b =>
+    b.addEventListener('click', e => {
+      e.stopPropagation();
+      const keys = Object.keys(bsWeeks()).sort();
+      if(!keys.length) return;
+      const tutte = bsCurPeriods().length === keys.length;
+      bsSetCur(Object.assign({}, BS.cur,
+        {periods: tutte ? [keys[keys.length-1]] : keys}));
+      BS.pending = true;
+      bsSyncWeekMarks();
     }));
 
   // Negozio: cambia solo il "chi", le settimane spuntate restano.
@@ -1319,6 +1341,23 @@ function bsResetView(){
 // aperto: etichetta ("W29–W32 · 4 sett."), intestazione singolare/plurale e
 // periodo coperto. Sono le tre cose che bsPaint rifarebbe, ma bsPaint rigenera
 // tutto il markup e chiuderebbe il pannello sotto le dita.
+// Rispecchia a schermo le settimane spuntate senza ridisegnare: il pannello è
+// aperto e bsPaint se lo porterebbe via. Aggiorna anche la voce "Tutte le week",
+// che risulta spuntata quando lo sono tutte, comunque ci si sia arrivati.
+function bsSyncWeekMarks(){
+  const sel = bsCurPeriods();
+  const marca = (el, on) => {
+    el.classList.toggle('bs-sel', on);
+    el.setAttribute('aria-selected', String(on));
+  };
+  document.querySelectorAll('#bs-root [data-week]').forEach(o =>
+    marca(o, sel.indexOf(o.dataset.week) > -1));
+  const tutte = document.querySelector('#bs-root [data-weekall]');
+  const n = Object.keys(bsWeeks()).length;
+  if(tutte) marca(tutte, n > 0 && sel.length === n);
+  bsRefreshWeekBtn();
+}
+
 function bsRefreshWeekBtn(){
   const ps = bsCurPeriods();
   const p = document.querySelector('#bs-root .bs-picker[data-picker="week"]');
@@ -1339,9 +1378,17 @@ function bsCommitWeeks(){
   if(!BS.pending) return;
   BS.pending = false;
   BS.committed = true;
-  const periods = bsCurPeriods();
-  const stores = bsStoresIn(periods);
-  if(!stores.length) return;
+  let periods = bsCurPeriods();
+  let stores = bsStoresIn(periods);
+  // Nessun negozio presente in tutte le settimane scelte: non c'è un totale
+  // onesto da mostrare. Torno all'ultima settimana e lo dico, invece di lasciare
+  // le spunte a schermo su una classifica che non è quella.
+  if(!stores.length){
+    periods = [periods[periods.length-1]];
+    stores = bsStoresIn(periods);
+    if(!stores.length) return;
+    bsLog('Nessun negozio ha caricato tutte le settimane scelte: torno all\'ultima.', true);
+  }
   const keep = BS.cur && !BS.cur.aggregate
     && stores.find(w => w.brand===BS.cur.brand && w.location===BS.cur.location);
   bsSetCur(keep ? {brand:keep.brand, location:keep.location, periods}
