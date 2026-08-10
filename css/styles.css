@@ -1253,6 +1253,13 @@ body{display:flex;flex-direction:column}
   transform:rotate(42deg)}
 .bs-picker-hint{padding:8px 12px 10px;font-family:'JetBrains Mono',monospace;font-size:10px;
   letter-spacing:.1em;text-transform:uppercase;color:var(--bs-muted)}
+/* L'etichetta della settimana non si accorcia mai: "LAST WEEK" tagliato in
+   "LAST WE…" non si legge, mentre l'intervallo di date può tranquillamente
+   andare a capo. In un pannello stretto quindi si impilano invece di
+   contendersi la riga. */
+.bs-multi .bs-picker-opt{flex-wrap:wrap;row-gap:2px}
+.bs-multi .bs-picker-lab{min-width:max-content}
+.bs-multi .bs-picker-n{margin-left:auto}
 .bs-picker-lab{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bs-picker-n{font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:500;
   color:var(--bs-muted);flex:0 0 auto}
