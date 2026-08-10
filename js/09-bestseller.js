@@ -30,8 +30,12 @@ const BS = {
   photos: null,     // elenco file della cartella Drive foto; null = non ancora chiesto
   flags: null,      // {codice:{salePct,carry}} dal file saldi; null = non ancora chiesto
   public: false,     // true in bs.html: sola lettura, senza selettori né valore
-  query: '', fDiv: '', fGen: '', fCat: '', fSea: '', sort: 'units',
-  fSale: '', fCarry: '',   // '' tutti · 'si' solo quelli · 'no' solo gli altri
+  query: '', sort: 'units',
+  // Filtri della barra: un ELENCO di valori ciascuno, vuoto = nessun filtro.
+  // Sono a spunta come i due selettori in alto, quindi "Calzature e Accessori"
+  // o "Uomo e Donna" si possono tenere insieme. Per sconto e carry over i valori
+  // sono 'si' e 'no': spuntarli entrambi equivale a non filtrare.
+  f: {div: [], gen: [], cat: [], sea: [], sale: [], carry: []},
   detail: null,     // prodotto aperto nella scheda
   busy: false,
   log: [],
@@ -254,13 +258,32 @@ async function bsLoadCurrent(){
 }
 
 // ── Filtri e ordinamento (stessa logica del design) ─────────────────────
+// Un articolo passa un filtro se non è stato spuntato niente (nessun filtro) o
+// se il suo valore è fra quelli spuntati.
+function bsPassa(campo, valore){
+  const sel = BS.f[campo] || [];
+  return !sel.length || sel.indexOf(String(valore==null?'':valore)) > -1;
+}
+
+// Definizione dei sei filtri: chiave, etichetta del pulsante quando non è
+// spuntato niente, e come si ricavano i valori possibili dai prodotti caricati.
+// `fissi` sono quelli che non dipendono dai dati (sconto, carry over).
+const BS_FILTRI = [
+  {k:'div',   lab:'Divisione', da: all => bsUniq(all.map(p=>p.div))},
+  {k:'gen',   lab:'Genere',    da: all => bsUniq(all.map(p=>p.gender))},
+  {k:'cat',   lab:'Categoria', da: all => bsUniq(all.map(p=>p.cat))},
+  {k:'sea',   lab:'Stagione',  da: all => bsUniq(all.map(bsSeason)).sort(bsSeasonCmp)},
+  {k:'sale',  lab:'Sconto',    fissi: [{v:'si', t:'A sconto'}, {v:'no', t:'Non a sconto'}]},
+  {k:'carry', lab:'Carry over',fissi: [{v:'si', t:'Carry over'}, {v:'no', t:'Non carry over'}]},
+];
+
 function bsFiltered(){
   const q = BS.query.trim().toLowerCase();
   const list = (BS.data.products||[]).filter(p =>
-    (!BS.fDiv || p.div===BS.fDiv) && (!BS.fGen || p.gender===BS.fGen) && (!BS.fCat || p.cat===BS.fCat) &&
-    (!BS.fSea || bsSeason(p)===BS.fSea) &&
-    (!BS.fSale  || (BS.fSale==='si'  ? !!bsFlag(p).salePct : !bsFlag(p).salePct)) &&
-    (!BS.fCarry || (BS.fCarry==='si' ? !!bsFlag(p).carry   : !bsFlag(p).carry)) &&
+    bsPassa('div', p.div) && bsPassa('gen', p.gender) && bsPassa('cat', p.cat) &&
+    bsPassa('sea', bsSeason(p)) &&
+    bsPassa('sale',  bsFlag(p).salePct ? 'si' : 'no') &&
+    bsPassa('carry', bsFlag(p).carry   ? 'si' : 'no') &&
     (!q || (p.name||'').toLowerCase().includes(q) || (p.code||'').toLowerCase().includes(q)));
   return list.slice().sort((a,b)=> BS.sort==='units' ? b.units-a.units : b.net-a.net);
 }
@@ -370,8 +393,7 @@ function bsPaint(){
     </button>`;
   }).join('');
 
-  const hasF = !!(BS.query||BS.fDiv||BS.fGen||BS.fCat||BS.fSea||BS.fSale||BS.fCarry);
-  const opt = (v,cur)=>`<option value="${bsEsc(v)}"${v===cur?' selected':''}>${bsEsc(v)}</option>`;
+  const hasF = !!BS.query || BS_FILTRI.some(f => (BS.f[f.k]||[]).length);
 
   root.innerHTML = bsStrip() + bsHeader(d) + `
   <div class="bs-kpiwrap"><div class="bs-kpis">
@@ -389,20 +411,7 @@ function bsPaint(){
   <div class="bs-tools"><div class="bs-tools-in">
     <div class="bs-search"><span>⌕</span>
       <input id="bs-q" value="${bsEsc(BS.query)}" placeholder="Cerca nome o codice"></div>
-    <select class="bs-fsel" id="bs-fdiv"><option value="">Divisione</option>
-      ${bsUniq(all.map(p=>p.div)).map(v=>opt(v,BS.fDiv)).join('')}</select>
-    <select class="bs-fsel" id="bs-fgen"><option value="">Genere</option>
-      ${bsUniq(all.map(p=>p.gender)).map(v=>opt(v,BS.fGen)).join('')}</select>
-    <select class="bs-fsel" id="bs-fcat"><option value="">Categoria</option>
-      ${bsUniq(all.map(p=>p.cat)).map(v=>opt(v,BS.fCat)).join('')}</select>
-    <select class="bs-fsel" id="bs-fsea"><option value="">Stagione</option>
-      ${bsUniq(all.map(bsSeason)).sort(bsSeasonCmp).map(v=>opt(v,BS.fSea)).join('')}</select>
-    <select class="bs-fsel" id="bs-fsale"><option value="">Sconto</option>
-      <option value="si"${BS.fSale==='si'?' selected':''}>A sconto</option>
-      <option value="no"${BS.fSale==='no'?' selected':''}>Non a sconto</option></select>
-    <select class="bs-fsel" id="bs-fcarry"><option value="">Carry over</option>
-      <option value="si"${BS.fCarry==='si'?' selected':''}>Carry over</option>
-      <option value="no"${BS.fCarry==='no'?' selected':''}>Non carry over</option></select>
+    ${BS_FILTRI.map(f => bsFilterPicker(f, all)).join('')}
     <div class="bs-sortgrp">
       <button class="bs-sortbtn${BS.sort==='units'?' bs-on':''}" data-sort="units">Pezzi</button>
       <button class="bs-sortbtn${BS.sort==='net'?' bs-on':''}" data-sort="net">Valore</button>
@@ -430,6 +439,40 @@ function bsPaint(){
   ${bsFooter()}
   ${BS.detail?bsModal(BS.detail):''}`;
   bsBind();
+}
+
+// Un filtro della barra, con la stessa grafica e la stessa logica a spunta dei
+// selettori settimana e negozio in testata. Prima era un <select> nativo: la
+// tendina la disegnava il sistema operativo (fondo blu, spunta di sistema) e non
+// si poteva né portare nello stile del modulo né rendere a scelta multipla.
+//
+// Il pulsante è una pillola come le altre della barra. Quando non c'è niente di
+// spuntato mostra il nome del filtro ("Divisione"); con un valore mostra quello,
+// con più di uno "Divisione · 3", perché elencarli non ci starebbe.
+function bsFilterPicker(f, all){
+  const sel = BS.f[f.k] || [];
+  const voci = f.fissi || (f.da(all) || []).map(v => ({v, t: v}));
+  if(!voci.length) return '';
+  const testa = !sel.length ? f.lab
+    : (sel.length === 1
+        ? ((voci.find(o => o.v === sel[0]) || {t: sel[0]}).t)
+        : f.lab + ' · ' + sel.length);
+  return `<div class="bs-picker bs-multi bs-fpick" data-picker="f-${f.k}">
+    <button class="bs-picker-btn bs-fbtn${sel.length?' bs-on':''}" aria-haspopup="listbox"
+      aria-expanded="false">
+      <span class="bs-picker-cur">${bsEsc(testa)}</span>
+      <span class="bs-picker-chev">▼</span>
+    </button>
+    <div class="bs-picker-panel" role="listbox" aria-multiselectable="true">
+      ${voci.map(o => {
+        const on = sel.indexOf(o.v) > -1;
+        return `<button class="bs-picker-opt${on?' bs-sel':''}" role="option"
+          aria-selected="${on}" data-f="${bsEsc(f.k)}" data-fv="${bsEsc(o.v)}">
+          <span class="bs-picker-mark"></span>
+          <span class="bs-picker-lab">${bsEsc(o.t)}</span></button>`;
+      }).join('')}
+    </div>
+  </div>`;
 }
 
 // Giacenza residua dell'articolo (colonna OHQ dell'export).
@@ -1268,6 +1311,7 @@ function bsBind(){
       if(open){
         const sel = p.querySelector('.bs-picker-opt.bs-sel');
         if(sel) sel.scrollIntoView({block:'nearest'});
+        bsAlignPanel(p);
         // Se aprendo questo pannello ho fatto partire il caricamento della
         // selezione appena spuntata, fra poco bsPaint rigenera il markup e se lo
         // porterebbe via: chiedo di riaprirlo dopo, così il pannello non
@@ -1279,13 +1323,15 @@ function bsBind(){
     });
   });
 
-  // Riapertura richiesta prima del ridisegno (vedi sopra).
+  // Riapertura richiesta prima del ridisegno (vedi sopra, e i filtri della barra
+  // che ridisegnano a ogni spunta).
   if(BS.reopen){
     const p = document.querySelector(`#bs-root .bs-picker[data-picker="${BS.reopen}"]`);
     BS.reopen = null;
     if(p){
       p.classList.add('bs-open');
       p.querySelector('.bs-picker-btn')?.setAttribute('aria-expanded','true');
+      bsAlignPanel(p);
     }
   }
 
@@ -1373,12 +1419,20 @@ function bsBind(){
     const nq = document.getElementById('bs-q');
     if(nq){ nq.focus(); try{ nq.setSelectionRange(pos,pos); }catch(_){} }
   });
-  on('bs-fdiv','change', e => { BS.fDiv = e.target.value; bsPaint(); });
-  on('bs-fgen','change', e => { BS.fGen = e.target.value; bsPaint(); });
-  on('bs-fcat','change', e => { BS.fCat = e.target.value; bsPaint(); });
-  on('bs-fsea','change', e => { BS.fSea = e.target.value; bsPaint(); });
-  on('bs-fsale','change', e => { BS.fSale = e.target.value; bsPaint(); });
-  on('bs-fcarry','change', e => { BS.fCarry = e.target.value; bsPaint(); });
+  // Filtri della barra: a spunta, e si applicano subito. Qui il ridisegno non
+  // costa niente (il filtro è locale, i dati ci sono già), quindi non c'è motivo
+  // di aspettare la chiusura come per settimane e negozi. bsPaint rigenererebbe
+  // il markup portandosi via il pannello aperto: BS.reopen lo rimette com'era.
+  document.querySelectorAll('#bs-root [data-f]').forEach(b =>
+    b.addEventListener('click', e => {
+      e.stopPropagation();
+      const k = b.dataset.f, v = b.dataset.fv;
+      const now = BS.f[k] || [];
+      BS.f[k] = now.indexOf(v) > -1 ? now.filter(x => x !== v) : now.concat(v);
+      BS.reopen = 'f-'+k;
+      BS.detail = null;
+      bsPaint();
+    }));
   on('bs-reset','click', () => { bsResetView(); bsPaint(); });
 
   document.querySelectorAll('#bs-root [data-sort]').forEach(b =>
@@ -1418,8 +1472,9 @@ function bsBind(){
 // Azzera vista e filtri quando cambia la selezione: i filtri di una settimana
 // non hanno senso su un'altra (una divisione può non esserci nemmeno).
 function bsResetView(){
-  BS.query=''; BS.fDiv=''; BS.fGen=''; BS.fCat=''; BS.fSea='';
-  BS.fSale=''; BS.fCarry=''; BS.detail=null;
+  BS.query = '';
+  BS.f = {div: [], gen: [], cat: [], sea: [], sale: [], carry: []};
+  BS.detail = null;
 }
 
 // Rispecchia a schermo le spunte di entrambi i selettori senza ridisegnare: i
@@ -1502,6 +1557,17 @@ function bsCommitSel(){
   if(bsCacheKey(BS.cur) === BS.loadedKey){ bsPaint(); return; }
   bsResetView();
   bsLoadCurrent();
+}
+
+// Filtri della barra: il pannello è più largo della pillola che lo apre, e su
+// quelli di destra uscirebbe dallo schermo. Lo misuro adesso che è visibile e,
+// se sborda, lo aggancio al bordo destro invece che al sinistro.
+function bsAlignPanel(p){
+  if(!p.classList.contains('bs-fpick')) return;
+  p.classList.remove('bs-right');
+  const pan = p.querySelector('.bs-picker-panel');
+  if(pan && pan.getBoundingClientRect().right > document.documentElement.clientWidth - 8)
+    p.classList.add('bs-right');
 }
 
 // Chiude i pannelli aperti, tranne `keep`. Restituisce quanti ne ha chiusi.
