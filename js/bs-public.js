@@ -22,17 +22,30 @@ var ALL_STORES = [];          // usato solo dall'import, che qui non c'è
     BS.data = await bsFetchPublic('');
     if(BS.data.error){ root.innerHTML = bsState('Classifica non disponibile', BS.data.error); return; }
 
+    // Le settimane le ha decise chi ha copiato il link: il token se le porta
+    // dietro e da qui non si cambiano (il selettore settimana resta inerte).
+    const periods = (BS.data.periods && BS.data.periods.length)
+      ? BS.data.periods.slice().sort()
+      : [BS.data.period_start];
     BS.cur = {brand: BS.data.brand, location: BS.data.location,
-              period_start: BS.data.period_start, aggregate: !!BS.data.aggregate};
+              periods, period_start: periods[periods.length-1],
+              aggregate: !!BS.data.aggregate};
     // bsPaint mostra "Nessun report caricato" se l'archivio è vuoto. Qui l'indice
-    // contiene ciò che il link permette di vedere: i negozi della settimana se il
-    // token è "tutti i negozi", altrimenti solo il proprio.
-    const uno = {brand: BS.data.brand, location: BS.data.location,
-                 period_start: BS.data.period_start, period: BS.data.period,
-                 period_end: BS.data.period_end};
-    BS.index = (BS.data.stores || []).length
-      ? BS.data.stores.map(s => Object.assign({}, uno, s))
-      : [uno];
+    // contiene ciò che il link permette di vedere: i negozi delle settimane se il
+    // token è "tutti i negozi", altrimenti solo il proprio. Una voce per negozio
+    // E per settimana, perché il selettore negozio elenca chi è presente in tutte
+    // (bsStoresIn conta le presenze).
+    const negozi = (BS.data.stores || []).length
+      ? BS.data.stores
+      : [{brand: BS.data.brand, location: BS.data.location}];
+    BS.index = [];
+    periods.forEach((ps, i) => negozi.forEach(s => BS.index.push(Object.assign({
+      period_start: ps, period: BS.data.period,
+      // Solo l'ultima settimana conosce la propria fine: dal link arriva la fine
+      // del periodo intero, non quella di ognuna. Serve a bsSpanLabel, che legge
+      // l'inizio della prima e la fine dell'ultima.
+      period_end: i === periods.length-1 ? BS.data.period_end : '',
+    }, s))));
     await bsAttachPhotos(BS.data.products);
     // Anche i badge CO/SALES: i flag arrivano col payload ma senza questa riga
     // BS.flags resta vuoto e alla prima apertura i badge non compaiono.

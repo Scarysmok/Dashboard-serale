@@ -1020,7 +1020,12 @@ body{display:flex;flex-direction:column}
   .bs-selrow{flex-direction:column;gap:16px}
 }
 .bs-sellabel{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.24em;
-  text-transform:uppercase;color:rgba(255,255,255,.4);margin-bottom:10px}
+  text-transform:uppercase;color:rgba(255,255,255,.4);margin-bottom:10px;
+  display:flex;align-items:baseline;gap:10px}
+/* Periodo coperto dalla selezione, accanto all'etichetta: "W29–W32 · 4 sett."
+   dice quante settimane sono ma non da quando a quando. */
+.bs-selspan{letter-spacing:.12em;color:rgba(255,255,255,.62);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
 .bs-chips{display:flex;flex-wrap:wrap;gap:8px}
 .bs-chip{border:1px solid rgba(255,255,255,.22);border-radius:999px;padding:7px 14px;
   font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;
@@ -1236,6 +1241,18 @@ body{display:flex;flex-direction:column}
 .bs-picker-mark{flex:0 0 6px;width:6px;height:6px;border-radius:50%;background:transparent}
 .bs-picker-opt.bs-sel .bs-picker-mark{background:var(--bs-red)}
 .bs-picker-opt.bs-sel{background:#f4f2ef}
+
+/* Selettore a scelta multipla (le settimane): il pallino diventa una casella da
+   spuntare, perché un pallino dice "una sola di queste" e qui invece se ne
+   possono prendere quante se ne vuole — la classifica le somma. */
+.bs-multi .bs-picker-mark{flex:0 0 15px;width:15px;height:15px;border-radius:5px;
+  border:1.5px solid #cfccc7;position:relative}
+.bs-multi .bs-picker-opt.bs-sel .bs-picker-mark{background:var(--bs-red);border-color:var(--bs-red)}
+.bs-multi .bs-picker-opt.bs-sel .bs-picker-mark::after{content:'';position:absolute;
+  left:4.5px;top:1px;width:4px;height:8px;border:solid #fff;border-width:0 2px 2px 0;
+  transform:rotate(42deg)}
+.bs-picker-hint{padding:8px 12px 10px;font-family:'JetBrains Mono',monospace;font-size:10px;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--bs-muted)}
 .bs-picker-lab{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bs-picker-n{font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:500;
   color:var(--bs-muted);flex:0 0 auto}

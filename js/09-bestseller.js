@@ -16,7 +16,12 @@
 const BS = {
   index: null,      // elenco settimane disponibili (dal backend)
   map: [],          // corrispondenze nome-negozio adidas → brand|location
-  cur: null,        // selezione: {brand, location, period_start} | {aggregate:true, period_start}
+  // Selezione corrente. `periods` è l'elenco ordinato delle settimane scelte —
+  // una o più — e comanda; `period_start` è sempre l'ultima di quell'elenco e
+  // resta perché mezzo modulo (etichette, eliminazione, chiave di cache della
+  // singola settimana) la legge. Passare da bsSetCur() tiene le due in accordo.
+  //   {brand, location, periods, period_start} | {aggregate:true, periods, period_start}
+  cur: null,
   data: null,       // report caricato
   photos: null,     // elenco file della cartella Drive foto; null = non ancora chiesto
   flags: null,      // {codice:{salePct,carry}} dal file saldi; null = non ancora chiesto
@@ -26,6 +31,11 @@ const BS = {
   detail: null,     // prodotto aperto nella scheda
   busy: false,
   log: [],
+  // Selezione settimane a spunta: `pending` = ci sono spunte non ancora
+  // applicate (si applicano chiudendo il pannello), `committed` = l'ultimo clic
+  // ha fatto partire quel caricamento, `reopen` = pannello da riaprire dopo il
+  // ridisegno. Vedi bsCommitWeeks.
+  pending: false, committed: false, reopen: null,
 };
 
 // Le 28 colonne dell'export adidas, nell'ordine del file. `t` è il formato:
@@ -181,9 +191,9 @@ async function renderBestSeller(){
     if(BS.index.length && !BS.cur){
       const last = BS.index.map(w=>w.period_start).sort().reverse()[0];
       const inWeek = BS.index.filter(w => w.period_start === last);
-      BS.cur = inWeek.length > 1
-        ? {aggregate:true, period_start:last}
-        : {brand:inWeek[0].brand, location:inWeek[0].location, period_start:last};
+      bsSetCur(inWeek.length > 1
+        ? {aggregate:true, periods:[last]}
+        : {brand:inWeek[0].brand, location:inWeek[0].location, periods:[last]});
     }
   }
   if(BS.cur && !BS.data) { await bsLoadCurrent(); return; }
@@ -208,11 +218,20 @@ async function bsLoadCurrent(){
       bsPaint();
       return;
     }
-    const path = c.aggregate
-      ? '/bestseller/aggregate?period_start='+encodeURIComponent(c.period_start)
-      : '/bestseller/week?brand='+encodeURIComponent(c.brand)
-        +'&location='+encodeURIComponent(c.location)
-        +'&period_start='+encodeURIComponent(c.period_start);
+    const ps = bsPeriodsOf(c);
+    // Più settimane: la somma la fa il server e torna un payload solo. Farla qui
+    // vorrebbe dire scaricare e tenere in memoria un aggregato per settimana
+    // (~550 kB l'uno) per poi buttarne via la gran parte — su un telefono è
+    // proprio il lavoro che non regge.
+    const path = ps.length > 1
+      ? '/bestseller/range?periods='+encodeURIComponent(ps.join(','))
+        + (c.aggregate ? '' : '&brand='+encodeURIComponent(c.brand)
+                             +'&location='+encodeURIComponent(c.location))
+      : c.aggregate
+        ? '/bestseller/aggregate?period_start='+encodeURIComponent(c.period_start)
+        : '/bestseller/week?brand='+encodeURIComponent(c.brand)
+          +'&location='+encodeURIComponent(c.location)
+          +'&period_start='+encodeURIComponent(c.period_start);
     // Stessa cache degli altri insiemi pesanti: IndexedDB + versione da
     // /datasets/version. L'aggregato è ~550 kB che il backend ricalcola a ogni
     // richiesta (misurato il 03/08) e la versione cambia solo quando si importa.
@@ -383,7 +402,8 @@ function bsPaint(){
   </div></div>
   <section class="bs-section bs-list">
     <div class="bs-sechead bs-tight"><h3>Classifica</h3><div class="bs-rule"></div>
-      <span class="bs-secmeta">${list.length} prodotti · ${list.reduce((s,x)=>s+(x.units||0),0)} pz</span></div>
+      <span class="bs-secmeta">${list.length} prodotti · ${list.reduce((s,x)=>s+(x.units||0),0)} pz${
+        bsPeriodsOf(d).length > 1 ? ' · giacenza a fine periodo' : ''}</span></div>
     <div class="bs-thead">
       <div style="flex:0 0 34px">#</div>
       <div style="flex:0 0 clamp(48px,5vw,64px)">Art.</div>
@@ -405,6 +425,9 @@ function bsPaint(){
 
 // Giacenza residua dell'articolo (colonna OHQ dell'export).
 // Nell'aggregato è la somma delle giacenze dei negozi di quella settimana.
+// Con più settimane selezionate è la giacenza dell'ULTIMA: è una fotografia
+// dello stock, non un flusso, e sommarla settimana su settimana conterebbe più
+// volte la stessa merce invenduta (la somma la fa il backend, _bs_sum_docs).
 function bsOhq(p){
   const v = (p.all||[])[BS_I_OHQ];
   const n = Number(v);
@@ -564,9 +587,35 @@ async function bsFetchPublic(store){
 
 // Chiave della copia locale. Deve distinguere ogni selezione, altrimenti una
 // settimana servirebbe i dati di un'altra.
+// Con una settimana sola la chiave è identica a quella di sempre: le copie già
+// sui dispositivi restano valide e nessuno si ritrova a riscaricare 550 kB solo
+// perché abbiamo aggiunto la selezione multipla.
 function bsCacheKey(c){
-  return 'bs:' + (c.aggregate ? 'agg|'+c.period_start
-                              : [c.brand, c.location, c.period_start].join('|'));
+  const ps = bsPeriodsOf(c);
+  const chi = c.aggregate ? 'agg' : [c.brand, c.location].join('|');
+  return 'bs:' + (ps.length > 1 ? chi+'|'+ps.join(',')
+                                : (c.aggregate ? 'agg|'+c.period_start
+                                               : chi+'|'+c.period_start));
+}
+
+// Settimane di una selezione, sempre come elenco ordinato. Regge anche le
+// selezioni "vecchia forma" (solo period_start), che arrivano dalla pagina
+// pubblica e dai punti che non sono ancora passati da bsSetCur.
+function bsPeriodsOf(c){
+  if(!c) return [];
+  const ps = (c.periods && c.periods.length) ? c.periods.slice() : [c.period_start];
+  return ps.filter(Boolean).sort();
+}
+const bsCurPeriods = () => bsPeriodsOf(BS.cur);
+
+// Unico punto in cui si scrive BS.cur: normalizza le settimane e tiene
+// period_start allineato all'ultima. Scriverlo a mano altrove significa
+// prima o poi lasciare le due informazioni in disaccordo.
+function bsSetCur(sel){
+  if(!sel){ BS.cur = null; return null; }
+  const ps = bsPeriodsOf(sel);
+  BS.cur = Object.assign({}, sel, {periods: ps, period_start: ps[ps.length-1] || ''});
+  return BS.cur;
 }
 
 // Report disponibili raggruppati per settimana: {period_start: [voci indice]}.
@@ -574,6 +623,51 @@ function bsWeeks(){
   const weeks = {};
   (BS.index||[]).forEach(w => { (weeks[w.period_start] = weeks[w.period_start] || []).push(w); });
   return weeks;
+}
+
+// Negozi presenti in TUTTE le settimane indicate. Con più settimane è
+// l'intersezione e non l'unione: un negozio che ha caricato 3 file su 4 darebbe
+// un totale su un periodo più corto degli altri, e nella classifica accanto
+// sembrerebbe semplicemente che ha venduto meno.
+function bsStoresIn(periods){
+  const weeks = bsWeeks();
+  const conta = new Map();
+  periods.forEach(ps => (weeks[ps]||[]).forEach(w => {
+    const k = w.brand+'|'+w.location;
+    if(!conta.has(k)) conta.set(k, {w, n:0});
+    conta.get(k).n++;
+  }));
+  return [...conta.values()].filter(x => x.n === periods.length).map(x => x.w);
+}
+
+// Etichetta della selezione per il pulsante: "W31" con una sola settimana,
+// "W29–W32 · 4 sett." se sono consecutive, "4 settimane" se ci sono buchi
+// (dire "W29–W34" quando due settimane in mezzo non ci sono sarebbe falso).
+function bsWeeksLabel(periods){
+  if(!periods.length) return '—';
+  if(periods.length === 1) return bsWeekLabel(periods[0]);
+  const keys = Object.keys(bsWeeks()).sort();
+  const i = keys.indexOf(periods[0]), j = keys.indexOf(periods[periods.length-1]);
+  const contigue = i > -1 && j - i + 1 === periods.length;
+  const n = periods.length + ' sett.';
+  return contigue
+    ? 'W'+bsWeekNum(periods[0])+'–W'+bsWeekNum(periods[periods.length-1])+' · '+n
+    : periods.length + ' settimane';
+}
+
+// "2026-07-06", "2026-08-02" → "06/07 – 02/08".
+function bsRangeTxt(a, b){
+  const short = t => bsPeriodLabel(t).replace(/\/\d{4}$/,'');
+  if(!a) return '';
+  return b ? short(a)+' – '+short(b) : short(a);
+}
+
+// Periodo coperto dalla selezione, in chiaro: "06/07 – 02/08".
+function bsSpanLabel(periods){
+  const weeks = bsWeeks();
+  const a = (weeks[periods[0]]||[])[0], b = (weeks[periods[periods.length-1]]||[])[0];
+  if(!a) return '';
+  return bsRangeTxt(a.period_start, (b && b.period_end) || periods[periods.length-1]);
 }
 
 // Due selettori distinti, SETTIMANA e NEGOZIO. La settimana comanda: la lista
@@ -584,24 +678,24 @@ function bsWeeks(){
 function bsHeader(d){
   const weeks = bsWeeks();
   const keys = Object.keys(weeks).sort().reverse();
-  const curPs = BS.cur ? BS.cur.period_start : null;
+  const curPeriods = bsCurPeriods();
+  const inSel = ps => curPeriods.indexOf(ps) > -1;
 
-  // ── Selettore settimana: tutte le settimane presenti in archivio.
-  let curWeek = '—';
+  // ── Selettore settimana: a spunta, si possono sceglierne più d'una e la
+  // classifica mostra la somma. Il pannello resta aperto mentre si spunta.
+  let curWeek = bsWeeksLabel(curPeriods);
   let weekOpts = '';
   keys.forEach(ps => {
-    const label = bsWeekLabel(ps);
-    const sel = ps === curPs;
-    if(sel) curWeek = label;
+    const sel = inSel(ps);
     weekOpts += `<button class="bs-picker-opt${sel?' bs-sel':''}" role="option"
       aria-selected="${sel}" data-week="${bsEsc(ps)}">
       <span class="bs-picker-mark"></span>
-      <span class="bs-picker-lab">${bsEsc(label)}</span>
+      <span class="bs-picker-lab">${bsEsc(bsWeekLabel(ps))}</span>
       <span class="bs-picker-n">${bsEsc(bsWeekRange(weeks[ps][0]))}</span></button>`;
   });
 
-  // ── Selettore negozio: solo i negozi della settimana selezionata.
-  const inWeek = curPs ? (weeks[curPs] || []) : [];
+  // ── Selettore negozio: i negozi presenti in tutte le settimane spuntate.
+  const inWeek = bsStoresIn(curPeriods);
   let curStore = '—';
   let storeOpts = '';
   if(inWeek.length > 1){
@@ -609,7 +703,7 @@ function bsHeader(d){
     const txt = '★ Tutti i negozi';
     if(sel) curStore = txt;
     storeOpts += `<button class="bs-picker-opt bs-agg${sel?' bs-sel':''}" role="option"
-      aria-selected="${sel}" data-val="AGG|${bsEsc(curPs)}">
+      aria-selected="${sel}" data-val="AGG">
       <span class="bs-picker-mark"></span>
       <span class="bs-picker-lab">${txt}</span>
       <span class="bs-picker-n">${inWeek.length} negozi</span></button>`;
@@ -620,20 +714,26 @@ function bsHeader(d){
     const txt = w.brand+' · '+w.location;
     if(sel) curStore = txt;
     storeOpts += `<button class="bs-picker-opt${sel?' bs-sel':''}" role="option"
-      aria-selected="${sel}" data-val="${bsEsc([w.brand,w.location,w.period_start].join('|'))}">
+      aria-selected="${sel}" data-val="${bsEsc([w.brand,w.location].join('|'))}">
       <span class="bs-picker-mark"></span>
       <span class="bs-picker-lab">${bsEsc(txt)}</span></button>`;
   });
 
-  // Link pubblico: c'è una sola settimana, quindi quel selettore resta inerte
-  // (senza voci il pulsante nasce già disabilitato) e l'etichetta viene dal
-  // report. Il selettore negozio invece resta vivo se il token apre tutta la
-  // settimana: BS.index contiene i negozi che il link permette di vedere.
+  // Link pubblico: le settimane le ha decise chi ha copiato il link e non si
+  // cambiano da qui, quindi quel selettore resta inerte (senza voci il pulsante
+  // nasce già disabilitato) e l'etichetta viene dal report. Il selettore negozio
+  // invece resta vivo se il token apre tutta la settimana: BS.index contiene i
+  // negozi che il link permette di vedere.
   if(BS.public){
-    curWeek = d ? bsWeekLabel(d.period_start) : '—';
+    curWeek = d ? bsWeeksLabel(bsPeriodsOf(d)) : '—';
     weekOpts = '';
     if(inWeek.length < 2) storeOpts = '';
   }
+  // Sotto il pulsante: da quando a quando. Con una settimana sola l'etichetta
+  // ("W31") non dice le date, con quattro non dice nemmeno quali.
+  const span = BS.public
+    ? (d ? bsRangeTxt(d.period_start, d.period_end) : '')
+    : (curPeriods.length ? bsSpanLabel(curPeriods) : '');
 
   return `
   <header class="bs-header"><div class="bs-header-in">
@@ -649,14 +749,17 @@ function bsHeader(d){
     <div class="bs-selcol">
       <div class="bs-selrow">
         <div class="bs-selfield">
-          <div class="bs-sellabel">Settimana</div>
-          <div class="bs-picker" data-picker="week">
+          <div class="bs-sellabel">${curPeriods.length>1?'Settimane':'Settimana'}${
+            span?`<span class="bs-selspan">${bsEsc(span)}</span>`:''}</div>
+          <div class="bs-picker bs-multi" data-picker="week">
             <button class="bs-picker-btn" aria-haspopup="listbox"
               aria-expanded="false"${weekOpts?'':' disabled'}>
               <span class="bs-picker-cur">${bsEsc(curWeek)}</span>
               <span class="bs-picker-chev">▼</span>
             </button>
-            <div class="bs-picker-panel" role="listbox">${weekOpts}</div>
+            <div class="bs-picker-panel" role="listbox" aria-multiselectable="true">
+              <div class="bs-picker-hint">Spunta le settimane · chiudi per aggiornare</div>
+              ${weekOpts}</div>
           </div>
         </div>
         <div class="bs-selfield">
@@ -692,7 +795,10 @@ function bsShareChip(d){
 // frequente e sta dove si guarda la settimana di riferimento.
 function bsAdminChips(d){
   if(!bsIsAdmin()) return '';
-  const canDelete = !!(BS.cur && !BS.cur.aggregate && d && !d.error);
+  // Eliminare vale per un report — un negozio, una settimana. Con più settimane
+  // spuntate non si saprebbe quale, quindi il pulsante non compare.
+  const canDelete = !!(BS.cur && !BS.cur.aggregate && d && !d.error
+                       && bsCurPeriods().length === 1);
   return `
     <input type="file" id="bs-file" accept=".xlsx,.xls" multiple style="display:none">
     <button class="bs-chip-btn" id="bs-import"${BS.busy?' disabled':''}>
@@ -968,10 +1074,15 @@ async function bsAttachPhotos(products){
 // da /public/bestseller senza login. Il token vale per la selezione corrente e
 // si spegne cancellandolo. Dal link non passano valore, margine, sconti e ASP:
 // li esclude il backend, non la pagina.
+// Il link porta con sé TUTTE le settimane spuntate: chi lo apre vede la stessa
+// somma che vede chi l'ha copiato. `period_start` resta nella richiesta perché i
+// link a settimana singola conservano la forma di prima, e quelli già in mano ai
+// negozi continuano a valere.
 function bsLinkSel(){
   const c = BS.cur || {};
   return {period_start: c.period_start || '', brand: c.brand || '',
-          location: c.location || '', aggregate: !!c.aggregate};
+          location: c.location || '', aggregate: !!c.aggregate,
+          periods: bsCurPeriods()};
 }
 
 async function bsMakeLink(){
@@ -990,7 +1101,8 @@ async function bsKillLink(){
   if(!BS.cur) return;
   const s = bsLinkSel();
   const q = `?period_start=${encodeURIComponent(s.period_start)}&brand=${encodeURIComponent(s.brand)}`
-          + `&location=${encodeURIComponent(s.location)}&aggregate=${s.aggregate}`;
+          + `&location=${encodeURIComponent(s.location)}&aggregate=${s.aggregate}`
+          + `&periods=${encodeURIComponent(s.periods.join(','))}`;
   try{
     const r = await api('/bestseller/link'+q, {method:'DELETE'});
     if(!r.ok) throw new Error('errore '+r.status);
@@ -1081,38 +1193,67 @@ function bsBind(){
     if(!btn) return;
     btn.addEventListener('click', e => {
       e.stopPropagation();
+      BS.committed = false;
       bsClosePickers(p);            // un solo pannello aperto per volta
       const open = p.classList.toggle('bs-open');
       btn.setAttribute('aria-expanded', open ? 'true' : 'false');
       if(open){
         const sel = p.querySelector('.bs-picker-opt.bs-sel');
         if(sel) sel.scrollIntoView({block:'nearest'});
+        // Se aprendo questo pannello ho fatto partire il caricamento delle
+        // settimane appena spuntate, fra poco bsPaint rigenera il markup e se lo
+        // porterebbe via: chiedo di riaprirlo dopo, così il pannello non
+        // sparisce sotto le dita mentre lo si sta usando.
+        if(BS.committed) BS.reopen = p.dataset.picker;
+      }else if(p.dataset.picker === 'week'){
+        bsCommitWeeks();            // chiuso ricliccando il pulsante
       }
     });
   });
 
-  // Settimana: tengo il negozio selezionato se ha caricato anche la settimana
-  // nuova, altrimenti ricado sull'aggregato (o sull'unico negozio presente).
+  // Riapertura richiesta prima del ridisegno (vedi sopra).
+  if(BS.reopen){
+    const p = document.querySelector(`#bs-root .bs-picker[data-picker="${BS.reopen}"]`);
+    BS.reopen = null;
+    if(p){
+      p.classList.add('bs-open');
+      p.querySelector('.bs-picker-btn')?.setAttribute('aria-expanded','true');
+    }
+  }
+
+  // Settimana: la spunta aggiunge o toglie, e la classifica mostra la somma
+  // delle settimane rimaste. L'ultima non si può togliere — senza settimane non
+  // ci sarebbe niente da mostrare — e per "cambiare" settimana si spunta la
+  // nuova e si toglie la vecchia.
+  //
+  // Qui NON si carica: si aggiorna solo la spunta a schermo, e il caricamento
+  // parte alla chiusura del pannello (bsCommitWeeks). Chiamare bsLoadCurrent a
+  // ogni clic vorrebbe dire quattro richieste da mezzo mega per scegliere
+  // quattro settimane, e un pannello che si richiude a ogni spunta perché
+  // bsPaint rigenera il markup.
   document.querySelectorAll('#bs-root [data-week]').forEach(b =>
-    b.addEventListener('click', async () => {
+    b.addEventListener('click', e => {
+      e.stopPropagation();
       const ps = b.dataset.week;
-      const inWeek = bsWeeks()[ps] || [];
-      if(!inWeek.length) return;
-      const keep = BS.cur && !BS.cur.aggregate
-        && inWeek.find(w => w.brand===BS.cur.brand && w.location===BS.cur.location);
-      BS.cur = keep ? {brand:keep.brand, location:keep.location, period_start:ps}
-        : (inWeek.length > 1
-            ? {aggregate:true, period_start:ps}
-            : {brand:inWeek[0].brand, location:inWeek[0].location, period_start:ps});
-      bsResetView();
-      await bsLoadCurrent();
+      const now = bsCurPeriods();
+      const next = now.indexOf(ps) > -1 ? now.filter(x => x !== ps) : now.concat(ps).sort();
+      if(!next.length) return;                       // era l'unica spuntata
+      bsSetCur(Object.assign({}, BS.cur, {periods: next}));
+      BS.pending = true;
+      const on = next.indexOf(ps) > -1;
+      b.classList.toggle('bs-sel', on);
+      b.setAttribute('aria-selected', String(on));
+      bsRefreshWeekBtn();
     }));
 
+  // Negozio: cambia solo il "chi", le settimane spuntate restano.
   document.querySelectorAll('#bs-root [data-val]').forEach(b =>
     b.addEventListener('click', async () => {
       const v = b.dataset.val.split('|');
-      BS.cur = v[0]==='AGG' ? {aggregate:true, period_start:v[1]}
-                            : {brand:v[0], location:v[1], period_start:v[2]};
+      const periods = bsCurPeriods();
+      BS.pending = false;   // le spunte in sospeso vengono applicate da questo caricamento
+      bsSetCur(v[0]==='AGG' ? {aggregate:true, periods}
+                            : {brand:v[0], location:v[1], periods});
       bsResetView();
       await bsLoadCurrent();
     }));
@@ -1174,16 +1315,56 @@ function bsResetView(){
   BS.fSale=''; BS.fCarry=''; BS.detail=null;
 }
 
+// Aggiorna a mano il pulsante del selettore settimane mentre il pannello resta
+// aperto: etichetta ("W29–W32 · 4 sett."), intestazione singolare/plurale e
+// periodo coperto. Sono le tre cose che bsPaint rifarebbe, ma bsPaint rigenera
+// tutto il markup e chiuderebbe il pannello sotto le dita.
+function bsRefreshWeekBtn(){
+  const ps = bsCurPeriods();
+  const p = document.querySelector('#bs-root .bs-picker[data-picker="week"]');
+  if(!p) return;
+  const cur = p.querySelector('.bs-picker-cur');
+  if(cur) cur.textContent = bsWeeksLabel(ps);
+  const lab = p.closest('.bs-selfield')?.querySelector('.bs-sellabel');
+  if(lab) lab.innerHTML = (ps.length>1?'Settimane':'Settimana')
+    + `<span class="bs-selspan">${bsEsc(bsSpanLabel(ps))}</span>`;
+}
+
+// Applica la selezione delle settimane fatta a spunte. Chiamata quando il
+// pannello si chiude: è il momento in cui l'utente ha finito di scegliere.
+// Qui si sistema anche il negozio, perché l'insieme dei negozi disponibili è
+// l'intersezione delle settimane spuntate e quello scelto prima potrebbe non
+// esserci più.
+function bsCommitWeeks(){
+  if(!BS.pending) return;
+  BS.pending = false;
+  BS.committed = true;
+  const periods = bsCurPeriods();
+  const stores = bsStoresIn(periods);
+  if(!stores.length) return;
+  const keep = BS.cur && !BS.cur.aggregate
+    && stores.find(w => w.brand===BS.cur.brand && w.location===BS.cur.location);
+  bsSetCur(keep ? {brand:keep.brand, location:keep.location, periods}
+    : (stores.length > 1
+        ? {aggregate:true, periods}
+        : {brand:stores[0].brand, location:stores[0].location, periods}));
+  bsResetView();
+  bsLoadCurrent();
+}
+
 // Chiude i pannelli aperti, tranne `keep`. Restituisce quanti ne ha chiusi.
 function bsClosePickers(keep){
   let n = 0;
+  let week = false;
   document.querySelectorAll('#bs-root .bs-picker.bs-open').forEach(p => {
     if(p === keep) return;
     p.classList.remove('bs-open');
     const b = p.querySelector('.bs-picker-btn');
     if(b) b.setAttribute('aria-expanded','false');
+    if(p.dataset.picker === 'week') week = true;
     n++;
   });
+  if(week) bsCommitWeeks();
   return n;
 }
 
@@ -1191,7 +1372,13 @@ function bsClosePickers(keep){
 // vengono ricreati a ogni paint, quindi si cercano al momento del clic.
 document.addEventListener('click', e => {
   const inside = e.target && e.target.closest && e.target.closest('#bs-root .bs-picker');
-  if(!inside) bsClosePickers(null);
+  if(inside) return;
+  bsClosePickers(null);
+  // Anche se il pannello non risultava più aperto: chi ha spuntato delle
+  // settimane e poi ha cliccato su un prodotto ha comunque finito di scegliere,
+  // e quel clic può aver già rigenerato il markup (bsClosePickers non trova più
+  // nulla da chiudere e da solo non applicherebbe niente).
+  bsCommitWeeks();
 });
 
 // Esc: prima chiude i selettori, altrimenti la scheda prodotto.
