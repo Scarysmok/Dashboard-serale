@@ -16,11 +16,15 @@
 const BS = {
   index: null,      // elenco settimane disponibili (dal backend)
   map: [],          // corrispondenze nome-negozio adidas → brand|location
-  // Selezione corrente. `periods` è l'elenco ordinato delle settimane scelte —
-  // una o più — e comanda; `period_start` è sempre l'ultima di quell'elenco e
-  // resta perché mezzo modulo (etichette, eliminazione, chiave di cache della
-  // singola settimana) la legge. Passare da bsSetCur() tiene le due in accordo.
-  //   {brand, location, periods, period_start} | {aggregate:true, periods, period_start}
+  // Selezione corrente: DUE elenchi, le settimane e i negozi, e la classifica
+  // è la somma del loro incrocio.
+  //   periods  elenco ordinato delle settimane scelte (almeno una)
+  //   stores   elenco ordinato di "marchio|negozio"; VUOTO = tutti quelli
+  //            disponibili, che è anche come si normalizza "li ho spuntati tutti"
+  // Da questi due si ricavano i campi che mezzo modulo legge ancora e che
+  // vanno tenuti in accordo — period_start (l'ultima settimana), brand/location
+  // (solo con un negozio solo) e aggregate. Ci pensa bsSetCur: è l'unico posto
+  // da cui si scrive BS.cur.
   cur: null,
   data: null,       // report caricato
   photos: null,     // elenco file della cartella Drive foto; null = non ancora chiesto
@@ -34,7 +38,7 @@ const BS = {
   // Selezione settimane a spunta: `pending` = ci sono spunte non ancora
   // applicate (si applicano chiudendo il pannello), `committed` = l'ultimo clic
   // ha fatto partire quel caricamento, `reopen` = pannello da riaprire dopo il
-  // ridisegno. Vedi bsCommitWeeks.
+  // ridisegno. Vedi bsCommitSel.
   pending: false, committed: false, reopen: null,
 };
 
@@ -188,13 +192,10 @@ async function renderBestSeller(){
     // Selezione iniziale: settimana più recente, vista "tutti i negozi".
     // Se quella settimana ha un solo negozio l'aggregato non ha senso, quindi
     // si apre direttamente su quel negozio.
-    if(BS.index.length && !BS.cur){
-      const last = BS.index.map(w=>w.period_start).sort().reverse()[0];
-      const inWeek = BS.index.filter(w => w.period_start === last);
-      bsSetCur(inWeek.length > 1
-        ? {aggregate:true, periods:[last]}
-        : {brand:inWeek[0].brand, location:inWeek[0].location, periods:[last]});
-    }
+    // Settimana più recente, tutti i negozi. Se quella settimana ha un solo
+    // negozio ci pensa bsSetCur a capire che l'aggregato non ha senso.
+    if(BS.index.length && !BS.cur)
+      bsSetCur({periods:[BS.index.map(w=>w.period_start).sort().reverse()[0]], stores:[]});
   }
   if(BS.cur && !BS.data) { await bsLoadCurrent(); return; }
   bsPaint();
@@ -219,14 +220,14 @@ async function bsLoadCurrent(){
       return;
     }
     const ps = bsPeriodsOf(c);
-    // Più settimane: la somma la fa il server e torna un payload solo. Farla qui
-    // vorrebbe dire scaricare e tenere in memoria un aggregato per settimana
-    // (~550 kB l'uno) per poi buttarne via la gran parte — su un telefono è
-    // proprio il lavoro che non regge.
-    const path = ps.length > 1
+    const st = c.stores || [];
+    // Più settimane o un sottoinsieme di negozi: la somma la fa il server e
+    // torna un payload solo. Farla qui vorrebbe dire scaricare e tenere in
+    // memoria un aggregato per settimana (~550 kB l'uno) per poi buttarne via la
+    // gran parte — su un telefono è proprio il lavoro che non regge.
+    const path = (ps.length > 1 || st.length > 1)
       ? '/bestseller/range?periods='+encodeURIComponent(ps.join(','))
-        + (c.aggregate ? '' : '&brand='+encodeURIComponent(c.brand)
-                             +'&location='+encodeURIComponent(c.location))
+        + st.map(s => '&stores='+encodeURIComponent(s)).join('')
       : c.aggregate
         ? '/bestseller/aggregate?period_start='+encodeURIComponent(c.period_start)
         : '/bestseller/week?brand='+encodeURIComponent(c.brand)
@@ -592,10 +593,14 @@ async function bsFetchPublic(store){
 // perché abbiamo aggiunto la selezione multipla.
 function bsCacheKey(c){
   const ps = bsPeriodsOf(c);
-  const chi = c.aggregate ? 'agg' : [c.brand, c.location].join('|');
-  return 'bs:' + (ps.length > 1 ? chi+'|'+ps.join(',')
-                                : (c.aggregate ? 'agg|'+c.period_start
-                                               : chi+'|'+c.period_start));
+  const st = (c.stores || []);
+  // Sottoinsieme di negozi, o più settimane: chiave nuova, che li elenca
+  // entrambi. Altrimenti (una settimana × un negozio, o × tutti) resta quella
+  // di sempre.
+  if(ps.length > 1 || st.length > 1)
+    return 'bs:' + (st.length ? st.join('+') : 'agg') + '|' + ps.join(',');
+  return 'bs:' + (c.aggregate ? 'agg|'+c.period_start
+                              : [c.brand, c.location, c.period_start].join('|'));
 }
 
 // Settimane di una selezione, sempre come elenco ordinato. Regge anche le
@@ -608,13 +613,39 @@ function bsPeriodsOf(c){
 }
 const bsCurPeriods = () => bsPeriodsOf(BS.cur);
 
-// Unico punto in cui si scrive BS.cur: normalizza le settimane e tiene
-// period_start allineato all'ultima. Scriverlo a mano altrove significa
-// prima o poi lasciare le due informazioni in disaccordo.
+// Chiave di un negozio, la stessa forma che viaggia verso il backend.
+const bsStoreKey = w => w.brand+'|'+w.location;
+
+// Negozi scelti, sempre come elenco esplicito di voci dell'indice: BS.cur.stores
+// vuoto significa "tutti", e qui diventa l'elenco vero di quelli disponibili
+// nelle settimane spuntate. Chi disegna e chi carica non deve ricordarsi la
+// convenzione dell'elenco vuoto.
+function bsCurStores(){
+  const disp = bsStoresIn(bsCurPeriods());
+  const sel = (BS.cur && BS.cur.stores) || [];
+  if(!sel.length) return disp;
+  const dentro = disp.filter(w => sel.indexOf(bsStoreKey(w)) > -1);
+  return dentro.length ? dentro : disp;   // selezione ormai vuota → tutti
+}
+
+// Unico punto in cui si scrive BS.cur: normalizza i due elenchi e ricava da
+// essi period_start, brand/location e aggregate. Scriverli a mano altrove
+// significa prima o poi lasciarli in disaccordo fra loro.
 function bsSetCur(sel){
   if(!sel){ BS.cur = null; return null; }
   const ps = bsPeriodsOf(sel);
-  BS.cur = Object.assign({}, sel, {periods: ps, period_start: ps[ps.length-1] || ''});
+  const disp = bsStoresIn(ps).map(bsStoreKey);
+  let st = (sel.stores || []).slice().filter(k => disp.indexOf(k) > -1).sort();
+  // Spuntati tutti = nessun filtro: una sola forma per la stessa cosa, così la
+  // chiave di cache e quella del link non si sdoppiano.
+  if(st.length === disp.length) st = [];
+  const eff = st.length ? st : disp;          // quelli davvero inclusi
+  const uno = eff.length === 1 ? eff[0].split('|') : null;
+  BS.cur = Object.assign({}, sel, {
+    periods: ps, period_start: ps[ps.length-1] || '', stores: st,
+    brand: uno ? uno[0] : '', location: uno ? uno[1] : '',
+    aggregate: !uno,
+  });
   return BS.cur;
 }
 
@@ -662,6 +693,16 @@ function bsRangeTxt(a, b){
   return b ? short(a)+' – '+short(b) : short(a);
 }
 
+// Etichetta del selettore negozi: il nome se è uno solo, "★ Tutti i negozi" se
+// ci sono tutti, altrimenti quanti sono — con un sottoinsieme scrivere "tutti"
+// sarebbe una bugia, ed elencarne quattro non ci sta nel pulsante.
+function bsStoresLabel(disponibili, scelti){
+  if(!scelti.length) return '—';
+  if(scelti.length === 1) return scelti[0].replace('|', ' · ');
+  return scelti.length === disponibili.length
+    ? '★ Tutti i negozi' : scelti.length + ' negozi';
+}
+
 // Periodo coperto dalla selezione, in chiaro: "06/07 – 02/08".
 function bsSpanLabel(periods){
   const weeks = bsWeeks();
@@ -704,29 +745,28 @@ function bsHeader(d){
       <span class="bs-picker-n">${bsEsc(bsWeekRange(weeks[ps][0]))}</span></button>`;
   });
 
-  // ── Selettore negozio: i negozi presenti in tutte le settimane spuntate.
+  // ── Selettore negozio: anche questo a spunta, sui negozi presenti in tutte
+  // le settimane spuntate. Se ne possono prendere quanti si vuole e la
+  // classifica somma quelli.
   const inWeek = bsStoresIn(curPeriods);
-  let curStore = '—';
+  const scelti = bsCurStores().map(bsStoreKey);
+  const curStore = bsStoresLabel(inWeek, scelti);
   let storeOpts = '';
   if(inWeek.length > 1){
-    const sel = !!(BS.cur && BS.cur.aggregate);
-    const txt = '★ Tutti i negozi';
-    if(sel) curStore = txt;
-    storeOpts += `<button class="bs-picker-opt bs-agg${sel?' bs-sel':''}" role="option"
-      aria-selected="${sel}" data-val="AGG">
+    const tutti = scelti.length === inWeek.length;
+    storeOpts += `<button class="bs-picker-opt bs-agg${tutti?' bs-sel':''}" role="option"
+      aria-selected="${tutti}" data-storeall="1">
       <span class="bs-picker-mark"></span>
-      <span class="bs-picker-lab">${txt}</span>
+      <span class="bs-picker-lab">★ Tutti i negozi</span>
       <span class="bs-picker-n">${inWeek.length} negozi</span></button>`;
   }
   inWeek.forEach(w => {
-    const sel = !!(BS.cur && !BS.cur.aggregate && BS.cur.brand===w.brand
-                   && BS.cur.location===w.location);
-    const txt = w.brand+' · '+w.location;
-    if(sel) curStore = txt;
+    const k = bsStoreKey(w);
+    const sel = scelti.indexOf(k) > -1;
     storeOpts += `<button class="bs-picker-opt${sel?' bs-sel':''}" role="option"
-      aria-selected="${sel}" data-val="${bsEsc([w.brand,w.location].join('|'))}">
+      aria-selected="${sel}" data-val="${bsEsc(k)}">
       <span class="bs-picker-mark"></span>
-      <span class="bs-picker-lab">${bsEsc(txt)}</span></button>`;
+      <span class="bs-picker-lab">${bsEsc(w.brand+' · '+w.location)}</span></button>`;
   });
 
   // Link pubblico: le settimane le ha decise chi ha copiato il link e non si
@@ -773,14 +813,16 @@ function bsHeader(d){
           </div>
         </div>
         <div class="bs-selfield">
-          <div class="bs-sellabel">Negozio</div>
-          <div class="bs-picker" data-picker="store">
+          <div class="bs-sellabel">${scelti.length>1?'Negozi':'Negozio'}</div>
+          <div class="bs-picker${BS.public?'':' bs-multi'}" data-picker="store">
             <button class="bs-picker-btn" aria-haspopup="listbox"
               aria-expanded="false"${storeOpts?'':' disabled'}>
               <span class="bs-picker-cur">${bsEsc(curStore)}</span>
               <span class="bs-picker-chev">▼</span>
             </button>
-            <div class="bs-picker-panel" role="listbox">${storeOpts}</div>
+            <div class="bs-picker-panel" role="listbox"${BS.public?'':' aria-multiselectable="true"'}>
+              ${(!BS.public && inWeek.length>1)?'<div class="bs-picker-hint">Spunta i negozi · chiudi per aggiornare</div>':''}
+              ${storeOpts}</div>
           </div>
         </div>
       </div>
@@ -1092,7 +1134,7 @@ function bsLinkSel(){
   const c = BS.cur || {};
   return {period_start: c.period_start || '', brand: c.brand || '',
           location: c.location || '', aggregate: !!c.aggregate,
-          periods: bsCurPeriods()};
+          periods: bsCurPeriods(), stores: (c.stores || []).slice()};
 }
 
 async function bsMakeLink(){
@@ -1112,7 +1154,8 @@ async function bsKillLink(){
   const s = bsLinkSel();
   const q = `?period_start=${encodeURIComponent(s.period_start)}&brand=${encodeURIComponent(s.brand)}`
           + `&location=${encodeURIComponent(s.location)}&aggregate=${s.aggregate}`
-          + `&periods=${encodeURIComponent(s.periods.join(','))}`;
+          + `&periods=${encodeURIComponent(s.periods.join(','))}`
+          + `&stores=${encodeURIComponent(s.stores.join(','))}`;
   try{
     const r = await api('/bestseller/link'+q, {method:'DELETE'});
     if(!r.ok) throw new Error('errore '+r.status);
@@ -1210,13 +1253,13 @@ function bsBind(){
       if(open){
         const sel = p.querySelector('.bs-picker-opt.bs-sel');
         if(sel) sel.scrollIntoView({block:'nearest'});
-        // Se aprendo questo pannello ho fatto partire il caricamento delle
-        // settimane appena spuntate, fra poco bsPaint rigenera il markup e se lo
+        // Se aprendo questo pannello ho fatto partire il caricamento della
+        // selezione appena spuntata, fra poco bsPaint rigenera il markup e se lo
         // porterebbe via: chiedo di riaprirlo dopo, così il pannello non
         // sparisce sotto le dita mentre lo si sta usando.
         if(BS.committed) BS.reopen = p.dataset.picker;
-      }else if(p.dataset.picker === 'week'){
-        bsCommitWeeks();            // chiuso ricliccando il pulsante
+      }else{
+        bsCommitSel();            // chiuso ricliccando il pulsante
       }
     });
   });
@@ -1237,7 +1280,7 @@ function bsBind(){
   // nuova e si toglie la vecchia.
   //
   // Qui NON si carica: si aggiorna solo la spunta a schermo, e il caricamento
-  // parte alla chiusura del pannello (bsCommitWeeks). Chiamare bsLoadCurrent a
+  // parte alla chiusura del pannello (bsCommitSel). Chiamare bsLoadCurrent a
   // ogni clic vorrebbe dire quattro richieste da mezzo mega per scegliere
   // quattro settimane, e un pannello che si richiude a ogni spunta perché
   // bsPaint rigenera il markup.
@@ -1250,7 +1293,7 @@ function bsBind(){
       if(!next.length) return;                       // era l'unica spuntata
       bsSetCur(Object.assign({}, BS.cur, {periods: next}));
       BS.pending = true;
-      bsSyncWeekMarks();
+      bsSyncMarks();
     }));
 
   // "★ Tutte le week": prende tutto l'archivio, e ricliccata torna alla sola
@@ -1265,20 +1308,43 @@ function bsBind(){
       bsSetCur(Object.assign({}, BS.cur,
         {periods: tutte ? [keys[keys.length-1]] : keys}));
       BS.pending = true;
-      bsSyncWeekMarks();
+      bsSyncMarks();
     }));
 
-  // Negozio: cambia solo il "chi", le settimane spuntate restano.
-  document.querySelectorAll('#bs-root [data-val]').forEach(b =>
-    b.addEventListener('click', async () => {
-      const v = b.dataset.val.split('|');
-      const periods = bsCurPeriods();
-      BS.pending = false;   // le spunte in sospeso vengono applicate da questo caricamento
-      bsSetCur(v[0]==='AGG' ? {aggregate:true, periods}
-                            : {brand:v[0], location:v[1], periods});
+  // Negozio: a spunta come le settimane, e la classifica somma quelli scelti.
+  // L'ultimo rimasto non si può togliere, per lo stesso motivo delle settimane.
+  // Dal link pubblico la scelta resta singola: /public/bestseller accetta un
+  // negozio (?store=) o l'insieme che il token apre, non un sottoinsieme
+  // qualsiasi. Lì quindi si cambia negozio e si carica subito, come prima.
+  const negozi = (stores) => {
+    if(BS.public){
+      BS.pending = false;
+      bsSetCur(Object.assign({}, BS.cur, {stores}));
       bsResetView();
-      await bsLoadCurrent();
+      bsLoadCurrent();
+      return;
+    }
+    bsSetCur(Object.assign({}, BS.cur, {stores}));
+    BS.pending = true;
+    bsSyncMarks();
+  };
+
+  document.querySelectorAll('#bs-root [data-val]').forEach(b =>
+    b.addEventListener('click', e => {
+      e.stopPropagation();
+      const k = b.dataset.val;
+      if(BS.public) return negozi([k]);
+      const now = bsCurStores().map(bsStoreKey);
+      const next = now.indexOf(k) > -1 ? now.filter(x => x !== k) : now.concat(k);
+      if(!next.length) return;                       // era l'unico spuntato
+      negozi(next);
     }));
+
+  // "★ Tutti i negozi": li prende tutti. Non fa da interruttore come "Tutte le
+  // week", perché il ritorno naturale sarebbe "un negozio solo" e non c'è modo
+  // di sapere quale: si toglie la spunta a quelli che non servono.
+  document.querySelectorAll('#bs-root [data-storeall]').forEach(b =>
+    b.addEventListener('click', e => { e.stopPropagation(); negozi([]); }));
 
   const q = document.getElementById('bs-q');
   if(q) q.addEventListener('input', e => {
@@ -1337,64 +1403,71 @@ function bsResetView(){
   BS.fSale=''; BS.fCarry=''; BS.detail=null;
 }
 
-// Aggiorna a mano il pulsante del selettore settimane mentre il pannello resta
-// aperto: etichetta ("W29–W32 · 4 sett."), intestazione singolare/plurale e
-// periodo coperto. Sono le tre cose che bsPaint rifarebbe, ma bsPaint rigenera
-// tutto il markup e chiuderebbe il pannello sotto le dita.
-// Rispecchia a schermo le settimane spuntate senza ridisegnare: il pannello è
-// aperto e bsPaint se lo porterebbe via. Aggiorna anche la voce "Tutte le week",
-// che risulta spuntata quando lo sono tutte, comunque ci si sia arrivati.
-function bsSyncWeekMarks(){
-  const sel = bsCurPeriods();
+// Rispecchia a schermo le spunte di entrambi i selettori senza ridisegnare: i
+// pannelli sono aperti e bsPaint se li porterebbe via. Aggiorna anche le due
+// voci "★ Tutte…", che risultano spuntate quando lo sono tutte le righe,
+// comunque ci si sia arrivati.
+function bsSyncMarks(){
   const marca = (el, on) => {
     el.classList.toggle('bs-sel', on);
     el.setAttribute('aria-selected', String(on));
   };
-  document.querySelectorAll('#bs-root [data-week]').forEach(o =>
-    marca(o, sel.indexOf(o.dataset.week) > -1));
-  const tutte = document.querySelector('#bs-root [data-weekall]');
-  const n = Object.keys(bsWeeks()).length;
-  if(tutte) marca(tutte, n > 0 && sel.length === n);
-  bsRefreshWeekBtn();
-}
-
-function bsRefreshWeekBtn(){
   const ps = bsCurPeriods();
-  const p = document.querySelector('#bs-root .bs-picker[data-picker="week"]');
-  if(!p) return;
-  const cur = p.querySelector('.bs-picker-cur');
-  if(cur) cur.textContent = bsWeeksLabel(ps);
-  const lab = p.closest('.bs-selfield')?.querySelector('.bs-sellabel');
-  if(lab) lab.innerHTML = (ps.length>1?'Settimane':'Settimana')
-    + `<span class="bs-selspan">${bsEsc(bsSpanLabel(ps))}</span>`;
+  document.querySelectorAll('#bs-root [data-week]').forEach(o =>
+    marca(o, ps.indexOf(o.dataset.week) > -1));
+  const nSett = Object.keys(bsWeeks()).length;
+  const tutte = document.querySelector('#bs-root [data-weekall]');
+  if(tutte) marca(tutte, nSett > 0 && ps.length === nSett);
+
+  const st = bsCurStores().map(bsStoreKey);
+  document.querySelectorAll('#bs-root [data-val]').forEach(o =>
+    marca(o, st.indexOf(o.dataset.val) > -1));
+  const nNeg = bsStoresIn(ps).length;
+  const tutti = document.querySelector('#bs-root [data-storeall]');
+  if(tutti) marca(tutti, nNeg > 0 && st.length === nNeg);
+
+  bsRefreshBtns();
 }
 
-// Applica la selezione delle settimane fatta a spunte. Chiamata quando il
-// pannello si chiude: è il momento in cui l'utente ha finito di scegliere.
-// Qui si sistema anche il negozio, perché l'insieme dei negozi disponibili è
-// l'intersezione delle settimane spuntate e quello scelto prima potrebbe non
-// esserci più.
-function bsCommitWeeks(){
+// Aggiorna a mano i due pulsanti mentre i pannelli restano aperti: etichetta
+// ("W29–W32 · 4 sett.", "3 negozi"), intestazione singolare/plurale e periodo
+// coperto. Sono le cose che bsPaint rifarebbe, ma bsPaint rigenera tutto il
+// markup e chiuderebbe il pannello sotto le dita.
+function bsRefreshBtns(){
+  const ps = bsCurPeriods();
+  const testo = (picker, cur, lab) => {
+    const p = document.querySelector(`#bs-root .bs-picker[data-picker="${picker}"]`);
+    if(!p) return;
+    const c = p.querySelector('.bs-picker-cur');
+    if(c) c.textContent = cur;
+    const l = p.closest('.bs-selfield')?.querySelector('.bs-sellabel');
+    if(l) l.innerHTML = lab;
+  };
+  testo('week', bsWeeksLabel(ps), (ps.length>1?'Settimane':'Settimana')
+    + `<span class="bs-selspan">${bsEsc(bsSpanLabel(ps))}</span>`);
+  const st = bsCurStores().map(bsStoreKey);
+  testo('store', bsStoresLabel(bsStoresIn(ps), st), st.length>1 ? 'Negozi' : 'Negozio');
+}
+
+// Applica la selezione fatta a spunte — settimane e negozi insieme. Chiamata
+// quando un pannello si chiude: è il momento in cui l'utente ha finito di
+// scegliere. bsSetCur rinormalizza i due elenchi l'uno sull'altro, perché i
+// negozi disponibili dipendono dalle settimane spuntate e quelli scelti prima
+// potrebbero non esserci più.
+function bsCommitSel(){
   if(!BS.pending) return;
   BS.pending = false;
   BS.committed = true;
-  let periods = bsCurPeriods();
-  let stores = bsStoresIn(periods);
+  bsSetCur(BS.cur);
   // Nessun negozio presente in tutte le settimane scelte: non c'è un totale
   // onesto da mostrare. Torno all'ultima settimana e lo dico, invece di lasciare
   // le spunte a schermo su una classifica che non è quella.
-  if(!stores.length){
-    periods = [periods[periods.length-1]];
-    stores = bsStoresIn(periods);
-    if(!stores.length) return;
+  if(!bsCurStores().length){
+    const ps = bsCurPeriods();
+    bsSetCur({periods:[ps[ps.length-1]], stores:[]});
     bsLog('Nessun negozio ha caricato tutte le settimane scelte: torno all\'ultima.', true);
+    if(!bsCurStores().length) return;
   }
-  const keep = BS.cur && !BS.cur.aggregate
-    && stores.find(w => w.brand===BS.cur.brand && w.location===BS.cur.location);
-  bsSetCur(keep ? {brand:keep.brand, location:keep.location, periods}
-    : (stores.length > 1
-        ? {aggregate:true, periods}
-        : {brand:stores[0].brand, location:stores[0].location, periods}));
   bsResetView();
   bsLoadCurrent();
 }
@@ -1402,16 +1475,14 @@ function bsCommitWeeks(){
 // Chiude i pannelli aperti, tranne `keep`. Restituisce quanti ne ha chiusi.
 function bsClosePickers(keep){
   let n = 0;
-  let week = false;
   document.querySelectorAll('#bs-root .bs-picker.bs-open').forEach(p => {
     if(p === keep) return;
     p.classList.remove('bs-open');
     const b = p.querySelector('.bs-picker-btn');
     if(b) b.setAttribute('aria-expanded','false');
-    if(p.dataset.picker === 'week') week = true;
     n++;
   });
-  if(week) bsCommitWeeks();
+  if(n) bsCommitSel();          // non fa nulla se non c'erano spunte in sospeso
   return n;
 }
 
@@ -1425,7 +1496,7 @@ document.addEventListener('click', e => {
   // settimane e poi ha cliccato su un prodotto ha comunque finito di scegliere,
   // e quel clic può aver già rigenerato il markup (bsClosePickers non trova più
   // nulla da chiudere e da solo non applicherebbe niente).
-  bsCommitWeeks();
+  bsCommitSel();
 });
 
 // Esc: prima chiude i selettori, altrimenti la scheda prodotto.

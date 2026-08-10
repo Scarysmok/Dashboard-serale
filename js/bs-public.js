@@ -27,14 +27,11 @@ var ALL_STORES = [];          // usato solo dall'import, che qui non c'è
     const periods = (BS.data.periods && BS.data.periods.length)
       ? BS.data.periods.slice().sort()
       : [BS.data.period_start];
-    BS.cur = {brand: BS.data.brand, location: BS.data.location,
-              periods, period_start: periods[periods.length-1],
-              aggregate: !!BS.data.aggregate};
     // bsPaint mostra "Nessun report caricato" se l'archivio è vuoto. Qui l'indice
-    // contiene ciò che il link permette di vedere: i negozi delle settimane se il
-    // token è "tutti i negozi", altrimenti solo il proprio. Una voce per negozio
-    // E per settimana, perché il selettore negozio elenca chi è presente in tutte
-    // (bsStoresIn conta le presenze).
+    // contiene ciò che il link permette di vedere: i negozi che il token apre,
+    // uno solo se è un link di negozio. Una voce per negozio E per settimana,
+    // perché il selettore elenca chi è presente in tutte (bsStoresIn conta le
+    // presenze). Va riempito PRIMA di bsSetCur, che ci si appoggia.
     const negozi = (BS.data.stores || []).length
       ? BS.data.stores
       : [{brand: BS.data.brand, location: BS.data.location}];
@@ -46,6 +43,10 @@ var ALL_STORES = [];          // usato solo dall'import, che qui non c'è
       // l'inizio della prima e la fine dell'ultima.
       period_end: i === periods.length-1 ? BS.data.period_end : '',
     }, s))));
+    // Negozi inclusi nel totale mostrato: tutti quelli che il token apre se sta
+    // mostrando l'aggregato, altrimenti quello solo su cui è sceso.
+    bsSetCur({periods, stores: BS.data.aggregate
+      ? [] : [BS.data.brand+'|'+BS.data.location]});
     await bsAttachPhotos(BS.data.products);
     // Anche i badge CO/SALES: i flag arrivano col payload ma senza questa riga
     // BS.flags resta vuoto e alla prima apertura i badge non compaiono.

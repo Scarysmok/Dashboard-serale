@@ -1262,9 +1262,13 @@ body{display:flex;flex-direction:column}
    frase di aiuto, che su una riga sola ne chiede 301 e allargherebbe il
    pannello per niente. La frase invece va a capo, che è quello che deve fare. */
 .bs-multi .bs-picker-panel{min-width:240px}
-.bs-multi .bs-picker-opt{flex-wrap:wrap;row-gap:2px}
-.bs-multi .bs-picker-lab{min-width:max-content}
-.bs-multi .bs-picker-n{margin-left:auto}
+/* Solo le settimane: "LAST WEEK" è corto e va letto per intero, e accanto ha le
+   date che possono scendere a capo. I nomi dei negozi sono lunghi ("Adidas ·
+   Brindisi Colonne") e non hanno niente accanto: lì l'accorciatura con i
+   puntini resta quella giusta, altrimenti la riga uscirebbe dal pannello. */
+.bs-multi[data-picker="week"] .bs-picker-opt{flex-wrap:wrap;row-gap:2px}
+.bs-multi[data-picker="week"] .bs-picker-lab{min-width:max-content}
+.bs-multi[data-picker="week"] .bs-picker-n{margin-left:auto}
 .bs-picker-lab{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bs-picker-n{font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:500;
   color:var(--bs-muted);flex:0 0 auto}
