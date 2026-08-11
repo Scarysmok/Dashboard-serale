@@ -511,10 +511,29 @@ function bsOhqZero(p){ const n = bsOhq(p); return n!=null && n<=0; }
 function bsPhotoSrc(img){
   return String(img||'').startsWith('/') ? API_BASE + img : img;
 }
+// Immagine dell'articolo, col segnaposto sempre sotto.
+//
+// Il segnaposto c'è sempre e la foto ci si appoggia sopra: se l'articolo non ha
+// foto non viene disegnata, se ce l'ha ma non si carica `onerror` la toglie, e
+// in entrambi i casi resta scoperto quello che sta sotto. Prima erano due
+// strade diverse — stringa vuota da una parte, immagine nascosta dall'altra —
+// che finivano nello stesso riquadro grigio vuoto: una sola strada è più
+// difficile da rompere per metà.
+//
+// L'icona è disegnata qui e non è un file: nessuna richiesta di rete in più,
+// niente da caricare su Vercel, e il link pubblico se la prende da solo.
 function bsImg(p){
-  return p.img
-    ? `<img src="${bsEsc(bsPhotoSrc(p.img))}" alt="" loading="lazy" onerror="this.style.visibility='hidden'">`
-    : '';
+  const cod = bsEsc(p.code || '');
+  const ph = `<span class="bs-ph" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="4.5" width="18" height="15" rx="2.5"/>
+      <circle cx="8.5" cy="10" r="1.5"/>
+      <path d="M3.8 17.5 8.4 13a1.9 1.9 0 0 1 2.7 0l3.4 3.4"/>
+      <path d="M14 15.2 15.7 13.5a1.9 1.9 0 0 1 2.7 0l1.8 1.8"/>
+    </svg>${cod?`<i>${cod}</i>`:''}</span>`;
+  return ph + (p.img
+    ? `<img src="${bsEsc(bsPhotoSrc(p.img))}" alt="" loading="lazy" onerror="this.remove()">`
+    : '');
 }
 
 function bsStrip(){

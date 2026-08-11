@@ -1183,6 +1183,23 @@ body{display:flex;flex-direction:column}
 .bs-mimg{background:var(--bs-imgbg);aspect-ratio:1;display:flex;align-items:center;justify-content:center;
   padding:clamp(24px,4vw,48px)}
 .bs-mimg img{max-width:100%;max-height:100%;object-fit:contain;mix-blend-mode:multiply}
+
+/* ── Segnaposto per gli articoli senza foto ─────────────────────────────
+   Sta sempre sotto, e la foto ci si appoggia sopra in posizione assoluta: se
+   l'articolo non ha foto non viene disegnata, se non si carica `onerror` la
+   toglie, e in tutti e due i casi resta scoperto il segnaposto. Un solo
+   meccanismo per due casi che prima erano due rami separati.
+   Nella miniatura della riga (48-64px) il codice non ci sta e non si
+   leggerebbe: lì resta la sola icona. */
+.bs-pimg,.bs-c-img,.bs-mimg{position:relative}
+.bs-pimg img,.bs-c-img img,.bs-mimg img{position:absolute;inset:0;margin:auto}
+.bs-ph{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+  width:100%;min-width:0;color:var(--bs-faint);text-align:center;user-select:none}
+.bs-ph svg{width:clamp(20px,26%,52px);height:auto;flex:0 0 auto;opacity:.6}
+.bs-ph i{font-family:'JetBrains Mono',monospace;font-style:normal;font-size:10px;letter-spacing:.08em;
+  max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bs-c-img .bs-ph i{display:none}
+.bs-c-img .bs-ph svg{width:52%}
 .bs-mbody{padding:clamp(24px,3vw,38px)}
 .bs-mrank{font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.22em;text-transform:uppercase;
   color:var(--bs-muted)}
