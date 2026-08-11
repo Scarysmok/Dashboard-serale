@@ -42,12 +42,14 @@ const BS = {
   // Selezione a spunta: `pending` = ci sono spunte non ancora applicate (si
   // applicano chiudendo il pannello), `committed` = l'ultimo clic ha fatto
   // partire quel caricamento, `reopen` = pannello da riaprire dopo il ridisegno.
-  // `draft` = le spunte dei negozi mentre il pannello è aperto, null quando non
-  // se ne stanno facendo. Serve perché in BS.cur.stores l'elenco vuoto vuol dire
-  // "tutti", mentre a pannello aperto si deve poter arrivare a "nessuno
-  // spuntato" — è il passaggio obbligato per svuotare e riprenderne due.
-  // Vedi bsCommitSel.
-  pending: false, committed: false, reopen: null, draft: null,
+  // `draft` = le spunte in corso, un asse per volta, null quando su quell'asse
+  // non se ne stanno facendo. Serve perché in BS.cur l'elenco applicato non può
+  // essere vuoto — senza settimane non c'è niente da mostrare, e un elenco
+  // negozi vuoto significa "tutti" — mentre a pannello aperto si deve poter
+  // arrivare a "nessuno spuntato": è il passaggio obbligato per svuotare e
+  // ripartire da capo. Vedi bsCommitSel.
+  pending: false, committed: false, reopen: null,
+  draft: {periods: null, stores: null},
   loadedKey: null,  // chiave della selezione che sta a schermo (vedi bsCommitSel)
 };
 
@@ -691,11 +693,16 @@ function bsCurStores(){
   return dentro.length ? dentro : disp;   // selezione ormai vuota → tutti
 }
 
-// Negozi spuntati IN QUESTO MOMENTO, come chiavi: le spunte in corso se il
-// pannello è aperto, altrimenti la selezione applicata. È quello che si disegna;
-// quello che si carica è bsCurStores, che non conosce l'elenco vuoto.
+// Spuntati IN QUESTO MOMENTO: le spunte in corso se il pannello è aperto,
+// altrimenti la selezione applicata. È quello che si disegna; quello che si
+// carica sono bsCurPeriods/bsCurStores, che non conoscono l'elenco vuoto.
 function bsDraftStores(){
-  return BS.draft !== null ? BS.draft.slice() : bsCurStores().map(bsStoreKey);
+  const d = BS.draft.stores;
+  return d !== null ? d.slice() : bsCurStores().map(bsStoreKey);
+}
+function bsDraftPeriods(){
+  const d = BS.draft.periods;
+  return d !== null ? d.slice() : bsCurPeriods();
 }
 
 // Unico punto in cui si scrive BS.cur: normalizza i due elenchi e ricava da
@@ -789,7 +796,10 @@ function bsSpanLabel(periods){
 function bsHeader(d){
   const weeks = bsWeeks();
   const keys = Object.keys(weeks).sort().reverse();
-  const curPeriods = bsCurPeriods();
+  // Spunte da disegnare = quelle in corso; l'elenco dei negozi si rifà invece
+  // dalle settimane APPLICATE, che a differenza delle prime non è mai vuoto.
+  const curPeriods = bsDraftPeriods();
+  const basePeriods = bsCurPeriods();
   const inSel = ps => curPeriods.indexOf(ps) > -1;
 
   // ── Selettore settimana: a spunta, si possono sceglierne più d'una e la
@@ -797,7 +807,7 @@ function bsHeader(d){
   let curWeek = bsWeeksLabel(curPeriods);
   let weekOpts = '';
   // Scorciatoia per prendere tutto l'archivio in un clic invece di spuntare
-  // sette caselle. Ricliccandola si torna alla sola settimana più recente.
+  // sette caselle. Ricliccandola le toglie tutte, per ripartire da capo.
   if(keys.length > 1){
     const tutte = curPeriods.length === keys.length;
     weekOpts += `<button class="bs-picker-opt bs-agg${tutte?' bs-sel':''}" role="option"
@@ -818,7 +828,7 @@ function bsHeader(d){
   // ── Selettore negozio: anche questo a spunta, sui negozi presenti in tutte
   // le settimane spuntate. Se ne possono prendere quanti si vuole e la
   // classifica somma quelli.
-  const inWeek = bsStoresIn(curPeriods);
+  const inWeek = bsStoresIn(basePeriods);
   const scelti = bsDraftStores();
   const curStore = bsStoresLabel(inWeek, scelti);
   let storeOpts = '';
@@ -1370,31 +1380,28 @@ function bsBind(){
   // ogni clic vorrebbe dire quattro richieste da mezzo mega per scegliere
   // quattro settimane, e un pannello che si richiude a ogni spunta perché
   // bsPaint rigenera il markup.
+  const settimane = (chiavi) => { BS.draft.periods = chiavi; BS.pending = true; bsSyncMarks(); };
+
   document.querySelectorAll('#bs-root [data-week]').forEach(b =>
     b.addEventListener('click', e => {
       e.stopPropagation();
       const ps = b.dataset.week;
-      const now = bsCurPeriods();
-      const next = now.indexOf(ps) > -1 ? now.filter(x => x !== ps) : now.concat(ps).sort();
-      if(!next.length) return;                       // era l'unica spuntata
-      bsSetCur(Object.assign({}, BS.cur, {periods: next}));
-      BS.pending = true;
-      bsSyncMarks();
+      const now = bsDraftPeriods();
+      // Anche l'ultima spuntata si può togliere: serve per liberare la scelta e
+      // passare a un'altra settimana senza dover prima spuntare quella nuova.
+      // Restare a zero va bene solo mentre si sceglie: chiudendo così,
+      // bsCommitSel tiene la selezione di prima.
+      settimane(now.indexOf(ps) > -1 ? now.filter(x => x !== ps) : now.concat(ps).sort());
     }));
 
-  // "★ Tutte le week": prende tutto l'archivio, e ricliccata torna alla sola
-  // settimana più recente — altrimenti per tornare indietro toccherebbe
-  // despuntarle una per una.
+  // "★ Tutte le week" fa da interruttore, come "Tutti i negozi": se ci sono già
+  // tutte le toglie tutte, altrimenti le prende tutte.
   document.querySelectorAll('#bs-root [data-weekall]').forEach(b =>
     b.addEventListener('click', e => {
       e.stopPropagation();
       const keys = Object.keys(bsWeeks()).sort();
       if(!keys.length) return;
-      const tutte = bsCurPeriods().length === keys.length;
-      bsSetCur(Object.assign({}, BS.cur,
-        {periods: tutte ? [keys[keys.length-1]] : keys}));
-      BS.pending = true;
-      bsSyncMarks();
+      settimane(bsDraftPeriods().length === keys.length ? [] : keys);
     }));
 
   // Negozio: a spunta come le settimane, e la classifica somma quelli scelti.
@@ -1410,7 +1417,7 @@ function bsBind(){
       bsLoadCurrent();
       return;
     }
-    BS.draft = chiavi;
+    BS.draft.stores = chiavi;
     BS.pending = true;
     bsSyncMarks();
   };
@@ -1511,7 +1518,7 @@ function bsSyncMarks(){
     el.classList.toggle('bs-sel', on);
     el.setAttribute('aria-selected', String(on));
   };
-  const ps = bsCurPeriods();
+  const ps = bsDraftPeriods();
   document.querySelectorAll('#bs-root [data-week]').forEach(o =>
     marca(o, ps.indexOf(o.dataset.week) > -1));
   const nSett = Object.keys(bsWeeks()).length;
@@ -1521,7 +1528,10 @@ function bsSyncMarks(){
   const st = bsDraftStores();
   document.querySelectorAll('#bs-root [data-val]').forEach(o =>
     marca(o, st.indexOf(o.dataset.val) > -1));
-  const nNeg = bsStoresIn(ps).length;
+  // L'elenco dei negozi disponibili si rifà dalle settimane APPLICATE, non da
+  // quelle in corso di spunta: mentre si sceglie non deve cambiargli sotto, e a
+  // zero settimane sparirebbero tutti.
+  const nNeg = bsStoresIn(bsCurPeriods()).length;
   const tutti = document.querySelector('#bs-root [data-storeall]');
   if(tutti) marca(tutti, nNeg > 0 && st.length === nNeg);
 
@@ -1533,7 +1543,7 @@ function bsSyncMarks(){
 // coperto. Sono le cose che bsPaint rifarebbe, ma bsPaint rigenera tutto il
 // markup e chiuderebbe il pannello sotto le dita.
 function bsRefreshBtns(){
-  const ps = bsCurPeriods();
+  const ps = bsDraftPeriods();
   const testo = (picker, cur, lab) => {
     const p = document.querySelector(`#bs-root .bs-picker[data-picker="${picker}"]`);
     if(!p) return;
@@ -1545,7 +1555,8 @@ function bsRefreshBtns(){
   testo('week', bsWeeksLabel(ps), (ps.length>1?'Settimane':'Settimana')
     + `<span class="bs-selspan">${bsEsc(bsSpanLabel(ps))}</span>`);
   const st = bsDraftStores();
-  testo('store', bsStoresLabel(bsStoresIn(ps), st), st.length>1 ? 'Negozi' : 'Negozio');
+  testo('store', bsStoresLabel(bsStoresIn(bsCurPeriods()), st),
+        st.length>1 ? 'Negozi' : 'Negozio');
 }
 
 // Applica la selezione fatta a spunte — settimane e negozi insieme. Chiamata
@@ -1557,14 +1568,16 @@ function bsCommitSel(){
   if(!BS.pending) return;
   BS.pending = false;
   BS.committed = true;
-  // Le spunte dei negozi lasciate a zero non sono una selezione: chi ha svuotato
-  // per riprenderne due e poi ha chiuso senza sceglierne nessuno si tiene quella
-  // di prima, che è meno peggio di una classifica vuota.
-  if(BS.draft !== null){
-    if(BS.draft.length) bsSetCur(Object.assign({}, BS.cur, {stores: BS.draft}));
-    BS.draft = null;
-  }
-  bsSetCur(BS.cur);
+  // Le spunte lasciate a zero non sono una selezione: chi ha svuotato per
+  // ripartire da capo e poi ha chiuso senza scegliere niente si tiene quella di
+  // prima, che è meno peggio di una classifica vuota. Vale su tutti e due gli
+  // assi, e i due si applicano insieme perché i negozi disponibili dipendono
+  // dalle settimane scelte.
+  const sel = {};
+  if(BS.draft.periods && BS.draft.periods.length) sel.periods = BS.draft.periods;
+  if(BS.draft.stores  && BS.draft.stores.length)  sel.stores  = BS.draft.stores;
+  BS.draft = {periods: null, stores: null};
+  bsSetCur(Object.assign({}, BS.cur, sel));
   // Nessun negozio presente in tutte le settimane scelte: non c'è un totale
   // onesto da mostrare. Torno all'ultima settimana e lo dico, invece di lasciare
   // le spunte a schermo su una classifica che non è quella.
