@@ -50,6 +50,9 @@ const BS = {
   // ripartire da capo. Vedi bsCommitSel.
   pending: false, committed: false, reopen: null,
   draft: {periods: null, stores: null},
+  // true = il prossimo recupero dell'elenco foto salta la copia locale.
+  // Lo accende il tasto ↻ (vedi bsFetchPhotoList).
+  photosForce: false,
   loadedKey: null,  // chiave della selezione che sta a schermo (vedi bsCommitSel)
 };
 
@@ -937,6 +940,7 @@ function bsAdminChips(d){
       ${BS.busy?'⏳ Importo…':'📥 Importa Excel'}</button>
     <input type="file" id="bs-flagfile" accept=".xlsx,.xls" style="display:none">
     <button class="bs-chip-btn" id="bs-flags"${BS.busy?' disabled':''}>🏷 Importa saldi e CO</button>
+    <button class="bs-chip-btn" id="bs-photos"${BS.busy?' disabled':''}>🖼 Aggiorna foto</button>
     <button class="bs-chip-btn" id="bs-codes"${BS.busy?' disabled':''}>⬇ Codici senza foto</button>
     <button class="bs-chip-btn" id="bs-unlink"${BS.cur?'':' disabled'}>🔒 Spegni link</button>
     ${canDelete?`<button class="bs-chip-btn" id="bs-del">🗑 Elimina settimana</button>`:''}`;
@@ -1165,6 +1169,24 @@ async function bsImportFiles(files){
 // 03/08). Se compaiono lentezze, il colpevole è questo ramo.
 const bsThumb = f => f.thumb || ('https://drive.google.com/thumbnail?id='+encodeURIComponent(f.id)+'&sz=w400');
 
+// Elenco dei file nella cartella Drive delle foto.
+//
+// Drive non dichiara una versione, quindi la cache locale usa la data: l'elenco
+// si rinfresca da solo una volta al giorno. Ma le foto si caricano a mano, e chi
+// ne carica 1285 vuole vederle subito, non domani — `force` salta la copia
+// salvata e la riscrive, così anche i giri successivi vedono quella nuova.
+async function bsFetchPhotoList(force){
+  const oggi = new Date().toISOString().slice(0,10);
+  if(!force) return (await fetchCached('bs:photos', '/bestseller/photos', oggi)).files || [];
+  const r = await bsApi('/bestseller/photos');
+  if(!r.ok) throw new Error('errore '+r.status);
+  const files = (await r.json()).files || [];
+  if(typeof dcachePut === 'function'){
+    try{ dcachePut('bs:photos', oggi, {files}); }catch(_){}
+  }
+  return files;
+}
+
 // Aggancia ai prodotti il campo `img`. Non solleva mai: senza foto il modulo
 // funziona identico, con i riquadri vuoti (bsImg torna stringa vuota).
 async function bsAttachPhotos(products){
@@ -1175,11 +1197,8 @@ async function bsAttachPhotos(products){
       // 02-sync.js, quindi lì fetchCached non esiste e non va nemmeno valutata.
       let list = BS.public ? ((BS.data||{}).photos || []) : null;
       if(!list){
-        // Drive non dichiara una versione: uso la data, così l'elenco si
-        // rinfresca una volta al giorno. Le foto le carichi a mano e il tasto ↻
-        // forza comunque il giro completo.
-        list = (await fetchCached('bs:photos', '/bestseller/photos',
-                                  new Date().toISOString().slice(0,10))).files || [];
+        list = await bsFetchPhotoList(BS.photosForce);
+        BS.photosForce = false;
       }
       // Ordino per nome: dell'export adidas arrivano più viste per articolo
       // (IA5379_1_…, IA5379_2_…) e sotto si tiene la prima che abbina. Senza
@@ -1199,6 +1218,38 @@ async function bsAttachPhotos(products){
       if(src) p.img = src;
     }
   }catch(e){ console.debug('bsAttachPhotos', e); }
+}
+
+// Rilegge la cartella Drive delle foto, adesso.
+//
+// L'elenco è in cache nel browser con la data come versione: una volta aperto
+// il modulo, per il resto della giornata fetchCached serve la copia salvata e
+// le foto caricate nel frattempo non compaiono — nemmeno ricaricando la pagina,
+// perché quella copia sta in IndexedDB. Con le foto che si caricano a mano su
+// Drive non c'è niente che possa accorgersene da solo: serve un comando.
+async function bsRefreshPhotos(){
+  if(BS.busy) return;
+  BS.busy = true; bsPaint();
+  try{
+    bsLog('Rileggo la cartella delle foto…');
+    const files = await bsFetchPhotoList(true);
+    // Stesso ordinamento di bsAttachPhotos: a parità di codice vince la vista _1_.
+    BS.photos = files.sort((a,b) => String(a.name||'').localeCompare(String(b.name||'')));
+    // Riaggancio ai prodotti a schermo. Le vecchie associazioni vanno tolte
+    // prima: bsAttachPhotos scrive `img` solo dove trova un abbinamento, e un
+    // articolo la cui foto è stata rimossa da Drive resterebbe con la sua.
+    const prod = (BS.data && BS.data.products) || [];
+    prod.forEach(p => { delete p.img; });
+    await bsAttachPhotos(prod);
+    const conFoto = prod.filter(p => p.img).length;
+    bsLog(`Elenco foto aggiornato: <b>${files.length}</b> file nella cartella`
+      + (prod.length ? ` · <b>${conFoto}</b> articoli su ${prod.length} hanno la foto` : ''), true);
+  }catch(e){
+    bsLog('Non riesco a rileggere le foto: '+bsEsc(bsIsAbort(e)
+      ? 'il server non ha risposto in tempo' : (e.message||e)), true);
+  }
+  BS.busy = false;
+  bsPaint();
 }
 
 // ── Link pubblico da mandare ai negozi ──────────────────────────────────
@@ -1493,12 +1544,18 @@ function bsBind(){
     e.target.value = '';
     if(f) bsImportFlags(f);
   });
+  on('bs-photos','click', bsRefreshPhotos);
   on('bs-codes','click', bsDownloadCodes);
   on('bs-link','click', bsMakeLink);
   on('bs-unlink','click', bsKillLink);
   on('bs-del','click', bsDeleteWeek);
   on('bs-log-clear','click', () => { BS.log = []; bsPaint(); });
-  on('bs-reload','click', () => { BS.index = null; BS.data = null; renderBestSeller(); });
+  // Ricarica tutto, elenco foto compreso: da un tasto di ricarica ci si aspetta
+  // che rilegga davvero tutto, e le foto erano l'unica cosa che restava ferma.
+  on('bs-reload','click', () => {
+    BS.index = null; BS.data = null; BS.photos = null; BS.photosForce = true;
+    renderBestSeller();
+  });
 }
 
 // Azzera vista e filtri quando cambia la selezione: i filtri di una settimana
