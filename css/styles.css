@@ -1218,6 +1218,18 @@ body{display:flex;flex-direction:column}
 .bs-btn:disabled{opacity:.45;cursor:default}
 .bs-log{margin-top:14px;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.7;
   color:var(--bs-muted);white-space:pre-wrap;max-height:200px;overflow:auto}
+
+/* Riquadri che scorrono per conto loro dentro la pagina: arrivati in fondo, lo
+   scorrimento si ferma lì invece di passare alla pagina sotto e portarsela via
+   mentre si sta ancora leggendo. Sono tutti contenitori interni — pannelli di
+   filtro, schede a scomparsa, riquadro dei messaggi — e in nessuno di questi
+   il gesto ha motivo di proseguire altrove.
+   NON va messo su .scroll-area: quella È la pagina. */
+.bs-log,
+.am-filter-panel,
+.kfpanel,
+.sheet-body,
+.kpi-drill-sheet{overscroll-behavior:contain}
 .bs-log b{color:var(--bs-ink)}
 .bs-log .bs-err{color:var(--bs-red)}
 .bs-note{font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:.06em;color:var(--bs-muted)}
