@@ -330,17 +330,30 @@ function bsPaint(){
   const d = BS.data;
   const all = d.products || [];
   const list = bsFiltered();
+  // C'è qualcosa che restringe la classifica? Serve alle tessere qui sotto e al
+  // pulsante Azzera, quindi si calcola una volta sola e prima di tutti e due.
+  const hasF = !!BS.query || BS_FILTRI.some(f => (BS.f[f.k]||[]).length);
   const max = list.length ? Math.max(...list.map(p=>p.units)) || 1 : 1;
-  const totUnits = all.reduce((s,x)=>s+(x.units||0),0);
-  const totNet = all.reduce((s,x)=>s+(x.net||0),0);
+  // Le tessere contano quello che si sta guardando: con un filtro attivo
+  // (es. Bambino) dicono i pezzi e il valore DI QUEL filtrato, non del report
+  // intero — altrimenti sotto ci sarebbe una classifica di bambino e sopra un
+  // totale di tutti, e i due numeri non parlerebbero della stessa cosa.
+  const somma = (arr, campo) => arr.reduce((s,x)=>s+(x[campo]||0),0);
+  const totUnits = somma(list, 'units'), totNet = somma(list, 'net');
   // Il n° 1 è quello della classifica corrente: cambia con l'ordinamento
   // (pezzi/valore) e con i filtri, non è il primo dell'array come arriva.
   const first = list[0];
+  // Con un filtro attivo la riga sotto il numero dice su quanto: serve a non
+  // scambiare un totale parziale per quello di tutto il periodo.
+  const su = (n, tot) => hasF ? 'su '+n+' in tutto' : tot;
 
   const kpis = [
-    {l:'Prodotti venduti', v:String(all.length), s:'referenze attive', size:'clamp(28px,3vw,40px)'},
-    {l:'Pezzi totali', v:totUnits.toLocaleString('it-IT'), s:'unità sell-out', size:'clamp(28px,3vw,40px)'},
-    {l:'Valore netto', v:bsEur(totNet), s:'vendite nette periodo', size:'clamp(24px,2.5vw,34px)'},
+    {l:'Prodotti venduti', v:String(list.length),
+     s:su(all.length, 'referenze attive'), size:'clamp(28px,3vw,40px)'},
+    {l:'Pezzi totali', v:totUnits.toLocaleString('it-IT'),
+     s:su(somma(all,'units').toLocaleString('it-IT'), 'unità sell-out'), size:'clamp(28px,3vw,40px)'},
+    {l:'Valore netto', v:bsEur(totNet),
+     s:su(bsEur(somma(all,'net')), 'vendite nette periodo'), size:'clamp(24px,2.5vw,34px)'},
     {l:'Best seller n°1', v:first?first.name:'—', s:first?first.code:'', size:'clamp(15px,1.6vw,20px)'},
   ];
 
@@ -393,7 +406,6 @@ function bsPaint(){
     </button>`;
   }).join('');
 
-  const hasF = !!BS.query || BS_FILTRI.some(f => (BS.f[f.k]||[]).length);
 
   root.innerHTML = bsStrip() + bsHeader(d) + `
   <div class="bs-kpiwrap"><div class="bs-kpis">
