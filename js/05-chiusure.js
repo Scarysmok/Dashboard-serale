@@ -455,12 +455,14 @@ function _azClosureRowHTML(r, flat, rank){
 // "1 mancante · 1 chiuso": le card grigie sono grigie per due motivi diversi e
 // sommarle direbbe "2 mancanti", cioè due problemi dove ce n'è uno.
 // `colora` mette in giallo la sola parte che è davvero un problema.
-function _missSummary(list, colora){
+function _missSummary(list, colora, grassetto){
   const ch=list.filter(s=>s.closed).length, ma=list.length-ch;
   const p=[];
   if(ma){
-    const t=`${ma} mancante${ma>1?'i':''}`;
-    p.push(colora?`<span style="color:var(--warn)">${t}</span>`:t);
+    let t=`${ma} mancante${ma>1?'i':''}`;
+    if(grassetto) t=`<b class="bad">${t}</b>`;
+    else if(colora) t=`<span style="color:var(--warn)">${t}</span>`;
+    p.push(t);
   }
   if(ch) p.push(`${ch} chius${ch>1?'i':'o'}`);
   return p.join(' · ');
@@ -615,7 +617,12 @@ function renderCards(){
     }
 
     for(const [brand,group] of Object.entries(brands)){
-      const stores=group.real;
+      // Dentro il brand i negozi vanno per incasso, dal più alto: la
+      // numerazione 01, 02, 03 accanto ai nomi è una classifica, e senza
+      // ordinarli erano solo etichette messe nell'ordine in cui i PDF erano
+      // stati letti. La copia evita di riordinare l'array condiviso con altre
+      // viste (`rows` è lo stesso di getFilteredData).
+      const stores=group.real.slice().sort((a,b)=>b.corrispettivo-a.corrispettivo);
       const miss=group.miss;
       const bCorr=stores.reduce((a,r)=>a+r.corrispettivo,0);
       const bNet=bCorr/1.22;
@@ -634,7 +641,7 @@ function renderCards(){
           <span><span class="brand-chev">▼</span>${_escHtml(brand)}</span>
           <span class="az-sec-rule"></span>
           <span class="az-sec-meta">${totCount} negoz${totCount===1?'io':'i'}${
-            miss.length?` · <b class="bad">${miss.length} mancant${miss.length>1?'i':'e'}</b>`:''
+            miss.length?` · ${_missSummary(miss,false,true)}`:''
           } · ${fmt(bCorr)}</span>
         </div>`;
       }else{
@@ -661,7 +668,7 @@ function renderCards(){
             </div>
             <div class="missing-body">
               <span class="missing-dot" style="background:${bc.strong}"></span>
-              <span class="missing-label">Nessuna chiusura ricevuta</span>
+              <span class="missing-label">${s.closed?'Negozio chiuso':'Nessuna chiusura ricevuta'}</span>
             </div>
           </div>`;
         }
