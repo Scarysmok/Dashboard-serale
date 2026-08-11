@@ -531,8 +531,15 @@ function bsImg(p){
       <path d="M3.8 17.5 8.4 13a1.9 1.9 0 0 1 2.7 0l3.4 3.4"/>
       <path d="M14 15.2 15.7 13.5a1.9 1.9 0 0 1 2.7 0l1.8 1.8"/>
     </svg>${cod?`<i>${cod}</i>`:''}</span>`;
+  // `onload` nasconde il segnaposto, `onerror` toglie l'immagine e lo lascia.
+  // Nasconderlo serve: le foto dell'export adidas sono PNG TRASPARENTI e per
+  // giunta in mix-blend-mode multiply, quindi un segnaposto lasciato sotto si
+  // vede attraverso la scarpa. Va nascosto al caricamento e non prima, così
+  // finché l'immagine sta arrivando il riquadro non è vuoto.
   return ph + (p.img
-    ? `<img src="${bsEsc(bsPhotoSrc(p.img))}" alt="" loading="lazy" onerror="this.remove()">`
+    ? `<img src="${bsEsc(bsPhotoSrc(p.img))}" alt="" loading="lazy"
+        onload="if(this.previousElementSibling)this.previousElementSibling.style.display='none'"
+        onerror="this.remove()">`
     : '');
 }
 
