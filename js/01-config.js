@@ -592,6 +592,21 @@ const storeKey=(brand,location)=>
 // perché non era ancora attivo. Lo string-compare 'YYYY-MM-DD' funziona come
 // confronto cronologico.
 function getMissingStores(date){
+  return getAbsentStores(date).filter(s => !isStoreClosedOn(s.brand, s.location, date));
+}
+
+// Negozi che quel giorno erano CHIUSI per calendario e infatti non hanno
+// mandato niente. Non sono un problema: da un negozio chiuso non ci si aspetta
+// né apertura né chiusura. Restano però dentro il totale dei negozi, perché il
+// negozio esiste — è il giorno che non c'era.
+function getClosedStores(date){
+  return getAbsentStores(date).filter(s => isStoreClosedOn(s.brand, s.location, date));
+}
+
+// Attesi e non arrivati, senza distinguere il motivo. I due elenchi qui sopra
+// sono la sua partizione, quindi "mancanti + chiusi" è sempre questo insieme e
+// il denominatore ("su 33") non cambia mai di significato.
+function getAbsentStores(date){
   if(!date) return [];
   const present=new Set(allData.filter(r=>r.dateISO===date).map(r=>storeKey(r.brand,r.location)));
   return ALL_STORES
@@ -599,23 +614,41 @@ function getMissingStores(date){
     .filter(s => !present.has(storeKey(s.brand,s.location)));
 }
 
-// Aggiorna label e stato del chip "Mancanti" in base al filtro data attivo.
+// Chiuso = nel file dei target quel giorno vale zero.
+// Riga a zero e riga ASSENTE non sono la stessa cosa, anche se `+x||0` le
+// appiattisce entrambe su zero: la prima dice "quel giorno il negozio è
+// chiuso", la seconda dice solo che il file non copre quella data (i target
+// caricati sono del 2026: per il 2025 non c'è nulla). Trattare l'assenza come
+// "chiuso" farebbe sparire dei negozi dai controlli senza dirlo a nessuno,
+// quindi qui si chiede prima se la riga esiste.
+function isStoreClosedOn(brand, location, dateISO){
+  if(!dateISO) return false;
+  const k = storeKey(brand, location) + '|' + dateISO;
+  return (k in targetsByKey) && (+targetsByKey[k] || 0) <= 0;
+}
+
+// Aggiorna label e stato dei chip "Mancanti" e "Chiusi" in base al filtro data
+// attivo. Senza data non hanno senso (mancante rispetto a quale giorno?), quindi
+// restano spenti e, se erano accesi, si ricade su "Tutti".
 function updateMissingChip(){
-  const chip=document.getElementById('chip-mancanti');
+  _chipConteggio('chip-mancanti', '📭 ', 'Mancanti', 'mancanti', getMissingStores);
+  _chipConteggio('chip-chiusi',   '🔒 ', 'Chiusi',   'chiusi',   getClosedStores);
+}
+
+function _chipConteggio(id, emoji, testo, nomeFiltro, elenco){
+  const chip=document.getElementById(id);
   if(!chip) return;
   if(!filterDate){
-    chip.textContent=(AZ?'':'📭 ')+'Mancanti';
+    chip.textContent=(AZ?'':emoji)+testo;
     chip.classList.add('disabled');
-    if(filter==='mancanti'){
-      // Se c'era il filtro mancanti attivo e si toglie la data, fallback su 'all'
+    if(filter===nomeFiltro){
       filter='all';
       document.querySelectorAll('.chip').forEach(c=>c.classList.remove('on'));
       const allChip=document.querySelector('.chip[onclick*="\'all\'"]');
       if(allChip)allChip.classList.add('on');
     }
   }else{
-    const n=getMissingStores(filterDate).length;
-    chip.textContent=`${AZ?'':'📭 '}Mancanti (${n})`;
+    chip.textContent=`${AZ?'':emoji}${testo} (${elenco(filterDate).length})`;
     chip.classList.remove('disabled');
   }
 }

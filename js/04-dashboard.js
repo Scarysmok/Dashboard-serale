@@ -70,7 +70,12 @@ function renderOggi(){
   _oggiRefDate=refDate;
   const recs=allData.filter(r=>r.dateISO===refDate);
   const missing=getMissingStores(refDate);
-  const expectedCount=recs.length+missing.length;
+  // Chiusi = quel giorno il negozio non apriva (target a zero). Non hanno
+  // inviato ed è giusto così. Restano però nel denominatore: i negozi sono 33
+  // comunque, e cambiare il totale a seconda del giorno renderebbe impossibile
+  // capire a colpo d'occhio se "31 su 32" è meglio o peggio di ieri.
+  const closed=getClosedStores(refDate);
+  const expectedCount=recs.length+missing.length+closed.length;
   // Chiusure arrivate da negozi NON attivi in quella data (non attesi): sono
   // quelle che gonfiano "N su M". Le elenco così l'utente vede quali sono.
   const unexpected=recs.filter(r=>!isStoreMonitoredOn(r.brand,r.location,refDate));
@@ -189,19 +194,27 @@ function renderOggi(){
       <div class="odc-l">Aperture</div>
       <div class="odc-v">${apD.received}<span class="odc-tot"> / ${apD.expected}</span></div>
       <div class="oggi-prog"><div class="oggi-prog-fill green" style="width:${pct(apD.received,apD.expected)}%"></div></div>
-      ${apD.missing.length?`<div class="odc-miss" onclick="toggleApIssue('mancanti')">${apD.missing.length} mancant${apD.missing.length===1?'e':'i'} ${apD.missOpen?'▴':'›'}</div>`:`<div class="odc-ok">✓ tutte ricevute</div>`}
+      ${apD.missing.length
+        ? `<div class="odc-miss" onclick="toggleApIssue('mancanti')">${apD.missing.length} mancant${apD.missing.length===1?'e':'i'}${apD.closed.length?` · ${apD.closed.length} chius${apD.closed.length===1?'o':'i'}`:''} ${apD.missOpen?'▴':'›'}</div>`
+        : (apD.closed.length
+            ? `<div class="odc-ok">✓ tutte ricevute · ${apD.closed.length} chius${apD.closed.length===1?'o':'i'}</div>`
+            : `<div class="odc-ok">✓ tutte ricevute</div>`)}
     </div>` : '';
   const chCard = `<div class="oggi-duo-card">
       <div class="odc-l">Chiusure</div>
       <div class="odc-v">${recs.length}<span class="odc-tot"> / ${expectedCount}</span></div>
       <div class="oggi-prog"><div class="oggi-prog-fill acc" style="width:${pct(recs.length,expectedCount)}%"></div></div>
-      ${missing.length?`<div class="odc-miss" onclick="oggiGoChiusure(true)">${missing.length} mancant${missing.length===1?'e':'i'} ›</div>`:`<div class="odc-ok">✓ tutte ricevute</div>`}
+      ${missing.length
+        ? `<div class="odc-miss" onclick="oggiGoChiusure(true)">${missing.length} mancant${missing.length===1?'e':'i'}${closed.length?` · ${closed.length} chius${closed.length===1?'o':'i'}`:''} ›</div>`
+        : (closed.length
+            ? `<div class="odc-ok">✓ tutte ricevute · ${closed.length} chius${closed.length===1?'o':'i'}</div>`
+            : `<div class="odc-ok">✓ tutte ricevute</div>`)}
     </div>`;
   const duo = `<div class="oggi-duo">${apCard}${chCard}</div>`;
 
   // Recap giornata (testo a regole). Card collassabile in fondo alla Dashboard;
   // il testo viene anche salvato sul server per la lettura via Siri (URL /recap.txt).
-  _dailyRecapText=_composeRecap({refDate,recs,missing,expectedCount,totNet,tgtD,pyD,anomalie,dateLabel,apD});
+  _dailyRecapText=_composeRecap({refDate,recs,missing,closed,expectedCount,totNet,tgtD,pyD,anomalie,dateLabel,apD});
   // Salva il recap sul server per l'URL Siri (fire-and-forget, solo se cambiato).
   // Alla voce mando una versione "fonetica" (accenti per la pronuncia corretta);
   // la card a schermo resta con l'ortografia normale.
@@ -232,6 +245,11 @@ function renderOggi(){
       +(apD?` · ${apD.received} apertur${apD.received===1?'a':'e'}`:''),
     alert:missing.length
       ? `${missing.length} chiusur${missing.length===1?'a':'e'} non arrivat${missing.length===1?'a':'e'}`
+      : '',
+    // In coda e in grigio: dice perché il conto non torna, senza far sembrare
+    // un problema un negozio che quel giorno semplicemente non apriva.
+    note:closed.length
+      ? `${closed.length} negoz${closed.length===1?'io':'i'} chius${closed.length===1?'o':'i'}`
       : '',
     // Dall'avviso si va direttamente all'elenco dei negozi che non hanno
     // inviato, invece di dover cercare quali sono: oggiGoChiusure allinea la
@@ -269,19 +287,25 @@ function toggleRecap(){ _recapOpen=!_recapOpen; renderOggi(); }
 // malfMemoria()/allStoreChecks. Frasi in italiano naturale, pronte anche per
 // la sintesi vocale (importi in "euro", scostamenti come "sopra/sotto").
 function _composeRecap(o){
-  const {refDate,recs,missing,expectedCount,totNet,tgtD,pyD,anomalie,dateLabel,apD}=o;
+  const {refDate,recs,missing,closed,expectedCount,totNet,tgtD,pyD,anomalie,dateLabel,apD}=o;
   const P=[];
   const eur=n=>Math.round(n).toLocaleString('it-IT')+' euro';
   const names=(arr,max=3)=>arr.slice(0,max).map(s=>`${s.brand} ${s.location}`).join(', ')+(arr.length>max?` e altri ${arr.length-max}`:'');
   const scost=(d,label)=>`${Math.abs(d).toFixed(1).replace('.',',')}% ${d>=0?'sopra':'sotto'} ${label}`;
   // Aperture
   if(apD){
-    if(!apD.missing.length) P.push(`Oggi sono arrivate tutte le ${apD.expected} aperture.`);
-    else P.push(`Aperture: ${apD.received} su ${apD.expected}, manca${apD.missing.length>1?'no':''} ${names(apD.missing)}.`);
+    const apChiusi=apD.closed && apD.closed.length
+      ? ` ${apD.closed.length===1?'Era chiuso':'Erano chiusi'} ${names(apD.closed)}.` : '';
+    if(!apD.missing.length) P.push(`Oggi sono arrivate tutte le ${apD.received} aperture attese.`+apChiusi);
+    else P.push(`Aperture: ${apD.received} su ${apD.expected}, manca${apD.missing.length>1?'no':''} ${names(apD.missing)}.`+apChiusi);
   }
-  // Chiusure della giornata di riferimento
-  if(!missing.length) P.push(`Le chiusure di ${dateLabel} sono arrivate da tutti i ${expectedCount} negozi.`);
-  else P.push(`Le chiusure di ${dateLabel} sono arrivate da ${recs.length} negozi su ${expectedCount}: manca${missing.length>1?'no':''} ${names(missing)}.`);
+  // Chiusure della giornata di riferimento. I negozi chiusi vanno nominati:
+  // senza, il conto non torna ("31 su 33, ne manca 1") e chi ascolta il recap
+  // da Siri non ha modo di capire dov'è finito l'altro.
+  const chiusiTxt=closed && closed.length
+    ? ` ${closed.length===1?'Era chiuso':'Erano chiusi'} ${names(closed)}.` : '';
+  if(!missing.length) P.push(`Le chiusure di ${dateLabel} sono arrivate da tutti i ${expectedCount-((closed&&closed.length)||0)} negozi aperti.`+chiusiTxt);
+  else P.push(`Le chiusure di ${dateLabel} sono arrivate da ${recs.length} negozi su ${expectedCount}: manca${missing.length>1?'no':''} ${names(missing)}.`+chiusiTxt);
   // Corrispettivo netto + scostamenti
   let c=`Il corrispettivo netto di giornata è ${eur(totNet)}`;
   const b=[];
@@ -571,7 +595,11 @@ function _aperturaData(){
   const recs=[..._byStore.values()];
   const expected=ALL_STORES.filter(s=>isStoreMonitoredOn(s.brand,s.location,day));
   const gotKeys=new Set(recs.map(a=>storeKey(a.brand,a.location)));
-  const missing=expected.filter(s=>!gotKeys.has(storeKey(s.brand,s.location)));
+  // Da un negozio chiuso quel giorno non ci si aspetta nemmeno l'apertura: esce
+  // dai mancanti (e quindi dal banner rosso), ma resta contato a parte.
+  const assenti=expected.filter(s=>!gotKeys.has(storeKey(s.brand,s.location)));
+  const closed=assenti.filter(s=>isStoreClosedOn(s.brand,s.location,day));
+  const missing=assenti.filter(s=>!isStoreClosedOn(s.brand,s.location,day));
 
   // Tre liste di anomalie, con l'indice in allAperture per il salto alla scheda
   const fondi=[],puliti=[],guasti=[];
@@ -620,9 +648,9 @@ function _aperturaData(){
     guasti,({a,i})=>storeRow(a,i,noteVal(a.insegnaNote,'guasto')+_segnalaIconHTML(a,i)));
 
   const dayLabel=`${day.slice(8,10)}/${day.slice(5,7)}`;
-  // Ricevute = attesi - mancanti: così i due numeri tornano sempre, anche se un
-  // negozio non monitorato invia comunque la checklist.
-  const receivedCount=expected.length-missing.length;
+  // Ricevute = attesi - mancanti - chiusi: così i due numeri tornano sempre,
+  // anche se un negozio non monitorato invia comunque la checklist.
+  const receivedCount=expected.length-missing.length-closed.length;
   const missOpen=_apIssuesOpen.has('mancanti');
   const missingListHTML = (missing.length && missOpen)
     ? `<div class="oggi-list">${missing.map(s=>`<div class="oggi-row" style="cursor:default">
@@ -634,7 +662,7 @@ function _aperturaData(){
   const countersListHTML = counters
     ? `<div class="oggi-list">${counters}</div>`
     : `<div class="oggi-list"><div class="oggi-empty-ok">✓ Fondi cassa allineati, nessuna segnalazione pulizia o guasti</div></div>`;
-  return {day,dayLabel,received:receivedCount,expected:expected.length,missing,missOpen,missingListHTML,countersListHTML};
+  return {day,dayLabel,received:receivedCount,expected:expected.length,missing,closed,missOpen,missingListHTML,countersListHTML};
 }
 // Wrapper legacy (ramo cold-start di renderOggi): banner classico full-width.
 function _aperturaSectionHTML(){
@@ -830,11 +858,17 @@ function renderKPI(){
   // Il numero di mancanti viene dalla STESSA fonte del chip, così card e chip
   // non possono mai discordare.
   const missCount = filterDate ? getMissingStores(filterDate).length : 0;
+  // I chiusi non hanno inviato ma non sono mancanti: vanno tolti dagli inviati
+  // (altrimenti il numero a sinistra sarebbe più alto delle chiusure vere) e
+  // detti a parte, così il conto torna a vista: 31 + 1 + 1 = 33.
+  const closedCount = filterDate ? getClosedStores(filterDate).length : 0;
   const negSub=filterDate
-    ? `inviate · ${missCount} mancant${missCount===1?'e':'i'} su ${expectedCount}`
+    ? `inviate · ${missCount} mancant${missCount===1?'e':'i'}`
+      + (closedCount?` · ${closedCount} chius${closedCount===1?'o':'i'}`:'')
+      + ` su ${expectedCount}`
     : 'PDF caricati';
   document.getElementById('kpi-scroll').innerHTML=[
-    {l:'Negozi',v:filterDate?`${Math.max(0,expectedCount-missCount)}/${expectedCount}`:d.length,cls:'y',s:negSub},
+    {l:'Negozi',v:filterDate?`${Math.max(0,expectedCount-missCount-closedCount)}/${expectedCount}`:d.length,cls:'y',s:negSub},
     {l:'Corrispettivo',v:fmt(totCorr),cls:'g',s:'lordo IVA 22%'},
     {l:'Net Sales',v:fmt(totNet),cls:'b',s:'al netto IVA'},
     {l:'Contanti',v:fmt(d.reduce((a,r)=>a+r.contanti,0)),cls:'',s:'incassato'},

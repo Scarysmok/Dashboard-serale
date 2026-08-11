@@ -746,6 +746,11 @@ html.az .az-rchev{flex:0 0 10px;text-align:right;color:#cfccc6;font-size:16px}
 /* Negozio senza chiusura: riga spenta */
 html.az .az-row.az-miss{background:var(--div2);cursor:default}
 html.az .az-row.az-miss .az-rname{color:var(--t3)}
+/* Negozio chiuso: stessa riga grigia di "chiusura non ricevuta" ma senza il
+   filo rosso a sinistra, che nel resto della sezione vuol dire "intervieni".
+   Qui non c'è niente da fare: il negozio quel giorno non apriva. */
+html.az .az-row.az-miss.az-closed{border-left-color:var(--bd2)}
+html.az .az-row.az-miss.az-closed .az-rmeta{color:var(--faint)}
 
 /* Subtotale del brand e totale generale: piatti, senza tinte */
 html.az .subtotal-card,

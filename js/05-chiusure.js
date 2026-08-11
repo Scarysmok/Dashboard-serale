@@ -452,15 +452,34 @@ function _azClosureRowHTML(r, flat, rank){
     <span class="az-rchev">›</span>
   </div>`;
 }
-// Riga grigia per il negozio che non ha inviato la chiusura.
+// "1 mancante · 1 chiuso": le card grigie sono grigie per due motivi diversi e
+// sommarle direbbe "2 mancanti", cioè due problemi dove ce n'è uno.
+// `colora` mette in giallo la sola parte che è davvero un problema.
+function _missSummary(list, colora){
+  const ch=list.filter(s=>s.closed).length, ma=list.length-ch;
+  const p=[];
+  if(ma){
+    const t=`${ma} mancante${ma>1?'i':''}`;
+    p.push(colora?`<span style="color:var(--warn)">${t}</span>`:t);
+  }
+  if(ch) p.push(`${ch} chius${ch>1?'i':'o'}`);
+  return p.join(' · ');
+}
+
+// Riga grigia per il negozio da cui non è arrivata la chiusura. Due casi che si
+// somigliano a schermo ma non nella sostanza: `s.closed` è il negozio chiuso
+// quel giorno — non manca niente, non c'era nulla da mandare — e va detto in
+// grigio, senza il rosso che è riservato alle cose su cui intervenire.
 function _azMissingRowHTML(s, flat, dateDisp){
-  const sub=flat?`${_escHtml(s.brand)} · chiusura non ricevuta`:'Chiusura non ricevuta';
+  const testo=s.closed?'negozio chiuso':'chiusura non ricevuta';
+  const sub=flat?`${_escHtml(s.brand)} · ${testo}`
+                :testo.charAt(0).toUpperCase()+testo.slice(1);
   // Nessun onclick: non c'è una chiusura da aprire.
-  return `<div class="az-row az-miss">
+  return `<div class="az-row az-miss${s.closed?' az-closed':''}">
     <span class="az-rank">—</span>
     <span class="az-rmain">
       <span class="az-rname">${_escHtml(s.location)}</span>
-      <span class="az-rmeta"><span class="bad">${sub}</span></span>
+      <span class="az-rmeta"><span class="${s.closed?'':'bad'}">${sub}</span></span>
     </span>
     <span class="az-rval"><span class="az-rv">—</span><span class="az-rpct low">${dateDisp||''}</span></span>
   </div>`;
@@ -480,11 +499,15 @@ function _azNegoziHero(){
     if(filterDate) kicker=filterDate.split('-').reverse().join('/');
   }
   const miss=(!ap&&filterDate)?getMissingStores(filterDate).length:0;
+  const chiusi=(!ap&&filterDate)?getClosedStores(filterDate).length:0;
   box.innerHTML=azHero({
     kicker,
     h1:String(n),
     accent:ap?'aperture':'chiusure',
     inline:true,
+    // I negozi chiusi non sono un problema: vanno in coda, in grigio, non
+    // nell'avviso rosso, altrimenti il rosso smette di significare "guarda qui".
+    note:chiusi?`${chiusi} negoz${chiusi===1?'io':'i'} chius${chiusi===1?'o':'i'}`:'',
     // In rosso e da solo: è l'unica cosa su cui agire (vedi alert in azHero).
     alert:miss?`${miss} chiusur${miss===1?'a':'e'} non ricevut${miss===1?'a':'e'}`:'',
     // Qui siamo già nella tab giusta: basta accendere il filtro "Mancanti",
@@ -514,13 +537,20 @@ function renderCards(){
   if(filter==='sconti')  rows=rows.filter(r=>r.sconti);
   if(filter==='annull')  rows=rows.filter(r=>r.annull);
   if(filter==='mancanti')rows=[]; // mostro solo le card grigie sotto
+  if(filter==='chiusi')  rows=[]; // idem, ma quelle dei negozi chiusi
   if(q)rows=rows.filter(r=>r.store.toLowerCase().includes(q)||r.location.toLowerCase().includes(q)||r.brand.toLowerCase().includes(q));
 
   // Card "mancanti": solo se è selezionata una data e il filtro lo consente.
   // Con 'all' compaiono in linea con gli altri; con 'mancanti' sono le uniche.
+  // Due elenchi diversi con lo stesso aspetto di card: chi non ha inviato
+  // (problema) e chi quel giorno era chiuso (normale). Con 'all' ci sono
+  // entrambi, ognuno con la sua dicitura; i due chip li isolano.
   let missingRows=[];
-  if(filterDate && (filter==='all'||filter==='mancanti')){
-    missingRows=getMissingStores(filterDate);
+  if(filterDate && (filter==='all'||filter==='mancanti'||filter==='chiusi')){
+    const mancanti = filter==='chiusi'   ? [] : getMissingStores(filterDate);
+    const chiusi   = filter==='mancanti' ? [] :
+      getClosedStores(filterDate).map(s=>Object.assign({}, s, {closed:true}));
+    missingRows=mancanti.concat(chiusi);
     if(q)missingRows=missingRows.filter(s=>s.brand.toLowerCase().includes(q)||s.location.toLowerCase().includes(q));
   }
 
@@ -567,7 +597,7 @@ function renderCards(){
         </div>
         <div class="missing-body">
           <span class="missing-dot" style="background:${bc.strong}"></span>
-          <span class="missing-label">Nessuna chiusura ricevuta</span>
+          <span class="missing-label">${s.closed?'Negozio chiuso':'Nessuna chiusura ricevuta'}</span>
         </div>
       </div>`;
     }
@@ -594,7 +624,7 @@ function renderCards(){
       const bc=brandColor(brand);
       const totCount=stores.length+miss.length;
       const collapsed=collapsedBrands.has(brand);
-      const missLabel=miss.length?` · <span style="color:var(--warn)">${miss.length} mancante${miss.length>1?'i':''}</span>`:'';
+      const missLabel=miss.length?` · ${_missSummary(miss,true)}`:'';
       const tBrand=brand.replace(/'/g,"\\'");
       // Col tema azzurro l'intestazione del brand è tipografica (titoletto,
       // filo, nota a destra) e mostra il totale sempre, non solo da collassata:
@@ -658,9 +688,8 @@ function renderCards(){
   }
 
   if(rows.length>1){
-    const totMiss=missingRows.length;
-    const grandLabel=totMiss
-      ? `Totale · ${rows.length} negozi inviati · ${totMiss} mancante${totMiss>1?'i':''}`
+    const grandLabel=missingRows.length
+      ? `Totale · ${rows.length} negozi inviati · ${_missSummary(missingRows)}`
       : `Totale · ${rows.length} negozi`;
     html+=`<div class="grand-total">
       <div class="grand-label">${grandLabel}</div>

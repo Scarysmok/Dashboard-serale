@@ -31,6 +31,10 @@ var AZ = document.documentElement.classList.contains('az');
 //           che va bene, e così il rosso non indicava più nulla. Va scritta per
 //           esteso — "1 mancante" non dice di cosa, se nella stessa riga si
 //           contano sia chiusure sia aperture.
+//   note    coda grigia dopo l'avviso, per i fatti che NON sono un problema
+//           ("1 negozio chiuso"). Sta dopo l'alert e non dentro il claim
+//           perché l'ordine di lettura voluto è: quanto è arrivato, cosa manca
+//           davvero, e solo alla fine quello che non doveva arrivare.
 //   alertGo espressione JS da eseguire al clic sull'avviso: lo rende cliccabile
 //           e ci aggiunge una freccia, così dall'avviso si va a vedere cosa
 //           manca invece di doverlo cercare a mano. Deve essere una stringa
@@ -52,10 +56,12 @@ function azHero(o){
       ${o.kicker?`<div class="az-hero-kicker">${esc(o.kicker)}</div>`:'<span></span>'}
     </div>
     <h1 class="az-h1">${h1}${sep}${acc}</h1>
-    ${(o.claim||o.alert)?`<div class="az-hero-claim">${o.claim?esc(o.claim):''}${
+    ${(o.claim||o.alert||o.note)?`<div class="az-hero-claim">${o.claim?esc(o.claim):''}${
       o.alert?`${o.claim?'<i class="az-claim-sep"></i>':''}<b class="bad${
         o.alertGo?' az-go':''}"${o.alertGo?` onclick="${o.alertGo}"`:''}>${esc(o.alert)}${
         o.alertGo?' &rarr;':''}</b>`:''
+    }${
+      o.note?`${(o.claim||o.alert)?'<i class="az-claim-sep"></i>':''}<span>${esc(o.note)}</span>`:''
     }</div>`:''}
   </div>`;
 }
