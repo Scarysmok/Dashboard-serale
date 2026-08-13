@@ -73,6 +73,59 @@ function _fondoBadge(a){
   return {html:`<span class="ap-badge ok">💶 fondo allineato alla chiusura ${pd}</span>`, anomaly:false};
 }
 
+// ── Filtri della vista Aperture ─────────────────────────────────────────
+// Barra sua, non quella delle Chiusure: metà di quei filtri qui non vorrebbe
+// dire niente. Sconti e annullamenti vengono dagli scontrini di chiusura e in
+// una checklist di apertura non esistono; "anomalie" nelle chiusure è lo
+// scostamento di cassa, mentre qui le cose che non vanno sono tre (fondo,
+// pulizia, guasti) e stanno insieme sotto "segnalazioni".
+let filtroAperture='all';   // 'all' | 'mancanti' | 'chiusi' | 'segnal'
+
+function setFiltroAperture(v){
+  filtroAperture=v;
+  renderAperture();
+}
+
+// Una checklist ha qualcosa da guardare se il fondo non torna, se il negozio
+// non è pulito o se c'è un guasto. Il fondo si confronta con la chiusura
+// precedente, come fa il badge: senza quella non c'è scostamento da calcolare.
+function _apHaSegnalazioni(a){
+  if(!a) return false;
+  if(a.puliziaOk===false || a.insegnaOk===false) return true;
+  if(a.fondoCassa!=null){
+    const prev=_prevClosureFor(storeKey(a.brand,a.location),a.dateISO);
+    if(prev && isFinite(+prev.fondo) && +prev.fondo!==0
+       && Math.abs(a.fondoCassa-(+prev.fondo))>0.005) return true;
+  }
+  return false;
+}
+
+function _apPassaFiltro(it){
+  if(filtroAperture==='mancanti') return !it.rec && !it.closed;
+  if(filtroAperture==='chiusi')   return !!it.closed;
+  if(filtroAperture==='segnal')   return _apHaSegnalazioni(it.rec);
+  return true;
+}
+
+// I conteggi stanno nell'etichetta: dicono quanto c'è da guardare senza doverci
+// cliccare sopra. Un filtro senza niente dentro resta spento e non cliccabile,
+// così non si finisce su una lista vuota chiedendosi se è un errore.
+function _apFilterBarHTML(n){
+  const chip=(v,testo,emoji,quanti)=>{
+    const on=filtroAperture===v;
+    const vuoto=quanti===0 && v!=='all';
+    return `<button class="chip${on?' on':''}${vuoto?' disabled':''}"${
+      vuoto?'':` onclick="setFiltroAperture('${v}')"`}><i class="az-em">${emoji} </i>${testo}${
+      v==='all'?'':` (${quanti})`}</button>`;
+  };
+  return `<div class="filter-bar ap-filterbar">
+    ${chip('all','Tutti','📋',n.tutti)}
+    ${chip('mancanti','Mancanti','📭',n.mancanti)}
+    ${chip('chiusi','Chiusi','🔒',n.chiusi)}
+    ${chip('segnal','Segnalazioni','⚠',n.segnal)}
+  </div>`;
+}
+
 function renderAperture(){
   const list=document.getElementById('aperture-list');
   const chip=document.getElementById('apertura-date-chip');
@@ -103,23 +156,44 @@ function renderAperture(){
     if(!isStoreMonitoredOn(s.brand,s.location,aperturaDate)) continue;
     const k=storeKey(s.brand,s.location);
     seen.add(k);
-    items.push({brand:s.brand,location:s.location,rec:got.get(k)||null});
+    // `closed` solo se non ha inviato: un negozio segnato chiuso che manda
+    // comunque la checklist è a tutti gli effetti aperto, e va letto come tale.
+    const rec=got.get(k)||null;
+    items.push({brand:s.brand,location:s.location,rec,
+      closed:!rec && isStoreClosedOn(s.brand,s.location,aperturaDate)});
   }
   for(const a of recs){
     const k=storeKey(a.brand,a.location);
-    if(!seen.has(k)) items.push({brand:a.brand,location:a.location,rec:a});
+    if(!seen.has(k)) items.push({brand:a.brand,location:a.location,rec:a,closed:false});
   }
   items.sort((x,y)=>(x.brand+x.location).localeCompare(y.brand+y.location));
 
+  let html='';
   const received=items.filter(i=>i.rec).length;
-  let html=`<div style="margin:2px 16px 10px;font-size:12.5px;color:var(--t2);font-weight:600">${received} su ${items.length} aperture ricevute</div>`;
+  const closed=items.filter(i=>i.closed).length;
+  const missing=items.length-received-closed;
+  // Da un negozio chiuso non ci si aspetta l'apertura: esce dal denominatore e
+  // viene detto a parte. Contarlo fra gli attesi faceva sembrare che mancasse
+  // una checklist ogni domenica.
+  const segnal=items.filter(i=>_apHaSegnalazioni(i.rec)).length;
+  // Cambiando giorno il filtro acceso può restare senza niente dentro (ieri due
+  // negozi chiusi, oggi nessuno): invece di mostrare una lista vuota che sembra
+  // un errore, si torna a "Tutti".
+  if((filtroAperture==='mancanti' && !missing)
+   ||(filtroAperture==='chiusi'   && !closed)
+   ||(filtroAperture==='segnal'   && !segnal)) filtroAperture='all';
+  html=`<div style="margin:2px 16px 10px;font-size:12.5px;color:var(--t2);font-weight:600">${
+    received} su ${items.length-closed} aperture ricevute${
+    closed?` · ${closed} negoz${closed===1?'io':'i'} chius${closed===1?'o':'i'}`:''}</div>`
+    + _apFilterBarHTML({tutti:items.length, mancanti:missing, chiusi:closed, segnal});
   for(const it of items){
+    if(!_apPassaFiltro(it)) continue;
     const bc=brandColor(it.brand);
     if(!it.rec){
-      html+=`<div class="ap-card ap-missing">
+      html+=`<div class="ap-card ap-missing${it.closed?' ap-closed':''}">
         <div class="ap-head">
           <div><span class="ap-brand" style="color:${bc.text}">${it.brand}</span><span class="ap-store">${it.location}</span></div>
-          <span class="ap-time">📭 mancante</span>
+          <span class="ap-time">${it.closed?'🔒 chiuso':'📭 mancante'}</span>
         </div>
       </div>`;
       continue;
