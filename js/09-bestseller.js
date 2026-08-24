@@ -966,6 +966,7 @@ function bsAdminChips(d){
       ${BS.busy?'⏳ Importo…':'📥 Importa Excel'}</button>
     <input type="file" id="bs-flagfile" accept=".xlsx,.xls" style="display:none">
     <button class="bs-chip-btn" id="bs-flags"${BS.busy?' disabled':''}>🏷 Importa saldi e CO</button>
+    <button class="bs-chip-btn" id="bs-xls"${BS.busy?' disabled':''}>📊 Scarica Excel</button>
     <button class="bs-chip-btn" id="bs-photos"${BS.busy?' disabled':''}>🖼 Aggiorna foto</button>
     <button class="bs-chip-btn" id="bs-codes"${BS.busy?' disabled':''}>⬇ Codici senza foto</button>
     <button class="bs-chip-btn" id="bs-unlink"${BS.cur?'':' disabled'}>🔒 Spegni link</button>
@@ -1334,6 +1335,66 @@ function bsMatchCode(path, byCode){
 }
 
 
+// ── Esportazione Excel completa ─────────────────────────────────────────
+// Tutte le 28 colonne dell'export adidas, una riga per articolo × negozio ×
+// settimana. La classifica a schermo mostra i totali: qui c'è il dettaglio, da
+// cui in Excel si ricava qualsiasi taglio (una settimana, un negozio, entrambi).
+//
+// Il file lo costruisce il SERVER perché il dettaglio qui non c'è: il browser
+// riceve già sommato. Vedi /bestseller/export.
+//
+// Descrizione dei filtri attivi, per il foglio Leggimi del file: fra un mese il
+// file deve poter dire da solo cosa contiene.
+function bsFiltriLabel(){
+  const p = [];
+  BS_FILTRI.forEach(f => {
+    const sel = BS.f[f.k] || [];
+    if(!sel.length) return;
+    const voci = f.fissi || [];
+    const testo = v => (voci.find(o => o.v === v) || {t: v}).t;
+    p.push(`${f.lab}: ${sel.map(testo).join(', ')}`);
+  });
+  if(BS.query.trim()) p.push(`Ricerca: "${BS.query.trim()}"`);
+  return p.join(' · ');
+}
+
+async function bsDownloadXls(){
+  if(BS.busy || !BS.cur) return;
+  BS.busy = true; bsPaint();
+  try{
+    const filtri = bsFiltriLabel();
+    // I filtri sono tutti attributi dell'articolo, mai della coppia
+    // negozio-settimana: mando i codici che li passano e il server si limita a
+    // tenerli. Senza filtri non mando niente e prende tutto, così una selezione
+    // ampia non viaggia con seimila codici appresso.
+    const codes = filtri ? bsFiltered().map(p => p.code) : [];
+    bsLog('Preparo l\'Excel…');
+    const r = await bsApi('/bestseller/export', {method:'POST', body: JSON.stringify({
+      periods: bsCurPeriods(),
+      stores: (BS.cur.stores || []),
+      codes, filtri,
+    })});
+    if(!r.ok) throw new Error(r.status === 404
+      ? 'endpoint non disponibile: il backend va aggiornato' : 'errore '+r.status);
+    const blob = await r.blob();
+    const ps = bsCurPeriods();
+    const nome = `best-seller-${ps[0]}_${ps[ps.length-1]}.xlsx`;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = nome;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    const mb = (blob.size/1048576).toFixed(1).replace('.', ',');
+    bsLog(`Scaricato <b>${bsEsc(nome)}</b> (${mb} MB)`
+      + (filtri ? ` · filtri: ${bsEsc(filtri)}` : ' · senza filtri'), true);
+  }catch(e){
+    bsLog('Esportazione fallita: '+bsEsc(bsIsAbort(e)
+      ? 'il server non ha risposto in tempo' : (e.message||e)), true);
+  }
+  BS.busy = false;
+  bsPaint();
+}
+
 // ── Esportazione codici articolo ────────────────────────────────────────
 // Scarica i codici degli articoli PRIVI di foto, presi da tutti i report (ogni
 // negozio, ogni settimana). È la lista di lavoro per procurarsi le immagini
@@ -1570,6 +1631,7 @@ function bsBind(){
     e.target.value = '';
     if(f) bsImportFlags(f);
   });
+  on('bs-xls','click', bsDownloadXls);
   on('bs-photos','click', bsRefreshPhotos);
   on('bs-codes','click', bsDownloadCodes);
   on('bs-link','click', bsMakeLink);
