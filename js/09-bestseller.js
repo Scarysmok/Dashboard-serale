@@ -1002,12 +1002,23 @@ function bsFooter(){
 // pezzi che usa il backend: serve a leggere la curva delle taglie, cioè se a
 // mancare sono le centrali o le estreme. Un elenco ordinato per volume non lo
 // farebbe vedere.
-const BS_TG_LETTERE = ['XXS','XS','S','M','L','XL','XXL','XXXL','3XL','4XL'];
+// Scala delle taglie a lettera, comprese le varianti che il gestionale usa per
+// la stessa misura (2XS e XXS, 2XL e XXL) e le taglie donna 1X..4X.
+const BS_TG_LETTERE = ['3XS','2XS','XXS','XS','S','M','L','LT','XL','1X',
+                       'XXL','2XL','2X','XXXL','3XL','3X','4XL','4X','5XL'];
 function bsTgOrd(t){
   const s = String(t||'').trim().toUpperCase();
-  const num = s.replace(',', '.').match(/^(\d+(?:\.\d+)?)$/);
-  if(num) return [1, +num[1], s];
-  const mesi = s.match(/^(\d+)\s*-\s*(\d+)\s*M$/);      // 3-6M, 6-9M…
+  // MEZZE MISURE: il gestionale le scrive col trattino DAVANTI, e la mezza sta
+  // fra la sua misura e la successiva — "-10" va dopo il 10 e prima dell'11.
+  // Senza questo caso finivano tutte in fondo, dopo le taglie intere.
+  const mezza = s.match(/^-(\d+(?:[.,]\d+)?)\.?$/);
+  if(mezza) return [1, parseFloat(mezza[1].replace(',','.')) + 0.5, s];
+  // "19." compare così nel file: il punto in coda è rumore, non un decimale.
+  const num = s.replace(',', '.').match(/^(\d+(?:\.\d+)?)\.?$/);
+  if(num) return [1, parseFloat(num[1]), s];
+  const giro = s.match(/^(\d+)"$/);                     // 24"…40", giro vita
+  if(giro) return [1, +giro[1], s];
+  const mesi = s.match(/^(\d+)\s*-\s*(\d+)\s*M$/);      // 0-3M, 3-6M…
   if(mesi) return [0, +mesi[1], s];
   const anni = s.match(/^(\d+)\s*-\s*(\d+)\s*[AY]$/);   // 3-4A, 5-6Y…
   if(anni) return [0, 100 + (+anni[1]), s];
@@ -1018,6 +1029,15 @@ function bsTgOrd(t){
 function bsTgCmp(a, b){
   const x = bsTgOrd(a), y = bsTgOrd(b);
   return x[0]-y[0] || x[1]-y[1] || x[2].localeCompare(y[2]);
+}
+
+// Come si scrive una taglia a schermo. Il gestionale mette il trattino della
+// mezza misura DAVANTI ("-10"), in negozio si legge dopo ("10-"): a colpo
+// d'occhio "-10" sembra una quantità negativa, ed è l'unica cosa che si cambia
+// dell'etichetta — il resto resta come nel file.
+function bsTgLabel(t){
+  const s = String(t==null?'':t).trim();
+  return /^-\d/.test(s) ? s.slice(1) + '-' : s;
 }
 
 // Una striscia di taglie. `righe` sono [taglia, quantità]; l'ordine è quello
@@ -1032,14 +1052,15 @@ function bsTgStrip(righe, titolo, scala, cls){
     <div class="bs-tg-h">${bsEsc(titolo)}</div>
     <div class="bs-tg-list">${scala.map(t => {
       const n = q.get(t);
+      const lab = bsTgLabel(t);
       if(n === undefined) return `<div class="bs-tg-i bs-tg-vuota">
         <div class="bs-tg-bar"></div><div class="bs-tg-n">·</div>
-        <div class="bs-tg-t">${bsEsc(t)}</div><div class="bs-tg-p"></div></div>`;
+        <div class="bs-tg-t">${bsEsc(lab)}</div><div class="bs-tg-p"></div></div>`;
       const h = Math.max(3, Math.round(Math.abs(n) / max * 100));
-      return `<div class="bs-tg-i${n<0?' bs-tg-neg':''}" title="${bsEsc(t)}: ${n}">
+      return `<div class="bs-tg-i${n<0?' bs-tg-neg':''}" title="${bsEsc(lab)}: ${n}">
         <div class="bs-tg-bar"><i style="height:${h}%"></i></div>
         <div class="bs-tg-n">${bsFmt(n,'i')}</div>
-        <div class="bs-tg-t">${bsEsc(t)}</div>
+        <div class="bs-tg-t">${bsEsc(lab)}</div>
         <div class="bs-tg-p">${Math.round(n/tot*100)}%</div>
       </div>`;
     }).join('')}</div></div>`;

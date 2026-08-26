@@ -187,6 +187,45 @@ check('vuoto', 0, bsNumIt(''));
 check('numero già numero', 12.5, bsNumIt(12.5));
 check('testo non numerico', 0, bsNumIt('n.d.'));
 
+// ── 4c. Ordine naturale delle taglie ────────────────────────────────────
+// L'ordine della striscia serve a leggere la CURVA delle taglie: se a mancare
+// sono le centrali è un problema di riassortimento, se sono le estreme è
+// normale. Un ordine sbagliato rende la striscia inutile.
+// Il vocabolario è quello vero del file stock, 177 valori diversi.
+console.log('\nOrdine delle taglie:');
+// Un eval solo: con eval separati le const finiscono ognuna nel proprio
+// ambito e bsTgOrd non vedrebbe la scala delle lettere.
+eval([ritaglia('BS_TG_LETTERE','const'), ritaglia('bsTgOrd','fn'),
+      ritaglia('bsTgCmp','fn'), ritaglia('bsTgLabel','fn')].join('\n'));
+const ord = a => a.slice().sort(bsTgCmp);
+
+// Le mezze misure hanno il trattino DAVANTI e stanno fra la loro misura e la
+// successiva: "-10" dopo il 10, prima dell'11.
+check('mezze misure al posto giusto',
+      ['9','-9','10','-10','11','-11','12'],
+      ord(['12','-10','10','-11','9','11','-9']));
+check('scarpe bambino, numeri interi', ['28','30','33','35'],
+      ord(['35','28','33','30']));
+check('"19." è 19, il punto in coda è rumore', ['18','19.','20'],
+      ord(['20','18','19.']));
+check('lettere in scala, non in ordine alfabetico',
+      ['XS','S','M','L','XL','XXL'], ord(['XL','S','XXL','M','XS','L']));
+check('2XL e XXL sono vicine, non agli antipodi',
+      ['L','XL','XXL','2XL'], ord(['2XL','XXL','L','XL']));
+check('giro vita in pollici', ['28"','30"','32"','34"'],
+      ord(['34"','30"','28"','32"']));
+check('mesi e anni prima delle taglie adulto',
+      ['0-3M','3-6M','2-3A','3-4A'], ord(['3-4A','3-6M','2-3A','0-3M']));
+check('taglie ignote in fondo', ['S','M','L','NS','UN'],
+      ord(['UN','M','NS','L','S']));
+
+// A schermo il trattino della mezza misura va DOPO il numero: "-10" letto di
+// sfuggita sembra una quantità negativa.
+check('etichetta della mezza misura', '10-', bsTgLabel('-10'));
+check('le taglie intere non si toccano', '10', bsTgLabel('10'));
+check('le lettere non si toccano', 'XL', bsTgLabel('XL'));
+check('i mesi col trattino in mezzo restano', '3-6M', bsTgLabel('3-6M'));
+
 console.log('\nSettimane e stagioni:');
 check('lunedì di un lunedì è se stesso', ['2026-06-29','2026-07-05'], bsSettimanaDi('2026-06-29'));
 check('lunedì di una domenica è sei giorni prima', ['2026-06-29','2026-07-05'], bsSettimanaDi('2026-07-05'));
