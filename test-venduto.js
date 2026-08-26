@@ -129,9 +129,14 @@ check('domenica di chiusura', '2026-07-05', g.report[0].period_end);
 check('periodo leggibile', '29/06/2026 - 05/07/2026', g.report[0].period);
 
 const g905 = trova(g.report, '905', '2026-06-29');
-check('underwear conservato col suo codice', true, !!art(g905, 'UW40001'));
 check('nessuna busta fra i codici', false, !!art(g905, 'LAB33290'));
 check('prefisso AD tolto dai codici adidas', true, !!art(g905, 'IF6490'));
+// Il gestionale antepone due lettere al codice del fornitore: AD per adidas,
+// UW per l'underwear. Vanno tolte entrambe, perché il codice che resta è quello
+// del file stock — cioè la chiave con cui si aggancia la giacenza. Tenendo
+// "UW" l'underwear risulterebbe sempre a giacenza zero.
+check('underwear conservato, ma anche lui senza prefisso',
+      true, !!art(g905, '40001') && !art(g905, 'UW40001'));
 check('pezzi sommati sui giorni', 3, art(g905,'IF6490').units);
 check('valore in centesimi, non arrotondato', 165, art(g905,'IF6490').net);
 check('taglie del codice', [['43',2,110],['42',1,55]], art(g905,'IF6490').sizes);

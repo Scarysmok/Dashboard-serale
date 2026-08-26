@@ -253,7 +253,12 @@ async function bsLoadCurrent(){
     // Stessa cache degli altri insiemi pesanti: IndexedDB + versione da
     // /datasets/version. L'aggregato è ~550 kB che il backend ricalcola a ogni
     // richiesta (misurato il 03/08) e la versione cambia solo quando si importa.
-    BS.data = await fetchCached(bsCacheKey(c), path, _dsVersions.bestseller);
+    // La versione include ANCHE quella della giacenza: la classifica ora porta
+    // dentro la fotografia dello stock, quindi ricaricarla deve invalidare la
+    // copia locale. Senza questo, dopo aver caricato lo stock si continuerebbe
+    // a vedere la classifica di prima, con la colonna giacenza vuota.
+    BS.data = await fetchCached(bsCacheKey(c), path,
+                                _dsVersions.bestseller + '~' + (_dsVersions.bsstock || ''));
     if(!BS.data || !BS.data.products) BS.data = {error: 'Report non disponibile'};
     else { await bsAttachPhotos(BS.data.products); await bsLoadFlags(); }
   }catch(e){
@@ -438,7 +443,12 @@ function bsPaint(){
   <section class="bs-section bs-list">
     <div class="bs-sechead bs-tight"><h3>Classifica</h3><div class="bs-rule"></div>
       <span class="bs-secmeta">${list.length} prodotti · ${list.reduce((s,x)=>s+(x.units||0),0)} pz${
-        bsPeriodsOf(d).length > 1 ? ' · giacenza a fine periodo' : ''}</span></div>
+        // Quando c'è la fotografia dello stock, la giacenza NON è un dato della
+        // settimana guardata ma del giorno in cui è stata scattata: scriverlo
+        // qui, accanto alla colonna, evita di far leggere come "a fine giugno"
+        // un numero che è di oggi.
+        d && d.giacenza_al ? ' · giacenza al ' + bsEsc(bsPeriodLabel(d.giacenza_al))
+          : (bsPeriodsOf(d).length > 1 ? ' · giacenza a fine periodo' : '')}</span></div>
     <div class="bs-thead">
       <div style="flex:0 0 34px">#</div>
       <div style="flex:0 0 clamp(48px,5vw,64px)">Art.</div>
@@ -1220,7 +1230,13 @@ function bsParseVenduto(rows, fileName, acc){
     const sett = iso ? bsSettimanaDi(iso) : null;
     if(!sett){ acc.senzaData++; continue; }
 
-    const code = art.startsWith('AD') ? art.slice(2) : art;
+    // Il gestionale antepone due lettere al codice del fornitore: AD per
+    // adidas (ADIH9762 → IH9762), UW per l'underwear (UW4A3M54-981 →
+    // 4A3M54-981). Toglierle riporta al codice del file stock, che è la chiave
+    // con cui si aggancia la giacenza. Misurato sul file del 10-16/08: con
+    // entrambi i prefissi si agganciano 1.721 articoli su 1.772, con il solo AD
+    // erano 1.694. I 51 che restano fuori sono esauriti ovunque.
+    const code = /^(AD|UW)/.test(art) ? art.slice(2) : art;
     if(!acc.ana.has(code)){
       const cat = txt(r,'SPORTODE'), gen = txt(r,'TARGET_GROUP'), div = txt(r,'DIVISION');
       // Le 28 posizioni dell'export adidas: si riempie quello che il gestionale
