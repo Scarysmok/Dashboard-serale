@@ -1020,27 +1020,48 @@ function bsTgCmp(a, b){
   return x[0]-y[0] || x[1]-y[1] || x[2].localeCompare(y[2]);
 }
 
+// Una striscia di taglie. `righe` sono [taglia, quantità]; l'ordine è quello
+// naturale. `scala` allinea le due strisce (venduto e giacenza) sulle STESSE
+// colonne: senza, la taglia 8 del venduto finirebbe sopra la 10 della giacenza
+// e il confronto — che è tutto il punto — sarebbe una trappola.
+function bsTgStrip(righe, titolo, scala, cls){
+  const q = new Map(righe.map(r => [String(r[0]), r[1]]));
+  const max = Math.max(...scala.map(t => Math.abs(q.get(t) || 0)), 1);
+  const tot = scala.reduce((s,t) => s + Math.abs(q.get(t) || 0), 0) || 1;
+  return `<div class="bs-tg${cls ? ' '+cls : ''}">
+    <div class="bs-tg-h">${bsEsc(titolo)}</div>
+    <div class="bs-tg-list">${scala.map(t => {
+      const n = q.get(t);
+      if(n === undefined) return `<div class="bs-tg-i bs-tg-vuota">
+        <div class="bs-tg-bar"></div><div class="bs-tg-n">·</div>
+        <div class="bs-tg-t">${bsEsc(t)}</div><div class="bs-tg-p"></div></div>`;
+      const h = Math.max(3, Math.round(Math.abs(n) / max * 100));
+      return `<div class="bs-tg-i${n<0?' bs-tg-neg':''}" title="${bsEsc(t)}: ${n}">
+        <div class="bs-tg-bar"><i style="height:${h}%"></i></div>
+        <div class="bs-tg-n">${bsFmt(n,'i')}</div>
+        <div class="bs-tg-t">${bsEsc(t)}</div>
+        <div class="bs-tg-p">${Math.round(n/tot*100)}%</div>
+      </div>`;
+    }).join('')}</div></div>`;
+}
+
 function bsTaglie(p){
-  const tg = (p.sizes || []).slice();
+  const vend = p.sizes || [];
+  const gia  = p.giacenza_taglie || [];
   // Testo neutro di proposito: manca sulle settimane importate dall'export
   // adidas, ma anche sul link pubblico, dove le taglie non escono dal backend.
   // Scrivere una sola delle due ragioni vorrebbe dire mentire nell'altro caso.
-  if(!tg.length) return `<div class="bs-tg-no">Dettaglio taglie non disponibile per questa selezione.</div>`;
-  tg.sort((a,b) => bsTgCmp(a[0], b[0]));
-  const max = Math.max(...tg.map(t => Math.abs(t[1])), 1);
-  const tot = tg.reduce((s,t) => s + t[1], 0) || 1;
-  return `<div class="bs-tg">
-    <div class="bs-tg-h">Taglie · ${tg.length} su ${bsFmt(p.units,'i')} pezzi</div>
-    <div class="bs-tg-list">${tg.map(t => {
-      const neg = t[1] < 0;
-      const h = Math.max(3, Math.round(Math.abs(t[1]) / max * 100));
-      return `<div class="bs-tg-i${neg?' bs-tg-neg':''}" title="${bsEsc(t[0])}: ${t[1]} pezzi, ${bsEur(t[2])}">
-        <div class="bs-tg-bar"><i style="height:${h}%"></i></div>
-        <div class="bs-tg-n">${bsFmt(t[1],'i')}</div>
-        <div class="bs-tg-t">${bsEsc(t[0])}</div>
-        <div class="bs-tg-p">${Math.round(t[1]/tot*100)}%</div>
-      </div>`;
-    }).join('')}</div></div>`;
+  if(!vend.length && !gia.length)
+    return `<div class="bs-tg-no">Dettaglio taglie non disponibile per questa selezione.</div>`;
+  // Una scala sola per tutte e due le strisce: l'unione delle taglie viste,
+  // in ordine naturale. Una taglia che compare in una sola delle due lascia un
+  // posto vuoto nell'altra — ed è l'informazione più utile della scheda:
+  // venduta e non più a scaffale, oppure ferma e mai venduta.
+  const scala = [...new Set([...vend.map(t=>String(t[0])), ...gia.map(t=>String(t[0]))])]
+                  .sort(bsTgCmp);
+  const pzV = vend.reduce((s,t)=>s+t[1],0), pzG = gia.reduce((s,t)=>s+t[1],0);
+  return (vend.length ? bsTgStrip(vend, `Venduto per taglia · ${bsFmt(pzV,'i')} pz`, scala) : '')
+       + (gia.length  ? bsTgStrip(gia,  `Giacenza per taglia · ${bsFmt(pzG,'i')} pz`, scala, 'bs-tg-gia') : '');
 }
 
 function bsModal(p){
@@ -1191,8 +1212,9 @@ const BS_VEN_REQ = ['FILIALE','GIORNO','ARTICOLO','QTA','REALIZZO'];
 // `ana` tiene l'anagrafica UNA volta per codice invece che per ogni coppia
 // settimana-negozio: su otto mesi le coppie sono ~120.000 e ripetere nomi e
 // categorie in ognuna costerebbe decine di megabyte al browser per niente.
-function bsVenAcc(){
-  return {ana: new Map(), sett: new Map(), escluse:0, totali:0, senzaData:0, righe:0};
+function bsVenAcc(tgUk){
+  return {ana: new Map(), sett: new Map(), escluse:0, totali:0, senzaData:0,
+          righe:0, tgUk: tgUk || null, convertite:0};
 }
 
 function bsParseVenduto(rows, fileName, acc){
@@ -1268,7 +1290,16 @@ function bsParseVenduto(rows, fileName, acc){
     v.net    += val;
     v.lordo  += bsNumIt(at(r,'VAL_LORDO'));
     v.sconto += bsNumIt(at(r,'SCONTOVAL'));
-    const tg = txt(r,'TAGLIA') || '—';
+    // La taglia si riscrive nella scala della giacenza quando l'EAN la conosce.
+    // Il gestionale esporta il venduto in EU (42) e lo stock in UK (8): sono la
+    // stessa taglia scritta in due modi, e affiancarle senza convertirle rende
+    // le due strisce della scheda prodotto illeggibili insieme.
+    // Se l'EAN non è nella fotografia (articolo esaurito ovunque) si tiene la
+    // taglia originale: meglio quella che niente.
+    const ean = txt(r,'BARCODE');
+    const conv = acc.tgUk && ean ? acc.tgUk[ean] : null;
+    if(conv) acc.convertite++;
+    const tg = conv || txt(r,'TAGLIA') || '—';
     const cur = v.tg.get(tg) || [0,0];
     cur[0] += q; cur[1] += val;
     v.tg.set(tg, cur);
@@ -1536,7 +1567,9 @@ async function bsSalvaVenduto(acc, quantiFile){
   bsLog(`<b>${quantiFile} file di venduto</b>: ${acc.righe.toLocaleString('it-IT')} righe`
         + ` · ${sett.size} settimane · ${report.length} report da salvare`
         + (acc.escluse ? ` · ${acc.escluse.toLocaleString('it-IT')} righe escluse (buste e servizi)` : '')
-        + (acc.senzaData ? ` · ${acc.senzaData} senza data valida` : ''));
+        + (acc.senzaData ? ` · ${acc.senzaData} senza data valida` : '')
+        + (acc.tgUk ? ` · ${acc.convertite.toLocaleString('it-IT')} taglie allineate alla giacenza`
+                    : ` · taglie non convertite (nessuna giacenza caricata)`));
   let fatti = 0;
   for(const rep of report){
     const store = bsResolveStore(rep.filiale);
@@ -1578,7 +1611,16 @@ async function bsImportFiles(files){
   // I file di venduto NON si salvano man mano: si sommano tutti qui e si
   // scrivono alla fine, una volta per settimana. Il motivo sta su bsVenAcc —
   // le settimane a cavallo di due mesi stanno in due file diversi.
-  const acc = bsVenAcc();
+  // La corrispondenza EAN → taglia della giacenza, chiesta una volta sola prima
+  // di leggere i file: serve a scrivere le taglie del venduto nella stessa
+  // scala dello stock. Se la fotografia non c'è ancora si procede lo stesso,
+  // con le taglie come le scrive il gestionale.
+  let tgUk = null;
+  try{
+    const r = await api('/bestseller/stock/taglie');
+    if(r.ok) tgUk = await r.json();
+  }catch(_){ /* senza conversione si va avanti: non è un motivo per fermarsi */ }
+  const acc = bsVenAcc(tgUk);
   let venFile = 0;
   for(const f of files){
     try{

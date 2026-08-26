@@ -1233,6 +1233,13 @@ body{display:flex;flex-direction:column}
    farebbe sballare la somma delle taglie rispetto ai pezzi venduti. */
 .bs-tg-neg .bs-tg-bar>i{background:var(--bs-red,#d8322a);opacity:.55}
 .bs-tg-neg .bs-tg-n{color:var(--bs-red,#d8322a)}
+/* La striscia della giacenza usa le stesse colonne di quella del venduto, così
+   le due si leggono in verticale. Barre vuote e non compresse: una taglia
+   venduta e non più a scaffale deve lasciare un buco visibile. */
+.bs-tg-gia{margin-top:8px}
+.bs-tg-gia .bs-tg-bar>i{background:var(--bs-muted,#8a8782)}
+.bs-tg-vuota{opacity:.35}
+.bs-tg-vuota .bs-tg-n{color:var(--bs-muted,#8a8782);font-weight:400}
 .bs-tg-no{margin-top:14px;font-size:11.5px;line-height:1.5;color:var(--bs-muted)}
 
 .bs-groups{padding:0 clamp(20px,3vw,38px) clamp(24px,3vw,38px);display:grid;

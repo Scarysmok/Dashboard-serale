@@ -194,6 +194,39 @@ check('26F', 'FW2026', bsStg('26F'));
 check('26S', 'SS2026', bsStg('26S'));
 check('sigla non riconosciuta resta com\'è', 'CON', bsStg('CON'));
 
+// ── 4b. Taglie riscritte nella scala della giacenza ─────────────────────
+// Il gestionale esporta il venduto in scala EU (42) e lo stock in scala UK (8):
+// sono la stessa taglia scritta in due modi, e affiancarle senza convertirle
+// renderebbe le due strisce della scheda prodotto illeggibili insieme.
+// L'EAN è il ponte, e viene dai dati — non da una tabella EU→UK inventata, che
+// sbaglierebbe sulle mezze misure.
+console.log('\nConversione delle taglie sulla scala della giacenza:');
+const MAPPA = {};
+MAPPA['40688ADIF6490'] = '8';        // l'EAN finto delle righe di prova
+const accC = bsVenAcc(MAPPA);
+bsParseVenduto(GIUGNO, 'giugno.xlsx', accC);
+const cRep = bsVenReport(accC);
+const cArt = art(trova(cRep, '905', '2026-06-29'), 'IF6490');
+check('le taglie note passano alla scala della giacenza',
+      ['8', 3, 165], cArt.sizes[0]);
+check('una sola taglia dopo la conversione (42 e 43 erano lo stesso EAN)',
+      1, cArt.sizes.length);
+check('i pezzi restano quelli', 3, cArt.units);
+check('quante righe sono state convertite', 3, accC.convertite);
+
+// Un EAN che nella fotografia non c'è (articolo esaurito ovunque) tiene la sua
+// taglia originale: meglio quella che niente.
+const kArt = art(trova(cRep, '905', '2026-06-29'), 'KE1677');
+check('taglia non convertita se l\'EAN è sconosciuto', 'M', kArt.sizes[0][0]);
+
+// Senza fotografia caricata l'import va avanti lo stesso, senza convertire.
+const accS = bsVenAcc(null);
+bsParseVenduto(GIUGNO, 'giugno.xlsx', accS);
+check('senza mappa non converte niente', 0, accS.convertite);
+// Restano separate come le scrive il gestionale (43 prima perché ha più pezzi).
+check('e le taglie restano quelle del gestionale', [['43',2,110],['42',1,55]],
+      art(trova(bsVenReport(accS), '905', '2026-06-29'), 'IF6490').sizes);
+
 // ── 5. Il salvataggio ───────────────────────────────────────────────────
 // Questa parte esiste per un motivo preciso: il 26/08 il lettore era giusto e
 // il salvataggio si è rotto lo stesso, su una variabile rimasta in una riga di
