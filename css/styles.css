@@ -1221,14 +1221,22 @@ body{display:flex;flex-direction:column}
 .bs-tg{margin-top:14px;border:1px solid var(--bs-line2);border-radius:14px;padding:12px 14px 10px}
 .bs-tg-h{font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.16em;
   text-transform:uppercase;color:var(--bs-muted);margin-bottom:10px}
-.bs-tg-list{display:flex;gap:6px;align-items:flex-end;overflow-x:auto;padding-bottom:2px;
+/* `align-items:flex-start` e non flex-end: le colonne senza vendite non hanno
+   la percentuale, quindi sono alte una riga in meno. Allineandole in basso il
+   loro contenuto slittava giù di una riga e l'etichetta della taglia finiva
+   all'altezza in cui le altre colonne scrivono la percentuale — si leggeva
+   come se "3-" fosse un valore di quella riga.
+   La barra ha comunque altezza fissa, quindi le barre restano allineate fra
+   loro: cambia solo che ogni colonna parte dallo stesso punto in alto. */
+.bs-tg-list{display:flex;gap:6px;align-items:flex-start;overflow-x:auto;padding-bottom:2px;
   overscroll-behavior:contain}
 .bs-tg-i{flex:0 0 auto;min-width:38px;text-align:center}
 .bs-tg-bar{height:42px;display:flex;align-items:flex-end;justify-content:center}
 .bs-tg-bar>i{display:block;width:14px;border-radius:3px 3px 0 0;background:var(--bs-ink)}
 .bs-tg-n{margin-top:5px;font-size:12px;font-weight:800;letter-spacing:-.02em;line-height:1}
 .bs-tg-t{margin-top:3px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--bs-ink)}
-.bs-tg-p{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--bs-muted)}
+.bs-tg-p{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--bs-muted);
+  min-height:1.2em}
 /* una taglia a saldo negativo (più resi che vendite) resta in elenco: toglierla
    farebbe sballare la somma delle taglie rispetto ai pezzi venduti. */
 .bs-tg-neg .bs-tg-bar>i{background:var(--bs-red,#d8322a);opacity:.55}
