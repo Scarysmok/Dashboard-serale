@@ -962,7 +962,8 @@ function bsAdminChips(d){
                        && bsCurPeriods().length === 1);
   return `
     <input type="file" id="bs-file" accept=".xlsx,.xls" multiple style="display:none">
-    <button class="bs-chip-btn" id="bs-import"${BS.busy?' disabled':''}>
+    <button class="bs-chip-btn" id="bs-import"${BS.busy?' disabled':''}
+      title="Venduto del gestionale, giacenza (file stock) o vecchio export adidas: &#10;ogni file viene riconosciuto dalle sue colonne, non serve dirlo.&#10;&#10;I file di venduto vanno caricati TUTTI INSIEME: la settimana a cavallo&#10;fra due mesi sta in due file, e si somma solo dentro lo stesso caricamento.">
       ${BS.busy?'⏳ Importo…':'📥 Importa Excel'}</button>
     <input type="file" id="bs-flagfile" accept=".xlsx,.xls" style="display:none">
     <button class="bs-chip-btn" id="bs-flags"${BS.busy?' disabled':''}>🏷 Importa saldi e CO</button>
