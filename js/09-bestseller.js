@@ -982,6 +982,56 @@ function bsFooter(){
   </div></footer>`;
 }
 
+// ── Dettaglio taglie nella scheda prodotto ──────────────────────────────
+// Le taglie arrivano dal venduto del gestionale (dal 26/08/2026). Le settimane
+// più vecchie, importate dall'export adidas, non ce l'hanno: lì il riquadro
+// dice perché manca invece di sparire, altrimenti sembra rotto.
+//
+// Qui l'ordine è quello NATURALE (38, 39, 40… / XS, S, M, L), non quello per
+// pezzi che usa il backend: serve a leggere la curva delle taglie, cioè se a
+// mancare sono le centrali o le estreme. Un elenco ordinato per volume non lo
+// farebbe vedere.
+const BS_TG_LETTERE = ['XXS','XS','S','M','L','XL','XXL','XXXL','3XL','4XL'];
+function bsTgOrd(t){
+  const s = String(t||'').trim().toUpperCase();
+  const num = s.replace(',', '.').match(/^(\d+(?:\.\d+)?)$/);
+  if(num) return [1, +num[1], s];
+  const mesi = s.match(/^(\d+)\s*-\s*(\d+)\s*M$/);      // 3-6M, 6-9M…
+  if(mesi) return [0, +mesi[1], s];
+  const anni = s.match(/^(\d+)\s*-\s*(\d+)\s*[AY]$/);   // 3-4A, 5-6Y…
+  if(anni) return [0, 100 + (+anni[1]), s];
+  const i = BS_TG_LETTERE.indexOf(s);
+  if(i > -1) return [2, i, s];
+  return [3, 0, s];                                     // NS, UN, — : in fondo
+}
+function bsTgCmp(a, b){
+  const x = bsTgOrd(a), y = bsTgOrd(b);
+  return x[0]-y[0] || x[1]-y[1] || x[2].localeCompare(y[2]);
+}
+
+function bsTaglie(p){
+  const tg = (p.sizes || []).slice();
+  // Testo neutro di proposito: manca sulle settimane importate dall'export
+  // adidas, ma anche sul link pubblico, dove le taglie non escono dal backend.
+  // Scrivere una sola delle due ragioni vorrebbe dire mentire nell'altro caso.
+  if(!tg.length) return `<div class="bs-tg-no">Dettaglio taglie non disponibile per questa selezione.</div>`;
+  tg.sort((a,b) => bsTgCmp(a[0], b[0]));
+  const max = Math.max(...tg.map(t => Math.abs(t[1])), 1);
+  const tot = tg.reduce((s,t) => s + t[1], 0) || 1;
+  return `<div class="bs-tg">
+    <div class="bs-tg-h">Taglie · ${tg.length} su ${bsFmt(p.units,'i')} pezzi</div>
+    <div class="bs-tg-list">${tg.map(t => {
+      const neg = t[1] < 0;
+      const h = Math.max(3, Math.round(Math.abs(t[1]) / max * 100));
+      return `<div class="bs-tg-i${neg?' bs-tg-neg':''}" title="${bsEsc(t[0])}: ${t[1]} pezzi, ${bsEur(t[2])}">
+        <div class="bs-tg-bar"><i style="height:${h}%"></i></div>
+        <div class="bs-tg-n">${bsFmt(t[1],'i')}</div>
+        <div class="bs-tg-t">${bsEsc(t[0])}</div>
+        <div class="bs-tg-p">${Math.round(t[1]/tot*100)}%</div>
+      </div>`;
+    }).join('')}</div></div>`;
+}
+
 function bsModal(p){
   // Posizione riferita alla classifica che l'utente sta guardando (filtri e
   // ordinamento attivi), non all'ordine originale del file.
@@ -1008,6 +1058,7 @@ function bsModal(p){
         <div class="bs-hero">${hero.map(h=>`<div>
           <div class="bs-hero-v">${bsEsc(h.v)}</div>
           <div class="bs-hero-l">${bsEsc(h.l)}</div></div>`).join('')}</div>
+        ${bsTaglie(p)}
       </div>
     </div>
     <div class="bs-groups">${groups}</div>
@@ -1047,10 +1098,13 @@ function bsLog(msg, err){
 // Le righe grezze del primo foglio. Separata dai due lettori perché il file si
 // apre UNA volta sola e poi si prova a riconoscerlo: aprirlo due volte
 // raddoppierebbe la memoria su file da 30.000 righe.
+// Torna anche il NOME del foglio: nel file della giacenza è l'unico posto dove
+// sta la data della fotografia (stockmanadaily__20260817020132).
 function bsRows(ab){
   const wb = XLSX.read(ab, {type:'array', cellDates:true});
-  const ws = wb.Sheets[wb.SheetNames[0]];
-  return XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:null});
+  const nome = wb.SheetNames[0];
+  const ws = wb.Sheets[nome];
+  return {rows: XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:null}), foglio: nome};
 }
 
 const bsTit = s => { const t=String(s||'').trim(); return t? t.charAt(0)+t.slice(1).toLowerCase() : ''; };
@@ -1260,6 +1314,114 @@ function bsVenReport(acc){
   return report;
 }
 
+// ── Giacenza: la fotografia del gestionale ──────────────────────────────
+// Una riga per negozio × articolo × taglia. NON è una serie storica: è un solo
+// giorno, e ricaricarla sostituisce quella precedente.
+// Qui il codice articolo è già quello adidas (COD ARTICOLO = IF6490), lo stesso
+// che il venduto ricava togliendo il prefisso AD. L'underwear no, e per quello
+// l'aggancio vero è l'EAN, che c'è su ogni riga.
+const BS_STOCK_REQ = ['FILIALE','EAN','QTA_STOCK','COD ARTICOLO'];
+// Nell'ordine di _BS_STOCK_COLS e _BS_STOCK_ART del backend: se cambia uno,
+// va cambiato anche l'altro.
+const BS_STOCK_ART = ['DESCRIZIONE','MARCHIO','DIVISION','GENDER','SPORTCODE',
+                      'MARKETING','STG','CARRYOVER','COLORE','MATERIALE'];
+
+// La data della fotografia. Il file non ha una colonna con la data: sta nel
+// nome del foglio (stockmanadaily__20260817020132) e, in seconda battuta, nel
+// nome del file ("stock 17.08.2026.xlsx"). Se non si trova né l'una né l'altra
+// è meglio fermarsi che scrivere la data di oggi: una giacenza datata male è
+// peggio di una giacenza assente, perché non si vede.
+function bsStockData(foglio, fileName){
+  const f = String(foglio||'').match(/(20\d{2})(\d{2})(\d{2})/);
+  if(f) return `${f[1]}-${f[2]}-${f[3]}`;
+  const n = String(fileName||'').match(/(\d{1,2})[.\-_/](\d{1,2})[.\-_/](20\d{2})/);
+  if(n) return `${n[3]}-${n[2].padStart(2,'0')}-${n[1].padStart(2,'0')}`;
+  return '';
+}
+
+function bsParseStock(rows, foglio, fileName){
+  let head = -1;
+  for(let i=0;i<Math.min(rows.length,30);i++){
+    const nomi = (rows[i]||[]).map(h => String(h==null?'':h).trim().toUpperCase());
+    if(BS_STOCK_REQ.every(n => nomi.indexOf(n) > -1)){ head = i; break; }
+  }
+  if(head < 0) return null;      // non è il file della giacenza
+
+  const snapshot = bsStockData(foglio, fileName);
+  if(!snapshot) throw new Error(
+    `${fileName}: non capisco a che data è questa giacenza. Serve la data nel `
+    + `nome del file (es. "stock 24.08.2026.xlsx") o nel nome del foglio.`);
+
+  const pos = {};
+  (rows[head]||[]).forEach((h,i) => {
+    const k = String(h==null?'':h).trim().toUpperCase();
+    if(k && !(k in pos)) pos[k] = i;
+  });
+  const at = (r,n) => { const i = pos[n]; return i===undefined ? null : r[i]; };
+  const txt = (r,n) => String(at(r,n)==null?'':at(r,n)).trim();
+
+  const negozi = new Map();      // filiale → {rows, articoli}
+  let escluse = 0, pezzi = 0, ordinati = 0;
+
+  for(let i=head+1;i<rows.length;i++){
+    const r = rows[i]; if(!r) continue;
+    const fil = txt(r,'FILIALE');
+    const cod = txt(r,'COD ARTICOLO');
+    if(!fil || !cod) continue;
+    // Le shopping bag non sono giacenza: non vengono mai caricate a magazzino e
+    // vendute sì, quindi vanno a -42.342 pezzi e da sole ribalterebbero il
+    // totale di due negozi sotto zero.
+    if(txt(r,'DIVISION').toUpperCase()==='SERVICE'){ escluse++; continue; }
+
+    let n = negozi.get(fil);
+    if(!n){ n = {rows: [], articoli: {}}; negozi.set(fil, n); }
+    const q = Math.round(bsNumIt(at(r,'QTA_STOCK')));
+    const o = Math.round(bsNumIt(at(r,'QTA_ORDINATA')));
+    // Le righe a zero si TENGONO: "la 42 è finita" è esattamente ciò che serve
+    // sapere quando la 43 ne ha ancora cinque.
+    n.rows.push([cod, txt(r,'EAN'), txt(r,'TG UK'), txt(r,'TGL__EU'), q, o,
+                 bsNumIt(at(r,'PREZZOVENDITA')), bsNumIt(at(r,'PREZZOFATTURA')),
+                 bsNumIt(at(r,'ALIQUOTA'))]);
+    if(!(cod in n.articoli))
+      n.articoli[cod] = BS_STOCK_ART.map(c => txt(r,c));
+    pezzi += q; ordinati += o;
+  }
+  return {snapshot, negozi, escluse, pezzi, ordinati};
+}
+
+async function bsSalvaStock(st, fileName){
+  let ok=0, ko=0;
+  bsLog(`<b>${bsEsc(fileName)}</b>: giacenza al ${bsEsc(bsPeriodLabel(st.snapshot))}`
+        + ` · ${st.negozi.size} negozi · ${st.pezzi.toLocaleString('it-IT')} pezzi`
+        + ` · ${st.ordinati.toLocaleString('it-IT')} in arrivo`
+        + (st.escluse ? ` · ${st.escluse} righe di servizio escluse` : ''));
+  for(const [fil, n] of st.negozi){
+    const store = bsResolveStore(fil);
+    if(!store){
+      bsLog(`Giacenza: filiale ${bsEsc(fil)} sconosciuta, saltata.`, true);
+      ko++; continue;
+    }
+    try{
+      // Un negozio per chiamata: il file intero è ~50.000 righe e mandarlo in
+      // un colpo solo vuol dire tenerlo tutto in memoria da entrambe le parti.
+      const r = await api('/bestseller/stock', {method:'POST', body: JSON.stringify({
+        brand: store.brand, location: store.location, filiale: fil,
+        snapshot: st.snapshot, rows: n.rows, articoli: n.articoli,
+      })});
+      if(!r.ok){
+        let detail = 'Errore '+r.status;
+        try{ const e = await r.json(); if(e.detail) detail = typeof e.detail==='string'?e.detail:JSON.stringify(e.detail); }catch(_){}
+        throw new Error(detail);
+      }
+      ok++;
+      bsLog(`<b>${bsEsc(store.location)}</b> · ${n.rows.length.toLocaleString('it-IT')} righe di giacenza — salvate`);
+    }catch(e){
+      ko++; bsLog(`Giacenza ${bsEsc(store.location)}: ${bsEsc(e.message||e)}`, true);
+    }
+  }
+  return [ok, ko];
+}
+
 // ── Parsing dell'Excel adidas (nel browser, con SheetJS) ────────────────
 // Struttura del file: righe di intestazione con "Date:", "Store:", "Season - new:",
 // poi la riga colonne con 'Product Code' in colonna B, poi i prodotti, poi TOTAL.
@@ -1358,15 +1520,20 @@ async function bsSalvaVenduto(acc, quantiFile){
         + ` · ${sett.size} settimane · ${report.length} report da salvare`
         + (acc.escluse ? ` · ${acc.escluse.toLocaleString('it-IT')} righe escluse (buste e servizi)` : '')
         + (acc.senzaData ? ` · ${acc.senzaData} senza data valida` : ''));
+  let fatti = 0;
   for(const rep of report){
     const store = bsResolveStore(rep.filiale);
     if(!store){
       if(!ignote.has(rep.filiale)){
         ignote.add(rep.filiale);
-        bsLog(`${bsEsc(fileName)}: filiale ${bsEsc(rep.filiale)} sconosciuta, salto le sue settimane.`, true);
+        bsLog(`Filiale ${bsEsc(rep.filiale)} sconosciuta: salto le sue settimane.`, true);
       }
       ko++; continue;
     }
+    // Un cenno ogni venti: 272 salvataggi sono minuti di silenzio, e un
+    // riquadro fermo non si distingue da un riquadro bloccato.
+    if(++fatti % 20 === 0)
+      bsLog(`…${fatti} di ${report.length} (${bsEsc(rep.period)})`);
     try{
       const r = await api('/bestseller/week', {method:'POST', body: JSON.stringify({
         brand: store.brand, location: store.location, store_raw: rep.filiale,
@@ -1384,7 +1551,7 @@ async function bsSalvaVenduto(acc, quantiFile){
       bsLog(`${bsEsc(store.location)} · ${bsEsc(rep.period)}: ${bsEsc(e.message||e)}`, true);
     }
   }
-  bsLog(`<b>${bsEsc(fileName)}</b> — ${ok} report salvati${ko?`, ${ko} falliti`:''}.`);
+  bsLog(`<b>Venduto</b> — ${ok} report salvati${ko?`, ${ko} falliti`:''}.`);
   return [ok, ko];
 }
 
@@ -1399,10 +1566,16 @@ async function bsImportFiles(files){
   for(const f of files){
     try{
       bsLog(`Leggo ${bsEsc(f.name)}…`);
-      const rows = bsRows(await f.arrayBuffer());
-      // Il file si riconosce da solo: se ha le colonne del gestionale è un
-      // venduto (uno o più mesi, tutti i negozi), altrimenti è l'export adidas.
+      const {rows, foglio} = bsRows(await f.arrayBuffer());
+      // Il file si riconosce da solo, dalle sue colonne: venduto del gestionale
+      // (uno o più mesi, tutti i negozi), giacenza, o export adidas.
       if(bsParseVenduto(rows, f.name, acc)){ venFile++; continue; }
+      const st = bsParseStock(rows, foglio, f.name);
+      if(st){
+        const [o, k] = await bsSalvaStock(st, f.name);
+        ok += o; ko += k;
+        continue;
+      }
       const parsed = bsParseWorkbook(rows, f.name);
       if(parsed.missingCols && parsed.missingCols.length)
         bsLog(`${bsEsc(f.name)}: in questo export mancano ${bsEsc(parsed.missingCols.join(', '))}`

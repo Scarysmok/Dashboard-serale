@@ -31,8 +31,11 @@ if(!src) throw new Error('non leggo ' + SRC + ' — lanciami dalla cartella Dash
 
 // Ritaglia una dichiarazione dal sorgente, bilanciando le parentesi.
 function ritaglia(nome, tipo){
-  const inizio = tipo === 'const' ? src.indexOf('const ' + nome) : src.indexOf('function ' + nome + '(');
+  let inizio = tipo === 'const' ? src.indexOf('const ' + nome) : src.indexOf('function ' + nome + '(');
   if(inizio < 0) throw new Error('non trovo ' + nome + ' in ' + SRC);
+  // Se la funzione è async il prefisso va tenuto, altrimenti gli await dentro
+  // diventano errori di sintassi.
+  if(tipo !== 'const' && src.slice(inizio-6, inizio) === 'async ') inizio -= 6;
   let g = 0, q = 0, t = 0, visto = false;
   for(let i = inizio; i < src.length; i++){
     const c = src[i];
@@ -186,5 +189,50 @@ check('26F', 'FW2026', bsStg('26F'));
 check('26S', 'SS2026', bsStg('26S'));
 check('sigla non riconosciuta resta com\'è', 'CON', bsStg('CON'));
 
-console.log(ko ? '\nFALLITI: ' + ko : '\nTutto a posto.');
-ko;
+// ── 5. Il salvataggio ───────────────────────────────────────────────────
+// Questa parte esiste per un motivo preciso: il 26/08 il lettore era giusto e
+// il salvataggio si è rotto lo stesso, su una variabile rimasta in una riga di
+// log dopo un cambio di firma ("Can't find variable: fileName"). Il messaggio
+// arrivava DOPO il ciclo, quindi i 272 report erano già stati scritti ma il
+// conteggio andava perso e a schermo compariva "0 ok, 1 con errori".
+// Controllare solo il lettore non basta: qui si esegue anche il salvataggio,
+// col server finto.
+console.log('\nSalvataggio (server finto):');
+eval(ritaglia('bsSalvaVenduto', 'fn'));
+
+const inviati = [];
+function api(path, opts){                       // finto: registra e dice ok
+  inviati.push([path, JSON.parse(opts.body)]);
+  return Promise.resolve({ok:true, status:200, json:() => Promise.resolve({ok:true})});
+}
+function bsEsc(s){ return String(s==null?'':s); }
+const messaggi = [];
+function bsLog(m, err){ messaggi.push((err?'! ':'') + m); }
+function bsResolveStore(fil){
+  const m = {'905':'Rende', '355':'Lecce City'};
+  return m[fil] ? {brand:'Adidas', location:m[fil]} : null;
+}
+
+const salvataggio = leggi([GIUGNO, LUGLIO]);
+
+// I controlli stanno DENTRO la promessa: in JavaScriptCore le microtask si
+// svuotano solo a fine script, quindi fuori di qui il salvataggio risulterebbe
+// fermo al primo await e i conteggi sarebbero tutti a uno.
+bsSalvaVenduto(salvataggio.acc, 2).then(function(){
+  check('nessun errore durante il salvataggio', [], messaggi.filter(m => m[0]==='!'));
+  check('una chiamata per ogni report', salvataggio.report.length, inviati.length);
+  check('tutte a /bestseller/week', true, inviati.every(x => x[0]==='/bestseller/week'));
+  check('ogni settimana-negozio scritta una volta sola',
+        inviati.length,
+        new Set(inviati.map(x => x[1].location + '|' + x[1].period_start)).size);
+  check('i prodotti viaggiano con le taglie', true,
+        inviati.every(x => x[1].products.every(p => Array.isArray(p.sizes))));
+  check('il riepilogo finale non esplode (era qui il bug del 26/08)', true,
+        messaggi.some(m => m.indexOf('report salvati') > -1));
+  console.log(ko ? '\nFALLITI: ' + ko : '\nTutto a posto.');
+}, function(e){
+  ko++;
+  console.log('  X il salvataggio ha lanciato: ' + (e && e.message || e));
+  console.log('\nFALLITI: ' + ko);
+});
+'(esito sopra)';
