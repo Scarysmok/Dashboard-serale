@@ -1234,7 +1234,10 @@ body{display:flex;flex-direction:column}
 .bs-tg-bar{height:42px;display:flex;align-items:flex-end;justify-content:center}
 .bs-tg-bar>i{display:block;width:14px;border-radius:3px 3px 0 0;background:var(--bs-ink)}
 .bs-tg-n{margin-top:5px;font-size:12px;font-weight:800;letter-spacing:-.02em;line-height:1}
-.bs-tg-t{margin-top:3px;font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--bs-ink)}
+/* La taglia sta sopra la barra: è la riga che si scorre per prima, e le due
+   strisce si leggono in verticale sulle stesse colonne. */
+.bs-tg-t{margin-bottom:5px;font-family:'JetBrains Mono',monospace;font-size:10px;
+  color:var(--bs-ink);line-height:1}
 .bs-tg-p{font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--bs-muted);
   min-height:1.2em}
 /* una taglia a saldo negativo (più resi che vendite) resta in elenco: toglierla

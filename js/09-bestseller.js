@@ -1051,16 +1051,21 @@ function bsTgStrip(righe, titolo, scala, cls){
   return `<div class="bs-tg${cls ? ' '+cls : ''}">
     <div class="bs-tg-h">${bsEsc(titolo)}</div>
     <div class="bs-tg-list">${scala.map(t => {
-      const n = q.get(t);
+      // Una taglia che in questa striscia non compare vale ZERO e si scrive
+      // "0": è un dato, non un dato mancante. "Zero venduti" e "zero in
+      // giacenza" sono le due informazioni più utili della scheda, e un
+      // trattino o un puntino le farebbero leggere come "non lo so".
+      const c = q.has(t), n = c ? q.get(t) : 0;
       const lab = bsTgLabel(t);
-      if(n === undefined) return `<div class="bs-tg-i bs-tg-vuota">
-        <div class="bs-tg-bar"></div><div class="bs-tg-n">·</div>
-        <div class="bs-tg-t">${bsEsc(lab)}</div><div class="bs-tg-p"></div></div>`;
-      const h = Math.max(3, Math.round(Math.abs(n) / max * 100));
-      return `<div class="bs-tg-i${n<0?' bs-tg-neg':''}" title="${bsEsc(lab)}: ${n}">
-        <div class="bs-tg-bar"><i style="height:${h}%"></i></div>
-        <div class="bs-tg-n">${bsFmt(n,'i')}</div>
+      // La taglia sta IN CIMA, sopra la barra: si leggono di fila su una riga
+      // sola e le barre restano libere, invece di essere separate dai numeri.
+      // Sotto la barra restano quantità e percentuale.
+      const h = n ? Math.max(3, Math.round(Math.abs(n) / max * 100)) : 0;
+      return `<div class="bs-tg-i${n<0?' bs-tg-neg':''}${n?'':' bs-tg-vuota'}"
+        title="${bsEsc(lab)}: ${n}">
         <div class="bs-tg-t">${bsEsc(lab)}</div>
+        <div class="bs-tg-bar">${h?`<i style="height:${h}%"></i>`:''}</div>
+        <div class="bs-tg-n">${bsFmt(n,'i')}</div>
         <div class="bs-tg-p">${Math.round(n/tot*100)}%</div>
       </div>`;
     }).join('')}</div></div>`;
