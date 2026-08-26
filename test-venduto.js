@@ -1,0 +1,190 @@
+/* Controllo del lettore del venduto del gestionale (js/09-bestseller.js).
+ *
+ * Le regole che questo file protegge, tutte già costate un errore vero durante
+ * la scrittura:
+ *
+ *  1. La riga dei TOTALI in fondo al file non è un articolo. Ha la filiale
+ *     vuota: se entrasse, il primo posto della classifica sarebbe "TOTALE".
+ *  2. La somma delle taglie deve fare i pezzi venduti. Scartare le taglie a
+ *     saldo negativo (un reso) rompe questa uguaglianza in silenzio.
+ *  3. Il valore si tiene in CENTESIMI. Arrotondando all'euro, con i saldi al
+ *     50% (27,50 · 16,50 · 7,50) lo 0,5 va sempre verso l'alto e l'errore si
+ *     accumula: 355 € di troppo in una settimana sola, misurati sul file vero.
+ *  4. DUE FILE CHE SI SPARTISCONO UNA SETTIMANA DEVONO DARE LO STESSO
+ *     RISULTATO DI UN FILE SOLO. Gli export sono mensili e la settimana a
+ *     cavallo di due mesi sta metà in uno e metà nell'altro; siccome salvare
+ *     una settimana la SOSTITUISCE, senza la somma preventiva si perderebbero
+ *     i giorni del primo file, senza un errore a schermo.
+ *  5. Le buste (LAB) e i servizi escono, l'UNDERWEAR (UW) resta: è merce.
+ *
+ * Non apre nessun Excel e non serve un browser: ritaglia dal sorgente le
+ * funzioni che servono e le esegue su righe finte con la stessa forma di
+ * quelle vere (numeri all'italiana, date come testo gg/mm/aaaa).
+ *
+ *     osascript -l JavaScript test-venduto.js
+ */
+ObjC.import('Foundation');
+
+const SRC = 'js/09-bestseller.js';
+const src = $.NSString.stringWithContentsOfFileEncodingError(SRC, $.NSUTF8StringEncoding, null).js;
+if(!src) throw new Error('non leggo ' + SRC + ' — lanciami dalla cartella Dashboard-serale');
+
+// Ritaglia una dichiarazione dal sorgente, bilanciando le parentesi.
+function ritaglia(nome, tipo){
+  const inizio = tipo === 'const' ? src.indexOf('const ' + nome) : src.indexOf('function ' + nome + '(');
+  if(inizio < 0) throw new Error('non trovo ' + nome + ' in ' + SRC);
+  let g = 0, q = 0, t = 0, visto = false;
+  for(let i = inizio; i < src.length; i++){
+    const c = src[i];
+    if(c === '{'){ g++; visto = true; }
+    else if(c === '}'){ g--; if(tipo !== 'const' && visto && !g) return src.slice(inizio, i+1); }
+    else if(c === '['){ q++; } else if(c === ']'){ q--; }
+    else if(c === '('){ t++; } else if(c === ')'){ t--; }
+    else if(tipo === 'const' && !g && !q && !t){
+      if(c === ';') return src.slice(inizio, i+1);
+      if(c === '\n' && src[i-1] !== ',' && src[i-1] !== '=') return src.slice(inizio, i);
+    }
+  }
+  throw new Error('blocco non chiuso: ' + nome);
+}
+
+eval([
+  ['BS_EXCLUDE','const'], ['BS_DIV','const'], ['BS_GEN','const'], ['BS_CAT','const'],
+  ['BS_VEN_REQ','const'], ['bsTit','const'], ['bsPad2','const'],
+  ['bsIsoDate','fn'], ['bsPeriodLabel','fn'], ['bsNumIt','fn'], ['bsCellDate','fn'],
+  ['bsSettimanaDi','fn'], ['bsStg','fn'], ['bsVenAcc','fn'],
+  ['bsParseVenduto','fn'], ['bsVenReport','fn'],
+].map(([n,t]) => ritaglia(n, t)).join('\n'));
+
+let ko = 0;
+function check(cosa, atteso, ottenuto){
+  const a = JSON.stringify(atteso), o = JSON.stringify(ottenuto);
+  if(a !== o){ ko++; console.log('  X ' + cosa + ': atteso ' + a + ', ottenuto ' + o); }
+  else console.log('  ok ' + cosa + ' = ' + o);
+}
+
+// ── Righe finte, nella forma esatta del file del gestionale ─────────────
+const COLONNE = ['ENTE','FILIALE','GIORNO','CASSA','SCONTRINO','ORA','VENDITORE',
+  'CASSIERA','NOME','BARCODE','TAGLIA','ARTICOLO','DESCRIZIONE','QTA','VAL_LORDO',
+  'PRZVENDITA','SCONTOMERCE','SCONTOVAL','SCONTOCLIVAL','BONIFICO','REALIZZO',
+  'CLASSIF7','DIVISION','CLASSIF8','MARKETING','STG','CLASSIF11','PRODOTTO',
+  'CLASSIF9','SPORTODE','CLASSIF10','TARGET_GROUP','CARD'];
+
+// giorno, filiale, articolo, taglia, qta, lordo, sconto, realizzo, divisione
+function riga(g, fil, art, tg, qta, lordo, sconto, realizzo, div){
+  const r = new Array(COLONNE.length).fill('');
+  r[0]='930'; r[1]=fil; r[2]=g; r[9]='40688'+art; r[10]=tg; r[11]=art;
+  r[12]='ARTICOLO '+art; r[13]=String(qta); r[14]=lordo; r[17]=sconto; r[20]=realizzo;
+  r[22]=div||'Apparel'; r[24]='ORIGINALS & PARTNERSHIP'; r[25]='26F';
+  r[27]='T-SHIRTS'; r[29]='ORIGINALS'; r[31]='MEN';
+  return r;
+}
+function totali(){                       // la riga in fondo: nessuna filiale
+  const r = new Array(COLONNE.length).fill('');
+  r[13]='6.882,00'; r[14]='361.061,45';
+  return r;
+}
+
+// Lunedì 29/06/2026 → domenica 05/07: la settimana che negli export mensili
+// sta a cavallo fra il file di giugno e quello di luglio.
+const GIUGNO = [COLONNE,
+  riga('29/06/2026','905','ADIF6490','42','1','110','55','55'),
+  riga('30/06/2026','905','ADIF6490','43','2','220','110','110'),
+  riga('30/06/2026','905','ADKE1677','M','1','60','30','30'),
+  riga('30/06/2026','355','ADIF6490','42','1','110','55','55'),
+  riga('30/06/2026','905','LAB33290','S','1','0,3','0','0,3','Service'),
+  riga('30/06/2026','905','UW40001','M','2','30','0','30'),
+  totali()];
+
+const LUGLIO = [COLONNE,
+  riga('01/07/2026','905','ADIF6490','42','3','330','165','165'),
+  riga('02/07/2026','905','ADIF6490','43','-1','-110','-55','-55'),
+  riga('02/07/2026','905','ADKE1677','L','1','60','30','30'),
+  // Reso di una taglia che in questa settimana non era mai stata venduta: il
+  // suo saldo resta negativo, ed è il caso che tiene in piedi la quadratura.
+  riga('05/07/2026','905','ADKE1677','S','-1','-60','-30','-30'),
+  // 06/07 è il lunedì dopo: deve finire in un'altra settimana
+  riga('06/07/2026','905','ADIF6490','42','1','110','55','55'),
+  totali()];
+
+function leggi(files){
+  const acc = bsVenAcc();
+  files.forEach((f,i) => bsParseVenduto(f, 'file'+i+'.xlsx', acc));
+  return {acc, report: bsVenReport(acc)};
+}
+const trova = (rep, fil, ps) => rep.find(r => r.filiale===fil && r.period_start===ps);
+const art = (r, code) => r && r.products.find(p => p.code===code);
+
+// ── 1. Struttura, settimane, esclusioni ─────────────────────────────────
+console.log('Un file solo (giugno):');
+let g = leggi([GIUGNO]);
+check('riga dei totali scartata', 1, g.acc.totali);
+check('righe escluse (busta LAB)', 1, g.acc.escluse);
+check('due negozi', 2, g.report.length);
+check('settimana dal lunedì', '2026-06-29', g.report[0].period_start);
+check('domenica di chiusura', '2026-07-05', g.report[0].period_end);
+check('periodo leggibile', '29/06/2026 - 05/07/2026', g.report[0].period);
+
+const g905 = trova(g.report, '905', '2026-06-29');
+check('underwear conservato col suo codice', true, !!art(g905, 'UW40001'));
+check('nessuna busta fra i codici', false, !!art(g905, 'LAB33290'));
+check('prefisso AD tolto dai codici adidas', true, !!art(g905, 'IF6490'));
+check('pezzi sommati sui giorni', 3, art(g905,'IF6490').units);
+check('valore in centesimi, non arrotondato', 165, art(g905,'IF6490').net);
+check('taglie del codice', [['43',2,110],['42',1,55]], art(g905,'IF6490').sizes);
+check('stagione tradotta come lo storico', 'FW2026', art(g905,'IF6490').all[5]);
+check('giacenza lasciata vuota (viene dal file stock)', null, art(g905,'IF6490').all[22]);
+
+// ── 2. La settimana spezzata fra due file ───────────────────────────────
+// È il punto per cui i file non si salvano uno per volta.
+console.log('\nDue file che si spartiscono la settimana 29/06-05/07:');
+const due = leggi([GIUGNO, LUGLIO]);
+const inv = leggi([LUGLIO, GIUGNO]);      // l'ordine non deve contare
+const d905 = trova(due.report, '905', '2026-06-29');
+
+check('la settimana a cavallo esiste una volta sola', 1,
+      due.report.filter(r => r.filiale==='905' && r.period_start==='2026-06-29').length);
+check('pezzi dei DUE file sommati (1+2+3-1)', 5, art(d905,'IF6490').units);
+check('valore dei due file sommato', 275, art(d905,'IF6490').net);
+check('i giorni di giugno non sono andati persi', true, art(d905,'IF6490').units > 3);
+// Confronto per lunghezza e non per contenuto: stampare due report interi
+// renderebbe illeggibile l'esito degli altri controlli.
+check('caricare i file in ordine inverso non cambia nulla', true,
+      JSON.stringify(due.report) === JSON.stringify(inv.report));
+
+// Il lunedì successivo è un'altra settimana, non deve confluire.
+check('06/07 finisce nella settimana dopo', true,
+      !!trova(due.report, '905', '2026-07-06'));
+check('e porta il suo unico pezzo', 1, art(trova(due.report,'905','2026-07-06'),'IF6490').units);
+
+// ── 3. Resi e quadratura delle taglie ───────────────────────────────────
+console.log('\nResi e quadratura:');
+const ke = art(d905, 'KE1677');
+check('articolo con un venduto e un reso: resta 1 pezzo netto', 1, ke.units);
+check('la somma delle taglie fa i pezzi venduti', ke.units,
+      ke.sizes.reduce((s,t) => s+t[1], 0));
+check('la taglia resa resta, col segno', true, ke.sizes.some(t => t[1] < 0));
+
+let quadra = true;
+for(const r of due.report) for(const p of r.products)
+  if(p.sizes.reduce((s,t)=>s+t[1],0) !== p.units) quadra = false;
+check('quadratura taglie-pezzi su TUTTI i report', true, quadra);
+
+// ── 4. Numeri all'italiana ──────────────────────────────────────────────
+console.log('\nLettura dei numeri:');
+check('"361.061,45" (punto = migliaia, virgola = decimali)', 361061.45, bsNumIt('361.061,45'));
+check('"27,5"', 27.5, bsNumIt('27,5'));
+check('"4.96" senza virgola = decimale (così scrive il file stock)', 4.96, bsNumIt('4.96'));
+check('vuoto', 0, bsNumIt(''));
+check('numero già numero', 12.5, bsNumIt(12.5));
+check('testo non numerico', 0, bsNumIt('n.d.'));
+
+console.log('\nSettimane e stagioni:');
+check('lunedì di un lunedì è se stesso', ['2026-06-29','2026-07-05'], bsSettimanaDi('2026-06-29'));
+check('lunedì di una domenica è sei giorni prima', ['2026-06-29','2026-07-05'], bsSettimanaDi('2026-07-05'));
+check('26F', 'FW2026', bsStg('26F'));
+check('26S', 'SS2026', bsStg('26S'));
+check('sigla non riconosciuta resta com\'è', 'CON', bsStg('CON'));
+
+console.log(ko ? '\nFALLITI: ' + ko : '\nTutto a posto.');
+ko;

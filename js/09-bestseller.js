@@ -1043,14 +1043,228 @@ function bsLog(msg, err){
   else bsPaint();
 }
 
+// ── Lettura dei file (nel browser, con SheetJS) ─────────────────────────
+// Le righe grezze del primo foglio. Separata dai due lettori perché il file si
+// apre UNA volta sola e poi si prova a riconoscerlo: aprirlo due volte
+// raddoppierebbe la memoria su file da 30.000 righe.
+function bsRows(ab){
+  const wb = XLSX.read(ab, {type:'array', cellDates:true});
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  return XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:null});
+}
+
+const bsTit = s => { const t=String(s||'').trim(); return t? t.charAt(0)+t.slice(1).toLowerCase() : ''; };
+
+// Numeri all'italiana: "361.061,45" → 361061.45.
+// Il punto è separatore di migliaia SOLO se c'è anche la virgola: da solo è un
+// decimale, perché il file stock scrive i prezzi come "4.96". Sbagliare qui
+// vuol dire un prezzo fattura di 4.960 euro invece di 4,96.
+function bsNumIt(v){
+  if(v===null || v===undefined || v==='') return 0;
+  if(typeof v === 'number') return v;
+  const s = String(v).trim().replace(/\s/g,'');
+  const n = Number(s.includes(',') ? s.replace(/\./g,'').replace(',','.') : s);
+  return isFinite(n) ? n : 0;
+}
+
+const bsPad2 = n => String(n).padStart(2,'0');
+// La data di una cella: SheetJS può restituirla come testo "gg/mm/aaaa" o come
+// Date. Nel secondo caso si leggono i campi locali e non toISOString(), che
+// sposta di fuso e può far scivolare la riga al giorno prima — e quindi alla
+// settimana prima, se capita di lunedì.
+function bsCellDate(v){
+  if(v instanceof Date && !isNaN(v))
+    return `${v.getFullYear()}-${bsPad2(v.getMonth()+1)}-${bsPad2(v.getDate())}`;
+  return bsIsoDate(v);
+}
+
+// Lunedì e domenica della settimana di una data ISO. Le settimane del modulo
+// vanno da lunedì a domenica, come l'export adidas che c'era prima: così le
+// settimane nuove si affiancano allo storico senza disallinearsi.
+function bsSettimanaDi(iso){
+  const d = new Date(iso+'T00:00:00');
+  if(isNaN(d)) return null;
+  d.setDate(d.getDate() - ((d.getDay()+6) % 7));
+  const lun = `${d.getFullYear()}-${bsPad2(d.getMonth()+1)}-${bsPad2(d.getDate())}`;
+  d.setDate(d.getDate()+6);
+  return [lun, `${d.getFullYear()}-${bsPad2(d.getMonth()+1)}-${bsPad2(d.getDate())}`];
+}
+
+// "26F" → "FW2026", "26S" → "SS2026".
+// Il gestionale scrive la stagione in codice, l'export adidas per esteso. Senza
+// questa traduzione il filtro Stagione mostrerebbe due voci per la stessa
+// stagione, una per sorgente, e nessuna delle due completa.
+function bsStg(v){
+  const m = String(v||'').trim().toUpperCase().match(/^(\d{2})([FS])$/);
+  return m ? (m[2]==='F' ? 'FW' : 'SS') + (2000 + (+m[1])) : String(v||'').trim();
+}
+
+// ── Venduto del gestionale (una riga per riga di scontrino) ─────────────
+// Sorgente nuova dal 26/08/2026, al posto dell'export adidas. Cosa cambia:
+//  · una riga per riga di scontrino, non un aggregato → si conosce la TAGLIA
+//  · tutti i negozi in un file solo, riconosciuti dal codice FILIALE
+//  · un file può coprire più settimane (i mensili) → ne escono più report
+//  · i resi ci sono, con QTA negativa: il venduto è netto davvero
+//  · NIENTE GIACENZA: quella arriva dal file stock, che è un'altra cosa
+//
+// Il codice articolo del gestionale è "AD" + codice adidas (ADIH9762 → IH9762),
+// e così torna a essere la stessa chiave dello storico, delle foto e dei flag.
+// L'underwear non segue quella regola (UW4…, che nello stock è 4A0193-202):
+// resta col suo codice interno, e la giacenza gli si aggancia per EAN.
+const BS_VEN_REQ = ['FILIALE','GIORNO','ARTICOLO','QTA','REALIZZO'];
+
+// L'accumulatore condiviso da TUTTI i file di una stessa importazione.
+//
+// Perché non si salva un file per volta: gli export sono mensili, e una
+// settimana a cavallo di due mesi sta metà in un file e metà nell'altro (la
+// 29/06-05/07 sta in giugno e in luglio). Siccome salvare una settimana la
+// SOSTITUISCE, caricando prima giugno e poi luglio quella settimana resterebbe
+// con i soli 5 giorni di luglio, senza un errore a schermo. Capita una decina
+// di volte l'anno. Quindi: si leggono tutti i file, si somma, e ogni settimana
+// si scrive una volta sola.
+//
+// `ana` tiene l'anagrafica UNA volta per codice invece che per ogni coppia
+// settimana-negozio: su otto mesi le coppie sono ~120.000 e ripetere nomi e
+// categorie in ognuna costerebbe decine di megabyte al browser per niente.
+function bsVenAcc(){
+  return {ana: new Map(), sett: new Map(), escluse:0, totali:0, senzaData:0, righe:0};
+}
+
+function bsParseVenduto(rows, fileName, acc){
+  // La riga dei titoli si cerca, non si dà per scontata: negli export grezzi
+  // sopra ci possono essere righe di intestazione del gestionale.
+  let head = -1;
+  for(let i=0;i<Math.min(rows.length,30);i++){
+    const nomi = (rows[i]||[]).map(h => String(h==null?'':h).trim().toUpperCase());
+    if(BS_VEN_REQ.every(n => nomi.indexOf(n) > -1)){ head = i; break; }
+  }
+  if(head < 0) return null;     // non è un file di venduto: ci pensa l'altro lettore
+
+  const pos = {};
+  (rows[head]||[]).forEach((h,i) => {
+    const k = String(h==null?'':h).trim().toUpperCase();
+    if(k && !(k in pos)) pos[k] = i;
+  });
+  const at = (r,n) => { const i = pos[n]; return i===undefined ? null : r[i]; };
+  const txt = (r,n) => String(at(r,n)==null?'':at(r,n)).trim();
+
+  for(let i=head+1;i<rows.length;i++){
+    const r = rows[i]; if(!r) continue;
+    // Filiale vuota = la riga dei totali in fondo al file. Senza questo scarto
+    // il primo posto della classifica sarebbe "TOTALE" con 6.882 pezzi.
+    const fil = txt(r,'FILIALE');
+    if(!fil){ acc.totali++; continue; }
+    const art = txt(r,'ARTICOLO').toUpperCase();
+    if(!art) continue;
+    // Fuori le buste e il materiale di consumo. L'UNDERWEAR (UW) resta: è merce
+    // che si vende, e senza di lei mancherebbe un pezzo dell'assortimento.
+    if(BS_EXCLUDE.has(art) || /^(LAB|PRA)/.test(art)){ acc.escluse++; continue; }
+    if(txt(r,'DIVISION').toUpperCase()==='SERVICE'){ acc.escluse++; continue; }
+
+    const iso = bsCellDate(at(r,'GIORNO'));
+    const sett = iso ? bsSettimanaDi(iso) : null;
+    if(!sett){ acc.senzaData++; continue; }
+
+    const code = art.startsWith('AD') ? art.slice(2) : art;
+    if(!acc.ana.has(code)){
+      const cat = txt(r,'SPORTODE'), gen = txt(r,'TARGET_GROUP'), div = txt(r,'DIVISION');
+      // Le 28 posizioni dell'export adidas: si riempie quello che il gestionale
+      // sa, il resto resta null e in scheda prodotto compare "—". Giacenza,
+      // sell-through e WOS (22..27) restano vuote di proposito: le riempie il
+      // file stock, che è una fotografia e non un dato di settimana.
+      const all = new Array(28).fill(null);
+      all[0] = code;
+      all[1] = txt(r,'DESCRIZIONE');
+      all[2] = cat.toUpperCase();
+      all[3] = all[4] = gen.toUpperCase();
+      all[5] = bsStg(at(r,'STG'));
+      all[6] = txt(r,'MARKETING');
+      all[8] = div.toUpperCase();
+      acc.ana.set(code, {
+        all, name: all[1],
+        cat:    BS_CAT[cat.toUpperCase()] || bsTit(cat),
+        gender: BS_GEN[gen.toUpperCase()] || bsTit(gen),
+        div:    BS_DIV[div.toUpperCase()] || bsTit(div),
+      });
+    }
+
+    const k = sett[0] + '|' + fil + '|' + code;
+    let v = acc.sett.get(k);
+    if(!v){ v = {units:0, net:0, lordo:0, sconto:0, tg:new Map()}; acc.sett.set(k, v); }
+    const q = Math.round(bsNumIt(at(r,'QTA')));
+    const val = bsNumIt(at(r,'REALIZZO'));
+    v.units  += q;
+    v.net    += val;
+    v.lordo  += bsNumIt(at(r,'VAL_LORDO'));
+    v.sconto += bsNumIt(at(r,'SCONTOVAL'));
+    const tg = txt(r,'TAGLIA') || '—';
+    const cur = v.tg.get(tg) || [0,0];
+    cur[0] += q; cur[1] += val;
+    v.tg.set(tg, cur);
+    acc.righe++;
+  }
+  return true;
+}
+
+// Chiude l'accumulatore: da (settimana, filiale, codice) ai report da salvare,
+// uno per coppia settimana-negozio.
+function bsVenReport(acc){
+  const per = new Map();     // "settimana|filiale" → elenco prodotti
+  for(const [k, v] of acc.sett){
+    // Un articolo che nella settimana ha solo resi non è un best seller.
+    if(!(v.units > 0)) continue;
+    const taglio = k.lastIndexOf('|');
+    const chiave = k.slice(0, taglio);
+    const code = k.slice(taglio+1);
+    const a = acc.ana.get(code);
+    if(!a) continue;
+    // Centesimi, non euro interi. Qui i mezzi euro sono ovunque (saldi al 50%:
+    // 27,50 · 16,50 · 7,50) e Math.round manda sempre lo 0,5 verso l'alto:
+    // l'errore non si compensa, si somma sempre dallo stesso lato. Misurato sul
+    // file del 10-16/08: 355 € di troppo in una settimana sola.
+    const net = +v.net.toFixed(2);
+    const all = a.all.slice();
+    all[12] = net;
+    all[13] = v.units;
+    all[19] = +v.sconto.toFixed(2);
+    all[20] = v.lordo ? +(v.sconto / v.lordo).toFixed(4) : null;
+    all[21] = +(net / v.units).toFixed(2);
+    // Si tolgono solo le taglie a saldo esattamente zero (venduta e resa nella
+    // stessa settimana: non dicono niente e contano zero). Le NEGATIVE restano,
+    // per quanto strane da leggere: se un articolo ha venduto 3 M e avuto un
+    // reso in L, togliere la L farebbe sballare la somma delle taglie rispetto
+    // ai pezzi venduti — ed è proprio quella somma che dice se il dettaglio
+    // taglie è affidabile.
+    const sizes = [...v.tg.entries()]
+      .filter(([,t]) => t[0] !== 0)
+      .map(([t,x]) => [t, x[0], +x[1].toFixed(2)])
+      .sort((x,y) => y[1]-x[1] || String(x[0]).localeCompare(String(y[0])));
+    let lista = per.get(chiave);
+    if(!lista){ lista = []; per.set(chiave, lista); }
+    lista.push({code, name: a.name, cat: a.cat, gender: a.gender, div: a.div,
+                units: v.units, net, all, sizes});
+  }
+  const report = [];
+  for(const [chiave, lista] of per){
+    const [lun, fil] = chiave.split('|');
+    lista.sort((a,b) => b.units - a.units);
+    const dom = bsSettimanaDi(lun)[1];
+    report.push({
+      filiale: fil, period_start: lun, period_end: dom,
+      period: `${bsPeriodLabel(lun)} - ${bsPeriodLabel(dom)}`,
+      season: '', products: lista,
+    });
+  }
+  report.sort((a,b) => a.period_start.localeCompare(b.period_start)
+                    || a.filiale.localeCompare(b.filiale));
+  return report;
+}
+
 // ── Parsing dell'Excel adidas (nel browser, con SheetJS) ────────────────
 // Struttura del file: righe di intestazione con "Date:", "Store:", "Season - new:",
 // poi la riga colonne con 'Product Code' in colonna B, poi i prodotti, poi TOTAL.
-function bsParseWorkbook(ab, fileName){
-  const wb = XLSX.read(ab, {type:'array', cellDates:true});
-  const ws = wb.Sheets[wb.SheetNames[0]];
-  const rows = XLSX.utils.sheet_to_json(ws, {header:1, raw:true, defval:null});
-
+// Resta in servizio per lo storico e per chi ha ancora file vecchi da caricare.
+function bsParseWorkbook(rows, fileName){
   let storeRaw='', periodLabel='', season='', head=-1;
   for(let i=0;i<rows.length;i++){
     const c0 = rows[i] && rows[i][0];
@@ -1131,13 +1345,65 @@ function bsResolveStore(storeRaw){
   return {brand:'Adidas', location:adidas[idx].location};
 }
 
+// Salva i report ricavati da un file di venduto: una chiamata per ogni coppia
+// settimana-negozio. Un mensile ne produce una quarantina (≈4,5 settimane × 8
+// negozi), e vanno mandati uno alla volta: il documento di una settimana pesa
+// centinaia di kB e spedirli tutti insieme vuol dire tenerli tutti in memoria.
+async function bsSalvaVenduto(acc, quantiFile){
+  let ok=0, ko=0;
+  const ignote = new Set();
+  const report = bsVenReport(acc);
+  const sett = new Set(report.map(r => r.period_start));
+  bsLog(`<b>${quantiFile} file di venduto</b>: ${acc.righe.toLocaleString('it-IT')} righe`
+        + ` · ${sett.size} settimane · ${report.length} report da salvare`
+        + (acc.escluse ? ` · ${acc.escluse.toLocaleString('it-IT')} righe escluse (buste e servizi)` : '')
+        + (acc.senzaData ? ` · ${acc.senzaData} senza data valida` : ''));
+  for(const rep of report){
+    const store = bsResolveStore(rep.filiale);
+    if(!store){
+      if(!ignote.has(rep.filiale)){
+        ignote.add(rep.filiale);
+        bsLog(`${bsEsc(fileName)}: filiale ${bsEsc(rep.filiale)} sconosciuta, salto le sue settimane.`, true);
+      }
+      ko++; continue;
+    }
+    try{
+      const r = await api('/bestseller/week', {method:'POST', body: JSON.stringify({
+        brand: store.brand, location: store.location, store_raw: rep.filiale,
+        period: rep.period, period_start: rep.period_start,
+        period_end: rep.period_end, season: rep.season, products: rep.products,
+      })});
+      if(!r.ok){
+        let detail = 'Errore '+r.status;
+        try{ const e = await r.json(); if(e.detail) detail = typeof e.detail==='string'?e.detail:JSON.stringify(e.detail); }catch(_){}
+        throw new Error(detail);
+      }
+      ok++;
+    }catch(e){
+      ko++;
+      bsLog(`${bsEsc(store.location)} · ${bsEsc(rep.period)}: ${bsEsc(e.message||e)}`, true);
+    }
+  }
+  bsLog(`<b>${bsEsc(fileName)}</b> — ${ok} report salvati${ko?`, ${ko} falliti`:''}.`);
+  return [ok, ko];
+}
+
 async function bsImportFiles(files){
   BS.busy = true; bsPaint();
   let ok=0, ko=0;
+  // I file di venduto NON si salvano man mano: si sommano tutti qui e si
+  // scrivono alla fine, una volta per settimana. Il motivo sta su bsVenAcc —
+  // le settimane a cavallo di due mesi stanno in due file diversi.
+  const acc = bsVenAcc();
+  let venFile = 0;
   for(const f of files){
     try{
       bsLog(`Leggo ${bsEsc(f.name)}…`);
-      const parsed = bsParseWorkbook(await f.arrayBuffer(), f.name);
+      const rows = bsRows(await f.arrayBuffer());
+      // Il file si riconosce da solo: se ha le colonne del gestionale è un
+      // venduto (uno o più mesi, tutti i negozi), altrimenti è l'export adidas.
+      if(bsParseVenduto(rows, f.name, acc)){ venFile++; continue; }
+      const parsed = bsParseWorkbook(rows, f.name);
       if(parsed.missingCols && parsed.missingCols.length)
         bsLog(`${bsEsc(f.name)}: in questo export mancano ${bsEsc(parsed.missingCols.join(', '))}`
           + ` — restano vuote in scheda, il resto è allineato per nome di colonna.`);
@@ -1166,6 +1432,14 @@ async function bsImportFiles(files){
             + (parsed.excluded ? ` (${parsed.excluded} buste escluse)` : ''));
     }catch(e){
       ko++; bsLog(`${bsEsc(f.name)}: ${bsEsc(e.message||e)}`, true);
+    }
+  }
+  if(venFile){
+    try{
+      const [o, k] = await bsSalvaVenduto(acc, venFile);
+      ok += o; ko += k;
+    }catch(e){
+      ko++; bsLog(`Salvataggio del venduto: ${bsEsc(e.message||e)}`, true);
     }
   }
   // Ricarico indice e corrispondenze, poi riparto dalla settimana appena caricata.
