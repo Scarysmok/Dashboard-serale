@@ -468,6 +468,7 @@ function bsPaint(){
     ${hasF?'<button class="bs-reset" id="bs-reset">Azzera ✕</button>':''}
   </div></div>
   <section class="bs-section bs-list">
+    <div class="bs-listhead">
     <div class="bs-sechead bs-tight"><h3>Classifica</h3><div class="bs-rule"></div>
       <span class="bs-secmeta">${list.length} prodotti · ${list.reduce((s,x)=>s+(x.units||0),0)} pz${
         // Quando c'è la fotografia dello stock, la giacenza NON è un dato della
@@ -488,6 +489,7 @@ function bsPaint(){
         <div class="bs-c-wos">${bsWosPicker()}</div>
       </div>
       <div class="bs-c-chev"></div>
+    </div>
     </div>
     <div class="bs-rows">${rows || `<div class="bs-empty">
       <div class="bs-empty-t">Nessun prodotto</div>
