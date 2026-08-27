@@ -1323,6 +1323,10 @@ body{display:flex;flex-direction:column}
    mandare a capo tutte insieme sul telefono. */
 .bs-c-nums{display:contents}
 
+/* Nell'intestazione la cella della miniatura serve solo a tenere la colonna:
+   niente sfondo e niente altezza, altrimenti disegna un quadrato grigio e
+   alza la riga dei titoli. */
+
 /* Sotto i 760px cade il sell-through, sotto i 640 anche il valore: la
    COPERTURA resta, perché è quella su cui si agisce e il sell-through è la
    stessa informazione detta in un altro modo. */
@@ -1333,49 +1337,87 @@ body{display:flex;flex-direction:column}
   .bs-thead .bs-c-net,.bs-row .bs-c-net{display:none}
 }
 
-/* Sotto i 560px i numeri vanno A CAPO, sotto al prodotto.
-   Misurato prima di questa regola: a 390px al nome restavano 12px e a 375px
-   ZERO — il testo usciva da una scatola larga niente e finiva sopra i numeri.
-   Limare le larghezze non bastava: numero, foto, freccia e tre colonne si
-   mangiano da soli tutta la riga di un telefono. */
+/* Il doppione dei badge: gli stessi CO/SALES compaiono due volte nel markup,
+   sulla riga del nome e su quella del codice, e ogni layout ne nasconde uno.
+   Spostarli da un genitore all'altro col CSS non si può, e sono due elementi
+   minuscoli: costa meno duplicarli che generare markup diverso per il telefono. */
+.bs-bdg-mob{display:none}
+
+/* ── Classifica sul telefono ─────────────────────────────────────────────
+   Sotto i 560px la riga diventa DENSA e su una riga sola: miniatura piccola,
+   nome, codice coi badge, e le tre colonne numeriche a destra.
+   Il perché: con la quinta colonna il layout largo si rompeva — misurato, al
+   nome restavano 12px a 390px e ZERO a 375px — e la versione a due righe che
+   l'aveva risolto mostrava solo tre articoli per schermata. Questa ne mostra
+   sette, ed è la lista che si scorre per cercare, non per contemplare.
+   L'intestazione resta appiccicata in alto, così le colonne non perdono mai
+   il nome anche dopo cento righe. */
 @media(max-width:560px){
-  .bs-row,.bs-thead{flex-wrap:wrap;row-gap:10px}
-  /* Stesso rientro orizzontale della riga: l'intestazione ne aveva 4px e la
-     riga 10, e quei 6px bastavano a far sembrare i numeri spostati rispetto
-     alle etichette. */
-  .bs-thead{padding-left:clamp(10px,1.4vw,18px);padding-right:clamp(10px,1.4vw,18px)}
-  .bs-c-main{flex:1 1 100px}
-  /* Le tre celle si dividono la riga in PARTI UGUALI, e valgono sia per
-     l'intestazione sia per i dati: così ogni numero cade esattamente sotto la
-     sua etichetta. Dimensionandole sul contenuto non si incolonnavano —
-     "GIACENZA" è largo il doppio di "136" — e i numeri finivano tutti
-     ammucchiati a sinistra.
-     Niente rientro sotto la foto: servirebbero altri 112px e le etichette non
-     ci starebbero più (a 390px resterebbero 68px per "GIACENZA", che ne
-     chiede 95). */
-  .bs-c-nums{display:flex;flex:1 1 100%;gap:10px;align-items:flex-end;padding-left:0}
-  .bs-c-nums > div{flex:1 1 0;min-width:0;text-align:left}
-  /* Serve la stessa specificità di `.bs-thead .bs-c-ohq{text-align:right}`,
-     che sta più in basso nel file e altrimenti vince: l'etichetta GIACENZA
-     restava spinta a destra dentro la sua cella mentre il numero sotto era a
-     sinistra, e sembrava di nuovo disallineata. */
-  .bs-thead .bs-c-nums > div{text-align:left}
-  /* I numeri vanno DOPO la freccia, non prima: così la freccia resta in fondo
-     alla prima riga accanto al prodotto, dov'è sempre stata. Con `order`
-     e non spostando il markup, che su schermo largo deve restare com'è. */
-  .bs-c-nums{order:1}
+  .bs-thead{position:sticky;top:0;z-index:5;padding:10px 10px 8px;gap:6px;
+    background:rgba(246,245,243,.94);backdrop-filter:blur(10px)}
+  .bs-row{gap:6px;padding:8px 10px}
+  .bs-c-rank{flex:0 0 14px;font-size:11px}
+  .bs-c-img{flex:0 0 30px;border-radius:7px}
+  .bs-c-img .bs-ph svg{width:52%}
+  /* L'intestazione usa ORA le stesse classi della riga (bs-c-rank, bs-c-img,
+     bs-c-main, bs-c-chev) invece di misure scritte a mano: prima erano stili
+     in linea, che battono qualunque regola CSS, e le colonne non si potevano
+     allineare. */
+  /* Margini laterali ridotti: quaranta pixel di aria su un telefono da 390
+     sono un decimo della riga, e li paga il nome del prodotto. */
+  .bs-list{padding-left:8px;padding-right:8px}
+
+  .bs-rname{font-size:12.5px;line-height:1.2}
+  /* Sul telefono i badge scendono accanto al CODICE: sulla riga del nome lo
+     accorciavano a "ADIL…", e il nome è l'unica cosa che fa riconoscere un
+     articolo in una lista di 1.854. */
+  .bs-bdg-desk{display:none}
+  .bs-bdg-mob{display:inline-flex;align-items:center;gap:5px}
+  .bs-rmeta{margin-top:2px;gap:5px;flex-wrap:nowrap;font-size:9px}
+  /* La categoria esce: la si legge nella scheda, e in lista rubava la riga. */
+  .bs-rcat,.bs-minidot{display:none}
+  /* Badge ridotti: leggibili, ma senza pesare quanto il nome. */
+  .bs-rmeta .bs-co{border-width:1.5px;padding:0 2px;font-size:7px;line-height:1.5}
+  .bs-rmeta .bs-sale{padding:1px 4px;font-size:7px;letter-spacing:.12em;line-height:1.4}
+
+  /* I numeri restano in riga, a larghezza fissa: intestazione e dati usano le
+     stesse misure, quindi ogni numero cade sotto la sua etichetta. */
+  .bs-c-nums{display:contents}
+
+/* Nell'intestazione la cella della miniatura serve solo a tenere la colonna:
+   niente sfondo e niente altezza, altrimenti disegna un quadrato grigio e
+   alza la riga dei titoli. */
+.bs-thead .bs-c-img{background:none;aspect-ratio:auto;height:auto;border-radius:0}
+  /* Prefisso .bs-row/.bs-thead necessario: `.bs-c-ohq` ha una regola più in
+     basso nel file con la stessa specificità, che le rimetterebbe 52px e
+     sfalserebbe la colonna rispetto alla sua etichetta. */
+  .bs-row .bs-c-units,.bs-row .bs-c-ohq,.bs-row .bs-c-wos,
+  .bs-thead .bs-c-units,.bs-thead .bs-c-ohq,.bs-thead .bs-c-wos{
+    text-align:right;min-width:0}
+  .bs-row .bs-c-units,.bs-thead .bs-c-units{flex:0 0 36px}
+  .bs-row .bs-c-ohq,.bs-thead .bs-c-ohq{flex:0 0 40px}
+  /* La colonna copertura è più larga delle altre perché la sua intestazione È
+     il pulsante "WOS 4s": senza `min-width:0` un elemento flex non scende
+     sotto la larghezza del proprio contenuto, quindi quella cella si prendeva
+     19px in più e sfalsava tutte le colonne rispetto alle etichette. */
+  .bs-row .bs-c-wos,.bs-thead .bs-c-wos{flex:0 0 56px}
+  .bs-runits{font-size:13px;font-weight:800}
+  .bs-bar{display:none}                 /* la barra non ci sta e non serve */
+  .bs-rohq{font-size:13px}
+  .bs-ohq-note{display:none}
+  .bs-c-wos{font-size:13px;font-weight:800}
+  .bs-c-chev{flex:0 0 9px;font-size:15px}
+  .bs-thead .bs-c-units,.bs-thead .bs-c-ohq,.bs-thead .bs-c-wos{
+    font-size:9px;font-weight:400;text-align:right}
+  .bs-wospick .bs-picker-btn{font-size:9px;letter-spacing:.16em}
 
   /* La X della scheda prodotto scende IN BASSO A DESTRA, fissa.
      In alto finiva sotto la barra nera dell'app — la scheda è più alta dello
-     schermo, quindi scorrendo il pulsante saliva e spariva — ed era comunque
-     l'angolo più lontano dal pollice. Qui non può essere coperta da niente e
-     resta ferma mentre si scorre. Target 52px, sopra i 44 di Apple. */
-  /* Senza questa riga la X non si vede proprio. `.bs-modal` ha un'animazione
-     con fill-mode `both`, quindi conserva il transform finale — e un elemento
-     con transform diventa il riferimento dei figli `position:fixed`. La X
-     restava ancorata al fondo della SCHEDA, che è lunga tre schermate, invece
-     che al fondo dello schermo: misurata 292px sotto il bordo inferiore.
-     Sul telefono l'animazione d'ingresso non manca a nessuno. */
+     schermo — ed era l'angolo più lontano dal pollice. Target 52px.
+     `animation:none` non è cosmetico: l'animazione con fill-mode `both`
+     conserva il transform finale, e un elemento con transform diventa il
+     riferimento dei figli `position:fixed`. Senza toglierla la X restava
+     ancorata al fondo della SCHEDA, 292px sotto il bordo dello schermo. */
   .bs-modal{animation:none}
   .bs-x{position:fixed;top:auto;left:auto;
     right:calc(14px + env(safe-area-inset-right));
@@ -1384,6 +1426,7 @@ body{display:flex;flex-direction:column}
     background:var(--bs-ink);color:#fff;
     box-shadow:0 10px 26px -8px rgba(0,0,0,.65)}
 }
+
 
 /* ── Best Seller · selettore negozio/settimana ──────────────────────────
    Il <select> nativo non è stilizzabile (la tendina la disegna il sistema

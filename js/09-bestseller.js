@@ -418,9 +418,11 @@ function bsPaint(){
       <div class="bs-c-rank">${i+1}</div>
       <div class="bs-c-img">${bsImg(p)}</div>
       <div class="bs-c-main">
-        <div class="bs-rname"><span class="bs-rn-t">${bsEsc(p.name)}</span>${bsBadges(p)}</div>
-        <div class="bs-rmeta"><b>${bsEsc(p.code)}</b><span class="bs-minidot"></span>
-          <span>${bsEsc(p.div)} · ${bsEsc(p.gender)} · ${bsEsc(p.cat)}</span></div>
+        <div class="bs-rname"><span class="bs-rn-t">${bsEsc(p.name)}</span>
+          <span class="bs-bdg-desk">${bsBadges(p)}</span></div>
+        <div class="bs-rmeta"><b>${bsEsc(p.code)}</b>
+          <span class="bs-bdg-mob">${bsBadges(p)}</span><span class="bs-minidot"></span>
+          <span class="bs-rcat">${bsEsc(p.div)} · ${bsEsc(p.gender)} · ${bsEsc(p.cat)}</span></div>
       </div>
       <div class="bs-c-nums">
         <div class="bs-c-units">
@@ -475,9 +477,9 @@ function bsPaint(){
         d && d.giacenza_al ? ' · giacenza al ' + bsEsc(bsPeriodLabel(d.giacenza_al))
           : (bsPeriodsOf(d).length > 1 ? ' · giacenza a fine periodo' : '')}</span></div>
     <div class="bs-thead">
-      <div style="flex:0 0 34px">#</div>
-      <div style="flex:0 0 clamp(48px,5vw,64px)">Art.</div>
-      <div style="flex:1 1 auto">Prodotto</div>
+      <div class="bs-c-rank">#</div>
+      <div class="bs-c-img"></div>
+      <div class="bs-c-main">Prodotto</div>
       <div class="bs-c-nums">
         <div class="bs-c-units">Pezzi</div>
         <div class="bs-c-ohq">Giacenza</div>
@@ -485,7 +487,7 @@ function bsPaint(){
         <div class="bs-c-st">Sell-thru</div>
         <div class="bs-c-wos">${bsWosPicker()}</div>
       </div>
-      <div style="flex:0 0 14px"></div>
+      <div class="bs-c-chev"></div>
     </div>
     <div class="bs-rows">${rows || `<div class="bs-empty">
       <div class="bs-empty-t">Nessun prodotto</div>
