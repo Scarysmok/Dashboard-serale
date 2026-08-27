@@ -1082,7 +1082,12 @@ body{display:flex;flex-direction:column}
 .bs-pnet{font-size:16px;font-weight:800;line-height:1;letter-spacing:-.02em}
 
 /* barra filtri */
-.bs-tools{position:sticky;top:0;z-index:20;background:rgba(246,245,243,.88);backdrop-filter:blur(14px);
+/* La barra dei filtri NON resta appiccicata in alto: scorre via come tutto il
+   resto. Appiccicata era invece l'intestazione della classifica (vedi
+   .bs-thead), perché scorrendo mille articoli quello che serve sapere è che
+   colonna si sta leggendo, non che filtri ci sono — quelli si ritrovano
+   tornando su, e intanto rubavano un quarto di schermo. */
+.bs-tools{position:relative;z-index:20;background:rgba(246,245,243,.88);backdrop-filter:blur(14px);
   border-bottom:1px solid var(--bs-line);margin-top:clamp(32px,4vw,52px)}
 .bs-tools-in{max-width:1240px;margin:0 auto;padding:14px clamp(20px,5vw,56px);display:flex;
   flex-wrap:wrap;gap:10px;align-items:center}
@@ -1123,10 +1128,17 @@ body{display:flex;flex-direction:column}
 .bs-reset:hover{background:var(--bs-ink);color:#fff}
 
 /* classifica */
+/* Appiccicata in alto, su tutte le larghezze: è la riga che dice cosa sono i
+   numeri, e in una lista da 1.854 articoli serve sempre.
+   Lo sfondo non è decorazione: senza, le righe le passerebbero sotto e si
+   leggerebbero due testi sovrapposti. */
 .bs-thead{display:flex;align-items:center;gap:clamp(10px,1.4vw,18px);padding:16px 4px 10px;
   font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;
-  color:var(--bs-faint)}
-.bs-rows{background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 1px 0 #e4e2de}
+  color:var(--bs-ink);font-weight:700;position:sticky;top:0;z-index:15;
+  background:rgba(246,245,243,.96);backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--bs-line2)}
+.bs-rows{background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 1px 0 #e4e2de;
+  margin-top:10px}
 .bs-row{display:flex;align-items:center;gap:clamp(10px,1.4vw,18px);
   padding:clamp(10px,1.2vw,14px) clamp(10px,1.4vw,18px);border-bottom:1px solid var(--bs-line3);
   cursor:pointer;transition:background .18s;border-left:0;border-right:0;border-top:0;background:#fff;
@@ -1375,8 +1387,7 @@ body{display:flex;flex-direction:column}
    L'intestazione resta appiccicata in alto, così le colonne non perdono mai
    il nome anche dopo cento righe. */
 @media(max-width:560px){
-  .bs-thead{position:sticky;top:0;z-index:5;padding:10px 10px 8px;gap:6px;
-    background:rgba(246,245,243,.94);backdrop-filter:blur(10px)}
+  .bs-thead{padding:10px 10px 8px;gap:6px}
   .bs-row{gap:6px;padding:8px 10px}
   .bs-c-rank{flex:0 0 14px;font-size:11px}
   .bs-c-img{flex:0 0 30px;border-radius:7px}
@@ -1426,7 +1437,10 @@ body{display:flex;flex-direction:column}
   .bs-c-wos{font-size:13px;font-weight:800}
   .bs-c-chev{flex:0 0 9px;font-size:15px}
   .bs-thead .bs-c-units,.bs-thead .bs-c-ohq,.bs-thead .bs-c-wos{
-    font-size:9px;font-weight:400;text-align:right;overflow:hidden;white-space:nowrap}
+    font-size:9px;font-weight:400;text-align:right;white-space:nowrap}
+  /* Solo su queste due: sulla colonna WOS un overflow nascosto taglierebbe la
+     tendina, che si apre da lì dentro. */
+  .bs-thead .bs-c-units,.bs-thead .bs-c-ohq{overflow:hidden}
   .bs-lab-l{display:none}
   .bs-lab-s{display:inline}
   /* Spaziatura più stretta delle altre etichette: "WOS 4s ▾" con .16em
