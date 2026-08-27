@@ -35,7 +35,7 @@ const BS = {
   // Sono a spunta come i due selettori in alto, quindi "Calzature e Accessori"
   // o "Uomo e Donna" si possono tenere insieme. Per sconto e carry over i valori
   // sono 'si' e 'no': spuntarli entrambi equivale a non filtrare.
-  f: {div: [], gen: [], cat: [], sea: [], sale: [], carry: []},
+  f: {div: [], gen: [], cat: [], sea: [], sale: [], carry: [], stock: []},
   detail: null,     // prodotto aperto nella scheda
   busy: false,
   log: [],
@@ -297,7 +297,25 @@ const BS_FILTRI = [
   {k:'sea',   lab:'Stagione',  da: all => bsUniq(all.map(bsSeason)).sort(bsSeasonCmp)},
   {k:'sale',  lab:'Sconto',    fissi: [{v:'si', t:'A sconto'}, {v:'no', t:'Non a sconto'}]},
   {k:'carry', lab:'Carry over',fissi: [{v:'si', t:'Carry over'}, {v:'no', t:'Non carry over'}]},
+  // Giacenza: serve soprattutto ordinando per copertura. Copertura 0 non è un
+  // caso strano, vuol dire giacenza 0 — e ordinando dalla copertura più corta
+  // in cima finiscono tutti gli ESAURITI, che non "stanno per finire" ma sono
+  // già finiti: occupano le prime posizioni della lista che dovrebbe dire su
+  // cosa intervenire, ed è proprio lì che non si può fare niente.
+  //   Disponibile → cosa sta per finire ed è ancora spostabile fra i negozi
+  //   Esaurito    → cosa vendeva e non c'è più: la lista del riassortimento
+  {k:'stock', lab:'Giacenza', fissi: [{v:'si', t:'Disponibile'}, {v:'no', t:'Esaurito'}]},
 ];
+
+// "si" se ne resta almeno un pezzo, "no" se è esaurito, stringa vuota se la
+// giacenza non la sappiamo (nessuna fotografia caricata). Il terzo caso NON è
+// "esaurito": senza il dato non si può affermare né una cosa né l'altra, e
+// quegli articoli restano fuori da entrambe le spunte invece di finire fra gli
+// esauriti per difetto.
+function bsStockStato(p){
+  const n = bsOhq(p);
+  return n == null ? '' : (n > 0 ? 'si' : 'no');
+}
 
 function bsFiltered(){
   const q = BS.query.trim().toLowerCase();
@@ -306,6 +324,7 @@ function bsFiltered(){
     bsPassa('sea', bsSeason(p)) &&
     bsPassa('sale',  bsFlag(p).salePct ? 'si' : 'no') &&
     bsPassa('carry', bsFlag(p).carry   ? 'si' : 'no') &&
+    bsPassa('stock', bsStockStato(p)) &&
     (!q || (p.name||'').toLowerCase().includes(q) || (p.code||'').toLowerCase().includes(q)));
   if(BS.sort === 'wos'){
     // CRESCENTE, al contrario degli altri due: la domanda è "cosa sto per
@@ -2338,7 +2357,7 @@ function bsBind(){
 // non hanno senso su un'altra (una divisione può non esserci nemmeno).
 function bsResetView(){
   BS.query = '';
-  BS.f = {div: [], gen: [], cat: [], sea: [], sale: [], carry: []};
+  BS.f = {div: [], gen: [], cat: [], sea: [], sale: [], carry: [], stock: []};
   BS.detail = null;
 }
 

@@ -266,6 +266,44 @@ check('senza mappa non converte niente', 0, accS.convertite);
 check('e le taglie restano quelle del gestionale', [['43',2,110],['42',1,55]],
       art(trova(bsVenReport(accS), '905', '2026-06-29'), 'IF6490').sizes);
 
+// ── 6. Filtro "Giacenza" della classifica ───────────────────────────────
+// Serve soprattutto ordinando per copertura: copertura 0 vuol dire giacenza 0,
+// quindi in cima finiscono gli ESAURITI, che non stanno per finire ma sono già
+// finiti. La spunta "Disponibile" li toglie; quella opposta dà la lista del
+// riassortimento.
+console.log('\nFiltro Giacenza:');
+// BS_I_OHQ è dichiarato insieme ad altri sulla stessa riga, quindi si ritaglia
+// per il primo nome della riga: viene su tutta la dichiarazione.
+eval([ritaglia('BS_I_UNITS','const'), ritaglia('bsOhq','fn'),
+      ritaglia('bsStockStato','fn'), ritaglia('bsPassa','fn'),
+      // `const` dentro eval resta confinato lì: `var` invece esce, ed è l'unico
+      // modo di usare l'indice anche nelle righe qui sotto.
+      'var I_OHQ = BS_I_OHQ;'].join('\n'));
+var BS = {f: {stock: []}};
+
+const conGiac = n => { const a = new Array(28); a[I_OHQ] = n; return {all: a}; };
+check('giacenza positiva → disponibile', 'si', bsStockStato(conGiac(12)));
+check('giacenza zero → esaurito', 'no', bsStockStato(conGiac(0)));
+// Le giacenze negative sono errori di inventario, non merce: valgono esaurito.
+check('giacenza negativa → esaurito', 'no', bsStockStato(conGiac(-3)));
+// Terzo stato: senza fotografia caricata la giacenza NON si sa, e "non si sa"
+// non è "esaurito". Dirlo esaurito farebbe sparire l'articolo dalla lista dei
+// disponibili e comparire in quella del riassortimento, tutte e due sbagliate.
+check('giacenza sconosciuta → nessuno dei due', '', bsStockStato({all: new Array(28)}));
+
+BS.f.stock = [];
+check('senza spunte passano tutti', [true, true, true],
+      [conGiac(12), conGiac(0), {all: new Array(28)}].map(p => bsPassa('stock', bsStockStato(p))));
+BS.f.stock = ['si'];
+check('"Disponibile": passa solo chi ne ha', [true, false, false],
+      [conGiac(12), conGiac(0), {all: new Array(28)}].map(p => bsPassa('stock', bsStockStato(p))));
+BS.f.stock = ['no'];
+check('"Esaurito": passa solo chi è a zero', [false, true, false],
+      [conGiac(12), conGiac(0), {all: new Array(28)}].map(p => bsPassa('stock', bsStockStato(p))));
+BS.f.stock = ['si', 'no'];
+check('spuntati tutti e due: come nessuno, tranne gli sconosciuti', [true, true, false],
+      [conGiac(12), conGiac(0), {all: new Array(28)}].map(p => bsPassa('stock', bsStockStato(p))));
+
 // ── 5. Il salvataggio ───────────────────────────────────────────────────
 // Questa parte esiste per un motivo preciso: il 26/08 il lettore era giusto e
 // il salvataggio si è rotto lo stesso, su una variabile rimasta in una riga di
