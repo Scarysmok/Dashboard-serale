@@ -53,6 +53,11 @@ const BS = {
   // true = il prossimo recupero dell'elenco foto salta la copia locale.
   // Lo accende il tasto ↻ (vedi bsFetchPhotoList).
   photosForce: false,
+  // Settimane su cui il backend misura il ritmo di vendita per la copertura.
+  // È una scelta di MISURA, non di dati: cambiandola la classifica resta la
+  // stessa e si muove solo la colonna WOS. Il valore viaggia nella richiesta e
+  // fa parte della chiave di cache, altrimenti si vedrebbe la colonna vecchia.
+  wos: 4,
   loadedKey: null,  // chiave della selezione che sta a schermo (vedi bsCommitSel)
 };
 
@@ -74,6 +79,7 @@ const BS_GROUPS = [
   {title:'Stock & rotazione', idx:[22,23,24,25,26,27]},
 ];
 const BS_I_UNITS = 13, BS_I_ST = 25, BS_I_OHQ = 22;   // OHQ = giacenza residua
+const BS_I_WOS = 27;   // settimane di copertura
 const BS_I_SEASON = 5;   // colonna G dell'export: la stagione è un dato per articolo
 
 // Ordina le stagioni dalla più recente: FW2026, SS2026, FW2025… L'ordine
@@ -247,14 +253,15 @@ async function bsLoadCurrent(){
     // torna un payload solo. Farla qui vorrebbe dire scaricare e tenere in
     // memoria un aggregato per settimana (~550 kB l'uno) per poi buttarne via la
     // gran parte — su un telefono è proprio il lavoro che non regge.
+    const w = '&wos=' + encodeURIComponent(BS.wos);
     const path = (ps.length > 1 || st.length > 1)
       ? '/bestseller/range?periods='+encodeURIComponent(ps.join(','))
-        + st.map(s => '&stores='+encodeURIComponent(s)).join('')
+        + st.map(s => '&stores='+encodeURIComponent(s)).join('') + w
       : c.aggregate
-        ? '/bestseller/aggregate?period_start='+encodeURIComponent(c.period_start)
+        ? '/bestseller/aggregate?period_start='+encodeURIComponent(c.period_start) + w
         : '/bestseller/week?brand='+encodeURIComponent(c.brand)
           +'&location='+encodeURIComponent(c.location)
-          +'&period_start='+encodeURIComponent(c.period_start);
+          +'&period_start='+encodeURIComponent(c.period_start) + w;
     // Stessa cache degli altri insiemi pesanti: IndexedDB + versione da
     // /datasets/version. L'aggregato è ~550 kB che il backend ricalcola a ogni
     // richiesta (misurato il 03/08) e la versione cambia solo quando si importa.
@@ -262,7 +269,7 @@ async function bsLoadCurrent(){
     // dentro la fotografia dello stock, quindi ricaricarla deve invalidare la
     // copia locale. Senza questo, dopo aver caricato lo stock si continuerebbe
     // a vedere la classifica di prima, con la colonna giacenza vuota.
-    BS.data = await fetchCached(bsCacheKey(c), path,
+    BS.data = await fetchCached(bsCacheKey(c) + '~w' + BS.wos, path,
                                 _dsVersions.bestseller + '~' + (_dsVersions.bsstock || ''));
     if(!BS.data || !BS.data.products) BS.data = {error: 'Report non disponibile'};
     else { await bsAttachPhotos(BS.data.products); await bsLoadFlags(); }
@@ -300,6 +307,14 @@ function bsFiltered(){
     bsPassa('sale',  bsFlag(p).salePct ? 'si' : 'no') &&
     bsPassa('carry', bsFlag(p).carry   ? 'si' : 'no') &&
     (!q || (p.name||'').toLowerCase().includes(q) || (p.code||'').toLowerCase().includes(q)));
+  if(BS.sort === 'wos'){
+    // CRESCENTE, al contrario degli altri due: la domanda è "cosa sto per
+    // finire", quindi in cima va la copertura più corta. Chi non ha copertura
+    // misurabile (fermo, o senza dati) va in fondo: non è merce che urge.
+    const k = p => { const v = (p.all||[])[BS_I_WOS];
+      return (v === null || v === undefined || v === '') ? Infinity : Number(v); };
+    return list.slice().sort((a,b) => k(a)-k(b) || b.units-a.units);
+  }
   return list.slice().sort((a,b)=> BS.sort==='units' ? b.units-a.units : b.net-a.net);
 }
 
@@ -417,6 +432,7 @@ function bsPaint(){
       </div>
       <div class="bs-c-net">${bsEur(p.net)}</div>
       <div class="bs-c-st${stOk && st<0.5 ? ' bs-low':''}">${stOk?bsFmt(st,'p'):'—'}</div>
+      <div class="bs-c-wos">${bsWosTxt(p)}</div>
       <div class="bs-c-chev">›</div>
     </button>`;
   }).join('');
@@ -432,7 +448,8 @@ function bsPaint(){
   ${bsLogBox()}
   ${list.length>=3?`<section class="bs-section">
     <div class="bs-sechead"><h3>Podio</h3><div class="bs-rule"></div>
-      <span class="bs-secmeta">Top 3 · ${BS.sort==='units'?'per pezzi venduti':'per valore netto'}</span></div>
+      <span class="bs-secmeta">Top 3 · ${BS.sort==='units'?'per pezzi venduti'
+        :BS.sort==='wos'?'copertura più corta':'per valore netto'}</span></div>
     <div class="bs-podium">${podium}</div>
   </section>`:''}
   <div class="bs-tools"><div class="bs-tools-in">
@@ -442,6 +459,7 @@ function bsPaint(){
     <div class="bs-sortgrp">
       <button class="bs-sortbtn${BS.sort==='units'?' bs-on':''}" data-sort="units">Pezzi</button>
       <button class="bs-sortbtn${BS.sort==='net'?' bs-on':''}" data-sort="net">Valore</button>
+      <button class="bs-sortbtn${BS.sort==='wos'?' bs-on':''}" data-sort="wos">Copertura</button>
     </div>
     ${hasF?'<button class="bs-reset" id="bs-reset">Azzera ✕</button>':''}
   </div></div>
@@ -462,6 +480,7 @@ function bsPaint(){
       <div class="bs-c-ohq">Giacenza</div>
       <div class="bs-c-net">Valore</div>
       <div class="bs-c-st">Sell-thru</div>
+      <div class="bs-c-wos">${bsWosPicker()}</div>
       <div style="flex:0 0 14px"></div>
     </div>
     <div class="bs-rows">${rows || `<div class="bs-empty">
@@ -503,6 +522,45 @@ function bsFilterPicker(f, all){
           <span class="bs-picker-mark"></span>
           <span class="bs-picker-lab">${bsEsc(o.t)}</span></button>`;
       }).join('')}
+    </div>
+  </div>`;
+}
+
+// ── Settimane di copertura (WOS) ────────────────────────────────────────
+// Quante settimane dura la giacenza al ritmo di vendita RECENTE. Il ritmo lo
+// calcola il backend sulle ultime N settimane caricate, non su quelle che stai
+// guardando: la domanda è "al ritmo di adesso quanto mi dura", e il ritmo di
+// adesso non cambia perché apro gennaio. Conseguenza da sapere: cambiando le
+// settimane questa colonna NON cambia. Cambia solo col filtro negozi e con N.
+const BS_WOS_SETT = [2, 4, 8, 12];
+
+function bsWosTxt(p){
+  const v = (p.all || [])[BS_I_WOS];
+  if(v === null || v === undefined || v === '') return '<span class="bs-wos-no">—</span>';
+  // 99 è il tetto, non una misura: vuol dire fermo. Scriverlo come numero
+  // farebbe credere a una copertura di 99 settimane, che è un'altra cosa.
+  if(v >= 99) return '<span class="bs-wos-fermo">fermo</span>';
+  const n = Number(v);
+  return `<span class="bs-wos-v${n <= 2 ? ' bs-wos-corta' : ''}">`
+       + `${n.toLocaleString('it-IT',{maximumFractionDigits:1})}<i>s</i></span>`;
+}
+
+// L'intestazione della colonna È il comando: aprendola si sceglie su quante
+// settimane misurare il ritmo. Sta qui e non nella barra dei filtri perché non
+// filtra niente — cambia solo come si misura questa colonna.
+function bsWosPicker(){
+  return `<div class="bs-picker bs-wospick" data-picker="wos">
+    <button class="bs-picker-btn" aria-haspopup="listbox" aria-expanded="false">
+      <span class="bs-picker-cur">WOS ${BS.wos}s</span>
+      <span class="bs-picker-chev">▼</span>
+    </button>
+    <div class="bs-picker-panel" role="listbox">
+      <div class="bs-picker-hint">Settimane su cui si misura il ritmo di vendita.
+        Non cambia i dati a schermo, solo questa colonna.</div>
+      ${BS_WOS_SETT.map(n => `<button class="bs-picker-opt${n===BS.wos?' bs-sel':''}"
+        role="option" aria-selected="${n===BS.wos}" data-wos="${n}">
+        <span class="bs-picker-mark"></span>
+        <span class="bs-picker-lab">${n} settimane${n===4?' · consigliato':''}</span></button>`).join('')}
     </div>
   </div>`;
 }
@@ -1104,11 +1162,25 @@ function bsModal(p){
     {l:'Vendite nette', v:bsEur(p.net)},
     {l:'Sell through', v:bsFmt((p.all||[])[BS_I_ST],'p')},
   ];
+  // Righe che non stanno nelle 28 colonne dell'export adidas perché non
+  // vengono da lì: la merce in arrivo e la copertura che la considera. Qui c'è
+  // spazio, e qui si decide un riacquisto — dove l'ordinato conta eccome.
+  const extra = {
+    'Stock & rotazione': [
+      ['Ordinato · in arrivo', p.ordinato == null ? '—' : bsFmt(p.ordinato, 'i')],
+      ['Copertura con ordinato', p.wos_ord == null ? '—'
+        : (p.wos_ord >= 99 ? 'fermo'
+          : Number(p.wos_ord).toLocaleString('it-IT',{maximumFractionDigits:1}) + ' sett.')],
+    ],
+  };
   const groups = BS_GROUPS.map(g=>`
     <div><div class="bs-gtitle">${bsEsc(g.title)}</div>
       ${g.idx.map(i=>`<div class="bs-fld">
         <span class="bs-fld-l">${bsEsc(BS_FIELDS[i].l)}</span>
         <span class="bs-fld-v">${bsEsc(bsFmt((p.all||[])[i], BS_FIELDS[i].t))}</span></div>`).join('')}
+      ${(extra[g.title]||[]).map(([l,v])=>`<div class="bs-fld">
+        <span class="bs-fld-l">${bsEsc(l)}</span>
+        <span class="bs-fld-v">${bsEsc(v)}</span></div>`).join('')}
     </div>`).join('');
   return `<div class="bs-backdrop" id="bs-backdrop"><div class="bs-modal">
     <button class="bs-x" id="bs-close">✕</button>
@@ -2144,6 +2216,19 @@ function bsBind(){
       bsPaint();
     }));
   on('bs-reset','click', () => { bsResetView(); bsPaint(); });
+
+  // Tendina WOS: cambia solo la MISURA, quindi la selezione non si tocca. Ma il
+  // ritmo lo calcola il server, quindi serve ricaricare: la colonna non si può
+  // ricalcolare qui, i dati per farlo non ci sono.
+  document.querySelectorAll('#bs-root [data-wos]').forEach(b =>
+    b.addEventListener('click', e => {
+      e.stopPropagation();
+      const n = +b.dataset.wos;
+      if(n === BS.wos){ bsClosePickers(); return; }
+      BS.wos = n;
+      BS.detail = null;
+      bsLoadCurrent();
+    }));
 
   document.querySelectorAll('#bs-root [data-sort]').forEach(b =>
     b.addEventListener('click', () => { BS.sort = b.dataset.sort; bsPaint(); }));

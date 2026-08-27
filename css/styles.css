@@ -1145,15 +1145,38 @@ body{display:flex;flex-direction:column}
   color:var(--bs-muted)}
 .bs-rmeta b{color:var(--bs-ink);font-weight:500}
 .bs-minidot{width:2px;height:2px;border-radius:50%;background:#cfccc6}
-.bs-c-units{flex:0 0 clamp(58px,7vw,92px);text-align:right}
+.bs-c-units{flex:0 0 clamp(52px,6vw,84px);text-align:right}
 .bs-runits{font-size:clamp(16px,1.5vw,20px);font-weight:900;line-height:1;letter-spacing:-.03em}
 .bs-bar{margin-top:7px;height:3px;border-radius:2px;background:var(--bs-line2);overflow:hidden}
 .bs-bar i{display:block;height:100%;background:var(--bs-ink)}
-.bs-c-net{flex:0 0 clamp(66px,8vw,110px);text-align:right;font-size:clamp(12px,1.1vw,14px);
+.bs-c-net{flex:0 0 clamp(60px,7vw,96px);text-align:right;font-size:clamp(12px,1.1vw,14px);
   font-weight:800;letter-spacing:-.01em}
-.bs-c-st{flex:0 0 clamp(52px,6vw,80px);text-align:right;font-family:'JetBrains Mono',monospace;
+.bs-c-st{flex:0 0 clamp(46px,5vw,68px);text-align:right;font-family:'JetBrains Mono',monospace;
   font-size:11.5px;font-weight:500}
 .bs-c-st.bs-low{color:var(--bs-faint)}
+
+/* Copertura (WOS). Quinta colonna numerica: con le altre quattro rimpicciolite
+   ci sta, e l'intestazione È il comando che sceglie su quante settimane
+   misurare il ritmo — vedi bsWosPicker. */
+.bs-c-wos{flex:0 0 clamp(58px,6.5vw,86px);text-align:right;font-family:'JetBrains Mono',monospace;
+  font-size:11.5px;font-weight:500;color:var(--bs-ink)}
+.bs-c-wos i{font-style:normal;color:var(--bs-faint);margin-left:1px}
+/* Copertura corta = merce che sta per finire: è il caso su cui si agisce. */
+.bs-wos-corta{color:var(--bs-red,#d8322a);font-weight:800}
+/* "fermo" e non 99: 99 è il tetto, e scritto come numero farebbe credere a una
+   copertura di 99 settimane invece che a un articolo che non gira. */
+.bs-wos-fermo{font-size:10px;letter-spacing:.06em;color:var(--bs-faint)}
+.bs-wos-no{color:var(--bs-faint)}
+/* Il pulsante della tendina sta dentro l'intestazione: niente sfondo, si allinea
+   a destra come il testo delle altre intestazioni. */
+.bs-thead .bs-c-wos{padding:0;overflow:visible}
+.bs-wospick{display:inline-block;position:relative}
+.bs-wospick .bs-picker-btn{padding:2px 4px;min-height:0;border:0;background:none;
+  font-family:'JetBrains Mono',monospace;font-size:inherit;letter-spacing:inherit;
+  text-transform:inherit;color:inherit;gap:4px;cursor:pointer}
+.bs-wospick .bs-picker-btn:hover{color:var(--bs-red,#d8322a)}
+.bs-wospick .bs-picker-chev{font-size:7px}
+.bs-wospick .bs-picker-panel{right:0;left:auto;min-width:200px;text-align:left}
 .bs-c-chev{flex:0 0 14px;color:#cfccc6;font-size:18px;text-align:right}
 .bs-empty{padding:70px 20px;text-align:center}
 .bs-empty-t{font-size:15px;font-weight:900;letter-spacing:.12em;text-transform:uppercase}
@@ -1294,9 +1317,14 @@ body{display:flex;flex-direction:column}
 .bs-state-t{font-size:15px;font-weight:900;letter-spacing:.12em;text-transform:uppercase}
 .bs-state-s{margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.08em;
   color:var(--bs-muted)}
+/* Sul telefono cinque colonne numeriche non ci stanno. Cade prima il valore,
+   poi il sell-through: la COPERTURA resta, perché è quella su cui si agisce e
+   il sell-through è la stessa informazione detta in un altro modo. */
+@media(max-width:760px){
+  .bs-thead .bs-c-st,.bs-row .bs-c-st{display:none}
+}
 @media(max-width:640px){
   .bs-thead .bs-c-net,.bs-row .bs-c-net{display:none}
-  .bs-thead .bs-c-st,.bs-row .bs-c-st{display:none}
 }
 
 /* ── Best Seller · selettore negozio/settimana ──────────────────────────
