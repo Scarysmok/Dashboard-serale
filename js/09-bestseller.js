@@ -176,9 +176,14 @@ function bsPeriodLabel(iso){
 const BS_TIMEOUT = 50000;
 async function bsApi(path, opts){
   const ac = new AbortController();
-  const t = setTimeout(() => ac.abort(), BS_TIMEOUT);
+  // `timeout` nelle opzioni per le chiamate che legittimamente durano di più
+  // (l'export completo). Non finisce dentro fetch: è solo per l'attesa.
+  const o = Object.assign({}, opts);
+  const ms = o.timeout || BS_TIMEOUT;
+  delete o.timeout;
+  const t = setTimeout(() => ac.abort(), ms);
   try{
-    return await api(path, Object.assign({}, opts, {signal: ac.signal}));
+    return await api(path, Object.assign(o, {signal: ac.signal}));
   }finally{
     clearTimeout(t);
   }
@@ -1901,7 +1906,10 @@ async function bsDownloadXls(){
     // ampia non viaggia con seimila codici appresso.
     const codes = filtri ? bsFiltered().map(p => p.code) : [];
     bsLog('Preparo l\'Excel…');
-    const r = await bsApi('/bestseller/export', {method:'POST', body: JSON.stringify({
+    // Limite di attesa più lungo del solito: con tutte le settimane e tutti i
+    // negozi il file ha oltre centomila righe, e cinquanta secondi non bastano
+    // a costruirlo. Le altre chiamate restano a BS_TIMEOUT.
+    const r = await bsApi('/bestseller/export', {timeout: 240000, method:'POST', body: JSON.stringify({
       periods: bsCurPeriods(),
       stores: (BS.cur.stores || []),
       codes, filtri,
