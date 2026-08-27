@@ -482,7 +482,7 @@ function bsPaint(){
       <div class="bs-c-main">Prodotto</div>
       <div class="bs-c-nums">
         <div class="bs-c-units">Pezzi</div>
-        <div class="bs-c-ohq">Giacenza</div>
+        <div class="bs-c-ohq"><span class="bs-lab-l">Giacenza</span><span class="bs-lab-s">Giac.</span></div>
         <div class="bs-c-net">Valore</div>
         <div class="bs-c-st">Sell-thru</div>
         <div class="bs-c-wos">${bsWosPicker()}</div>

@@ -1388,6 +1388,11 @@ body{display:flex;flex-direction:column}
    niente sfondo e niente altezza, altrimenti disegna un quadrato grigio e
    alza la riga dei titoli. */
 .bs-thead .bs-c-img{background:none;aspect-ratio:auto;height:auto;border-radius:0}
+/* Etichette di colonna in due lunghezze: quella lunga su schermo largo, quella
+   corta sul telefono. "GIACENZA" è più larga della sua colonna e finiva sopra
+   la colonna accanto. Un `overflow:hidden` l'avrebbe tagliata invece di
+   sovrapporla, ma tagliata resta illeggibile: meglio una parola più corta. */
+.bs-lab-s{display:none}
   /* Prefisso .bs-row/.bs-thead necessario: `.bs-c-ohq` ha una regola più in
      basso nel file con la stessa specificità, che le rimetterebbe 52px e
      sfalserebbe la colonna rispetto alla sua etichetta. */
@@ -1408,8 +1413,13 @@ body{display:flex;flex-direction:column}
   .bs-c-wos{font-size:13px;font-weight:800}
   .bs-c-chev{flex:0 0 9px;font-size:15px}
   .bs-thead .bs-c-units,.bs-thead .bs-c-ohq,.bs-thead .bs-c-wos{
-    font-size:9px;font-weight:400;text-align:right}
-  .bs-wospick .bs-picker-btn{font-size:9px;letter-spacing:.16em}
+    font-size:9px;font-weight:400;text-align:right;overflow:hidden;white-space:nowrap}
+  .bs-lab-l{display:none}
+  .bs-lab-s{display:inline}
+  /* Spaziatura più stretta delle altre etichette: "WOS 4s ▾" con .16em
+     sborda di 3px dalla sua colonna. Stringerla costa niente, allargare la
+     colonna costerebbe 4px al nome del prodotto. */
+  .bs-wospick .bs-picker-btn{font-size:9px;letter-spacing:.06em;gap:3px}
 
   /* La X della scheda prodotto scende IN BASSO A DESTRA, fissa.
      In alto finiva sotto la barra nera dell'app — la scheda è più alta dello
