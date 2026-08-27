@@ -1333,6 +1333,20 @@ body{display:flex;flex-direction:column}
    `display:contents` le lascia figlie dirette della riga, quindi su schermo
    largo il flex si comporta esattamente come prima. Serve solo per poterle
    mandare a capo tutte insieme sul telefono. */
+/* Tasto "torna su": compare scorrendo, sparisce in cima. Non è dentro la
+   lista ma fisso sullo schermo, e resta sotto la scheda prodotto (z 60) così
+   non ci finisce sopra. */
+.bs-up{position:fixed;z-index:30;
+  right:calc(18px + env(safe-area-inset-right));
+  bottom:calc(18px + env(safe-area-inset-bottom));
+  width:46px;height:46px;border:0;border-radius:50%;
+  background:var(--bs-ink);color:#fff;font-size:19px;line-height:1;cursor:pointer;
+  box-shadow:0 10px 26px -10px rgba(0,0,0,.7);
+  opacity:0;transform:translateY(10px) scale(.9);pointer-events:none;
+  transition:opacity .18s,transform .18s}
+.bs-up.bs-on{opacity:1;transform:none;pointer-events:auto}
+.bs-up:hover{background:var(--bs-red)}
+
 .bs-c-nums{display:contents}
 
 /* Nell'intestazione la cella della miniatura serve solo a tenere la colonna:
@@ -1415,7 +1429,21 @@ body{display:flex;flex-direction:column}
 
   /* I numeri restano in riga, a larghezza fissa: intestazione e dati usano le
      stesse misure, quindi ogni numero cade sotto la sua etichetta. */
-  .bs-c-nums{display:contents}
+  /* Tasto "torna su": compare scorrendo, sparisce in cima. Non è dentro la
+   lista ma fisso sullo schermo, e resta sotto la scheda prodotto (z 60) così
+   non ci finisce sopra. */
+.bs-up{position:fixed;z-index:30;
+  right:calc(18px + env(safe-area-inset-right));
+  bottom:calc(18px + env(safe-area-inset-bottom));
+  width:46px;height:46px;border:0;border-radius:50%;
+  background:var(--bs-ink);color:#fff;font-size:19px;line-height:1;cursor:pointer;
+  box-shadow:0 10px 26px -10px rgba(0,0,0,.7);
+  opacity:0;transform:translateY(10px) scale(.9);pointer-events:none;
+  transition:opacity .18s,transform .18s}
+.bs-up.bs-on{opacity:1;transform:none;pointer-events:auto}
+.bs-up:hover{background:var(--bs-red)}
+
+.bs-c-nums{display:contents}
 
   /* Prefisso .bs-row/.bs-thead necessario: `.bs-c-ohq` ha una regola più in
      basso nel file con la stessa specificità, che le rimetterebbe 52px e

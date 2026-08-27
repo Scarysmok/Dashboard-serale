@@ -494,9 +494,47 @@ function bsPaint(){
       <div class="bs-empty-s">Prova ad azzerare i filtri</div></div>`}</div>
   </section>
   ${bsFooter()}
+  <button class="bs-up" id="bs-up" aria-label="Torna all'inizio della classifica">↑</button>
   ${BS.detail?bsModal(BS.detail):''}`;
   bsBind();
   bsAncoraX();
+  bsTornaSu();
+}
+
+// ── Tasto "torna su" ────────────────────────────────────────────────────
+// Compare solo dopo che si è sceso di uno schermo: prima non serve a niente e
+// coprirebbe una riga della classifica per nulla.
+//
+// Qual è l'elemento che scorre non è scontato: dentro l'app è .scroll-area
+// (il corpo non scorre, scorre il riquadro della scheda), sul link pubblico è
+// la finestra. Invece di scriverlo a mano lo si cerca risalendo dai genitori:
+// così la stessa funzione va bene in tutti e due i posti.
+function bsScroller(){
+  let e = document.getElementById('bs-root');
+  while(e && e !== document.body){
+    const o = getComputedStyle(e).overflowY;
+    if((o === 'auto' || o === 'scroll') && e.scrollHeight > e.clientHeight + 8) return e;
+    e = e.parentElement;
+  }
+  return null;   // null = scorre la finestra
+}
+
+function bsTornaSu(){
+  const b = document.getElementById('bs-up');
+  if(!b) return;
+  const box = bsScroller();
+  const quanto = () => box ? box.scrollTop : (window.scrollY || document.documentElement.scrollTop);
+  const soglia = () => (box ? box.clientHeight : window.innerHeight) * 0.9;
+  const guarda = () => {
+    // Con la scheda prodotto aperta il tasto non serve e finirebbe sopra di
+    // lei: la scheda ha già la sua X.
+    b.classList.toggle('bs-on', !BS.detail && quanto() > soglia());
+  };
+  (box || window).addEventListener('scroll', guarda, {passive: true});
+  b.addEventListener('click', () => {
+    (box || window).scrollTo({top: 0, behavior: 'smooth'});
+  });
+  guarda();
 }
 
 // Dove mettere il tasto di chiusura della scheda, sul telefono.
