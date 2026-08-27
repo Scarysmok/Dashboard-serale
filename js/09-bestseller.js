@@ -496,6 +496,23 @@ function bsPaint(){
   ${bsFooter()}
   ${BS.detail?bsModal(BS.detail):''}`;
   bsBind();
+  bsAncoraX();
+}
+
+// Dove mettere il tasto di chiusura della scheda, sul telefono.
+//
+// La scheda passa SOTTO la barra nera dell'app — è un pannello a tutto schermo
+// e la barra le sta sopra — quindi un `top` scritto a mano sarebbe una
+// scommessa sull'altezza della barra, che cambia col tema, con la tacca dello
+// schermo e con la riga di stato. Qui la si misura e basta.
+//
+// Su bs.html (il link pubblico) la barra non c'è: si ricade sui 16px di prima.
+function bsAncoraX(){
+  const bd = document.getElementById('bs-backdrop');
+  if(!bd) return;
+  const hd = document.querySelector('.app-header');
+  const giu = hd ? Math.max(0, Math.round(hd.getBoundingClientRect().bottom)) : 0;
+  bd.style.setProperty('--bs-x-top', (giu + 12) + 'px');
 }
 
 // Un filtro della barra, con la stessa grafica e la stessa logica a spunta dei

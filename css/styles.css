@@ -1326,6 +1326,33 @@ body{display:flex;flex-direction:column}
 /* Nell'intestazione la cella della miniatura serve solo a tenere la colonna:
    niente sfondo e niente altezza, altrimenti disegna un quadrato grigio e
    alza la riga dei titoli. */
+.bs-thead .bs-c-img{background:none;aspect-ratio:auto;height:auto;border-radius:0}
+/* Etichette di colonna in due lunghezze: quella lunga su schermo largo, quella
+   corta sul telefono. "GIACENZA" è più larga della sua colonna e finiva sopra
+   la colonna accanto. Un `overflow:hidden` l'avrebbe tagliata invece di
+   sovrapporla, ma tagliata resta illeggibile: meglio una parola più corta. */
+.bs-lab-s{display:none}
+/* I badge stanno dentro un contenitore per poterli mostrare o nascondere a
+   seconda del layout, ma un contenitore inline non propaga la spaziatura del
+   genitore flex: CO e SALES si toccavano, e il bordo del CO veniva tagliato
+   dall'allineamento sulla linea di base. Con inline-flex tornano staccati e
+   allineati al centro. */
+/* Gli stessi CO/SALES compaiono DUE volte nel markup, sulla riga del nome e su
+   quella del codice, e ogni layout ne nasconde uno: spostarli da un genitore
+   all'altro col CSS non si può, e sono due elementi minuscoli.
+   Vanno tenuti in una coppia sola di regole: quando erano sparsi in due punti
+   del file, quella più in basso vinceva e sul telefono sparivano entrambi.
+   Il contenitore è inline-FLEX perché uno inline non propaga la spaziatura del
+   genitore: CO e SALES si toccavano e il bordo del CO veniva tagliato. */
+.bs-bdg-desk{display:inline-flex;align-items:center;gap:7px}
+.bs-bdg-mob{display:none}
+/* Senza badge il contenitore resta vuoto: nasconderlo evita la spaziatura
+   di troppo dopo il nome o dopo il codice. */
+.bs-bdg-desk:empty,.bs-bdg-mob:empty{display:none}
+
+/* Nell'intestazione la cella della miniatura serve solo a tenere la colonna:
+   niente sfondo e niente altezza, altrimenti disegna un quadrato grigio e
+   alza la riga dei titoli. */
 
 /* Sotto i 760px cade il sell-through, sotto i 640 anche il valore: la
    COPERTURA resta, perché è quella su cui si agisce e il sell-through è la
@@ -1337,11 +1364,6 @@ body{display:flex;flex-direction:column}
   .bs-thead .bs-c-net,.bs-row .bs-c-net{display:none}
 }
 
-/* Il doppione dei badge: gli stessi CO/SALES compaiono due volte nel markup,
-   sulla riga del nome e su quella del codice, e ogni layout ne nasconde uno.
-   Spostarli da un genitore all'altro col CSS non si può, e sono due elementi
-   minuscoli: costa meno duplicarli che generare markup diverso per il telefono. */
-.bs-bdg-mob{display:none}
 
 /* ── Classifica sul telefono ─────────────────────────────────────────────
    Sotto i 560px la riga diventa DENSA e su una riga sola: miniatura piccola,
@@ -1384,15 +1406,6 @@ body{display:flex;flex-direction:column}
      stesse misure, quindi ogni numero cade sotto la sua etichetta. */
   .bs-c-nums{display:contents}
 
-/* Nell'intestazione la cella della miniatura serve solo a tenere la colonna:
-   niente sfondo e niente altezza, altrimenti disegna un quadrato grigio e
-   alza la riga dei titoli. */
-.bs-thead .bs-c-img{background:none;aspect-ratio:auto;height:auto;border-radius:0}
-/* Etichette di colonna in due lunghezze: quella lunga su schermo largo, quella
-   corta sul telefono. "GIACENZA" è più larga della sua colonna e finiva sopra
-   la colonna accanto. Un `overflow:hidden` l'avrebbe tagliata invece di
-   sovrapporla, ma tagliata resta illeggibile: meglio una parola più corta. */
-.bs-lab-s{display:none}
   /* Prefisso .bs-row/.bs-thead necessario: `.bs-c-ohq` ha una regola più in
      basso nel file con la stessa specificità, che le rimetterebbe 52px e
      sfalserebbe la colonna rispetto alla sua etichetta. */
@@ -1421,20 +1434,28 @@ body{display:flex;flex-direction:column}
      colonna costerebbe 4px al nome del prodotto. */
   .bs-wospick .bs-picker-btn{font-size:9px;letter-spacing:.06em;gap:3px}
 
-  /* La X della scheda prodotto scende IN BASSO A DESTRA, fissa.
-     In alto finiva sotto la barra nera dell'app — la scheda è più alta dello
-     schermo — ed era l'angolo più lontano dal pollice. Target 52px.
+  /* La X della scheda prodotto resta FISSA in alto a destra, appena sotto la
+     barra nera dell'app: `--bs-x-top` la calcola bsAncoraX misurando la barra,
+     perché scriverne l'altezza a mano sarebbe una scommessa (cambia col tema e
+     con la tacca dello schermo). Fissa e non assoluta: la scheda è più alta
+     dello schermo e scorrendo il pulsante spariva verso l'alto.
      `animation:none` non è cosmetico: l'animazione con fill-mode `both`
      conserva il transform finale, e un elemento con transform diventa il
      riferimento dei figli `position:fixed`. Senza toglierla la X restava
      ancorata al fondo della SCHEDA, 292px sotto il bordo dello schermo. */
   .bs-modal{animation:none}
-  .bs-x{position:fixed;top:auto;left:auto;
+  /* Via anche la sfocatura del fondale, e non per gusto: `backdrop-filter`
+     crea un riferimento per i figli `position:fixed`, e siccome il fondale è
+     anche l'elemento che SCORRE, la X scorreva insieme alla scheda invece di
+     restare ferma. Misurato: scorrendo di 400px se ne andava di 400px.
+     Il fondo si scurisce un po' per compensare la sfocatura persa. */
+  .bs-backdrop{backdrop-filter:none;background:rgba(13,13,13,.62)}
+  .bs-x{position:fixed;bottom:auto;left:auto;
+    top:var(--bs-x-top,16px);
     right:calc(14px + env(safe-area-inset-right));
-    bottom:calc(18px + env(safe-area-inset-bottom));
-    width:52px;height:52px;font-size:20px;z-index:70;
+    width:48px;height:48px;font-size:19px;z-index:70;
     background:var(--bs-ink);color:#fff;
-    box-shadow:0 10px 26px -8px rgba(0,0,0,.65)}
+    box-shadow:0 8px 22px -8px rgba(0,0,0,.6)}
 }
 
 
