@@ -1317,14 +1317,59 @@ body{display:flex;flex-direction:column}
 .bs-state-t{font-size:15px;font-weight:900;letter-spacing:.12em;text-transform:uppercase}
 .bs-state-s{margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:.08em;
   color:var(--bs-muted)}
-/* Sul telefono cinque colonne numeriche non ci stanno. Cade prima il valore,
-   poi il sell-through: la COPERTURA resta, perché è quella su cui si agisce e
-   il sell-through è la stessa informazione detta in un altro modo. */
+/* Le colonne numeriche stanno in un contenitore che di norma NON esiste:
+   `display:contents` le lascia figlie dirette della riga, quindi su schermo
+   largo il flex si comporta esattamente come prima. Serve solo per poterle
+   mandare a capo tutte insieme sul telefono. */
+.bs-c-nums{display:contents}
+
+/* Sotto i 760px cade il sell-through, sotto i 640 anche il valore: la
+   COPERTURA resta, perché è quella su cui si agisce e il sell-through è la
+   stessa informazione detta in un altro modo. */
 @media(max-width:760px){
   .bs-thead .bs-c-st,.bs-row .bs-c-st{display:none}
 }
 @media(max-width:640px){
   .bs-thead .bs-c-net,.bs-row .bs-c-net{display:none}
+}
+
+/* Sotto i 560px i numeri vanno A CAPO, sotto al prodotto.
+   Misurato prima di questa regola: a 390px al nome restavano 12px e a 375px
+   ZERO — il testo usciva da una scatola larga niente e finiva sopra i numeri.
+   Limare le larghezze non bastava: numero, foto, freccia e tre colonne si
+   mangiano da soli tutta la riga di un telefono. */
+@media(max-width:560px){
+  .bs-row,.bs-thead{flex-wrap:wrap;row-gap:10px}
+  .bs-c-main{flex:1 1 100px}
+  .bs-c-nums{display:flex;flex:1 1 100%;gap:16px;align-items:flex-end;
+    /* allineati sotto al nome, non sotto al numero di posizione */
+    padding-left:calc(34px + clamp(48px,5vw,64px) + 2*clamp(10px,1.4vw,18px))}
+  .bs-c-nums > div{flex:0 0 auto;text-align:left}
+  .bs-c-units{flex:0 0 72px}          /* la barra ha bisogno di una larghezza */
+  .bs-thead .bs-c-nums > div{text-align:left}
+  /* I numeri vanno DOPO la freccia, non prima: così la freccia resta in fondo
+     alla prima riga accanto al prodotto, dov'è sempre stata. Con `order`
+     e non spostando il markup, che su schermo largo deve restare com'è. */
+  .bs-c-nums{order:1}
+
+  /* La X della scheda prodotto scende IN BASSO A DESTRA, fissa.
+     In alto finiva sotto la barra nera dell'app — la scheda è più alta dello
+     schermo, quindi scorrendo il pulsante saliva e spariva — ed era comunque
+     l'angolo più lontano dal pollice. Qui non può essere coperta da niente e
+     resta ferma mentre si scorre. Target 52px, sopra i 44 di Apple. */
+  /* Senza questa riga la X non si vede proprio. `.bs-modal` ha un'animazione
+     con fill-mode `both`, quindi conserva il transform finale — e un elemento
+     con transform diventa il riferimento dei figli `position:fixed`. La X
+     restava ancorata al fondo della SCHEDA, che è lunga tre schermate, invece
+     che al fondo dello schermo: misurata 292px sotto il bordo inferiore.
+     Sul telefono l'animazione d'ingresso non manca a nessuno. */
+  .bs-modal{animation:none}
+  .bs-x{position:fixed;top:auto;left:auto;
+    right:calc(14px + env(safe-area-inset-right));
+    bottom:calc(18px + env(safe-area-inset-bottom));
+    width:52px;height:52px;font-size:20px;z-index:70;
+    background:var(--bs-ink);color:#fff;
+    box-shadow:0 10px 26px -8px rgba(0,0,0,.65)}
 }
 
 /* ── Best Seller · selettore negozio/settimana ──────────────────────────

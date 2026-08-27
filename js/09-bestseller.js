@@ -422,17 +422,19 @@ function bsPaint(){
         <div class="bs-rmeta"><b>${bsEsc(p.code)}</b><span class="bs-minidot"></span>
           <span>${bsEsc(p.div)} · ${bsEsc(p.gender)} · ${bsEsc(p.cat)}</span></div>
       </div>
-      <div class="bs-c-units">
-        <div class="bs-runits">${p.units}</div>
-        <div class="bs-bar"><i style="width:${Math.max(6,Math.round((p.units/max)*100))}%"></i></div>
+      <div class="bs-c-nums">
+        <div class="bs-c-units">
+          <div class="bs-runits">${p.units}</div>
+          <div class="bs-bar"><i style="width:${Math.max(6,Math.round((p.units/max)*100))}%"></i></div>
+        </div>
+        <div class="bs-c-ohq">
+          <div class="bs-rohq${ohqOk && ohq<=0 ? ' bs-zero':''}">${ohqOk?bsFmt(ohq,'i'):'—'}</div>
+          ${ohqOk && ohq<=0 ? '<div class="bs-ohq-note">esaurito</div>' : ''}
+        </div>
+        <div class="bs-c-net">${bsEur(p.net)}</div>
+        <div class="bs-c-st${stOk && st<0.5 ? ' bs-low':''}">${stOk?bsFmt(st,'p'):'—'}</div>
+        <div class="bs-c-wos">${bsWosTxt(p)}</div>
       </div>
-      <div class="bs-c-ohq">
-        <div class="bs-rohq${ohqOk && ohq<=0 ? ' bs-zero':''}">${ohqOk?bsFmt(ohq,'i'):'—'}</div>
-        ${ohqOk && ohq<=0 ? '<div class="bs-ohq-note">esaurito</div>' : ''}
-      </div>
-      <div class="bs-c-net">${bsEur(p.net)}</div>
-      <div class="bs-c-st${stOk && st<0.5 ? ' bs-low':''}">${stOk?bsFmt(st,'p'):'—'}</div>
-      <div class="bs-c-wos">${bsWosTxt(p)}</div>
       <div class="bs-c-chev">›</div>
     </button>`;
   }).join('');
@@ -476,11 +478,13 @@ function bsPaint(){
       <div style="flex:0 0 34px">#</div>
       <div style="flex:0 0 clamp(48px,5vw,64px)">Art.</div>
       <div style="flex:1 1 auto">Prodotto</div>
-      <div class="bs-c-units">Pezzi</div>
-      <div class="bs-c-ohq">Giacenza</div>
-      <div class="bs-c-net">Valore</div>
-      <div class="bs-c-st">Sell-thru</div>
-      <div class="bs-c-wos">${bsWosPicker()}</div>
+      <div class="bs-c-nums">
+        <div class="bs-c-units">Pezzi</div>
+        <div class="bs-c-ohq">Giacenza</div>
+        <div class="bs-c-net">Valore</div>
+        <div class="bs-c-st">Sell-thru</div>
+        <div class="bs-c-wos">${bsWosPicker()}</div>
+      </div>
       <div style="flex:0 0 14px"></div>
     </div>
     <div class="bs-rows">${rows || `<div class="bs-empty">
