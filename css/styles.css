@@ -1340,12 +1340,25 @@ body{display:flex;flex-direction:column}
    mangiano da soli tutta la riga di un telefono. */
 @media(max-width:560px){
   .bs-row,.bs-thead{flex-wrap:wrap;row-gap:10px}
+  /* Stesso rientro orizzontale della riga: l'intestazione ne aveva 4px e la
+     riga 10, e quei 6px bastavano a far sembrare i numeri spostati rispetto
+     alle etichette. */
+  .bs-thead{padding-left:clamp(10px,1.4vw,18px);padding-right:clamp(10px,1.4vw,18px)}
   .bs-c-main{flex:1 1 100px}
-  .bs-c-nums{display:flex;flex:1 1 100%;gap:16px;align-items:flex-end;
-    /* allineati sotto al nome, non sotto al numero di posizione */
-    padding-left:calc(34px + clamp(48px,5vw,64px) + 2*clamp(10px,1.4vw,18px))}
-  .bs-c-nums > div{flex:0 0 auto;text-align:left}
-  .bs-c-units{flex:0 0 72px}          /* la barra ha bisogno di una larghezza */
+  /* Le tre celle si dividono la riga in PARTI UGUALI, e valgono sia per
+     l'intestazione sia per i dati: così ogni numero cade esattamente sotto la
+     sua etichetta. Dimensionandole sul contenuto non si incolonnavano —
+     "GIACENZA" è largo il doppio di "136" — e i numeri finivano tutti
+     ammucchiati a sinistra.
+     Niente rientro sotto la foto: servirebbero altri 112px e le etichette non
+     ci starebbero più (a 390px resterebbero 68px per "GIACENZA", che ne
+     chiede 95). */
+  .bs-c-nums{display:flex;flex:1 1 100%;gap:10px;align-items:flex-end;padding-left:0}
+  .bs-c-nums > div{flex:1 1 0;min-width:0;text-align:left}
+  /* Serve la stessa specificità di `.bs-thead .bs-c-ohq{text-align:right}`,
+     che sta più in basso nel file e altrimenti vince: l'etichetta GIACENZA
+     restava spinta a destra dentro la sua cella mentre il numero sotto era a
+     sinistra, e sembrava di nuovo disallineata. */
   .bs-thead .bs-c-nums > div{text-align:left}
   /* I numeri vanno DOPO la freccia, non prima: così la freccia resta in fondo
      alla prima riga accanto al prodotto, dov'è sempre stata. Con `order`
