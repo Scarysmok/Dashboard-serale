@@ -1190,7 +1190,9 @@ body{display:flex;flex-direction:column}
   text-transform:inherit;color:inherit;gap:4px;cursor:pointer}
 .bs-wospick .bs-picker-btn:hover{color:var(--bs-red,#d8322a)}
 .bs-wospick .bs-picker-chev{font-size:7px}
-.bs-wospick .bs-picker-panel{right:0;left:auto;min-width:200px;text-align:left}
+/* Ancorato a destra e con un tetto alla larghezza: senza il tetto la larghezza
+   la detta la frase di aiuto su una riga sola. */
+.bs-wospick .bs-picker-panel{right:0;left:auto;min-width:200px;max-width:280px;text-align:left}
 .bs-c-chev{flex:0 0 14px;color:#cfccc6;font-size:18px;text-align:right}
 .bs-empty{padding:70px 20px;text-align:center}
 .bs-empty-t{font-size:15px;font-weight:900;letter-spacing:.12em;text-transform:uppercase}
@@ -1477,6 +1479,22 @@ body{display:flex;flex-direction:column}
      sborda di 3px dalla sua colonna. Stringerla costa niente, allargare la
      colonna costerebbe 4px al nome del prodotto. */
   .bs-wospick .bs-picker-btn{font-size:9px;letter-spacing:.06em;gap:3px}
+  /* La tendina non si aggancia più al pulsante ma al blocco di testa.
+     Il pulsante è largo 52px e il pannello, crescendo verso sinistra da lì,
+     arrivava a 717px sporgendo di 372 fuori dallo schermo. Il blocco di testa
+     è largo quanto lo schermo, quindi "attaccato a destra" vuol dire davvero
+     al bordo destro. `position:static` toglie al pulsante il ruolo di
+     riferimento; lo prende .bs-listhead, che è sticky e quindi posizionato. */
+  /* Due classi e non una: l'elemento è `bs-picker bs-wospick`, e `.bs-picker`
+     imposta position:relative — con una classe sola le due regole pesano
+     uguale e vince quella che sta più in basso nel file. */
+  .bs-picker.bs-wospick{position:static}
+  .bs-wospick .bs-picker-panel{left:auto;right:0;min-width:0;
+    width:min(280px, calc(100% - 16px));max-width:none;
+    /* Le celle dell'intestazione hanno nowrap per le etichette, e il pannello
+       sta dentro una di quelle: senza questo la frase di aiuto resta su una
+       riga sola e viene tagliata dal bordo. */
+    white-space:normal}
 
   /* La X della scheda prodotto resta FISSA in alto a destra, appena sotto la
      barra nera dell'app: `--bs-x-top` la calcola bsAncoraX misurando la barra,
