@@ -299,6 +299,13 @@
               </div>
             </div>
           </div>
+          <!-- Insieme / Per negozio. Nascosto finché la selezione non ha
+               almeno due negozi: con uno solo le due viste coinciderebbero.
+               Lo mostra renderTempo(). -->
+          <span class="am-vista" id="am-vista" style="display:none">
+            <button class="am-filter-btn has-sel" id="am-vista-ins" onclick="setAmVista('insieme')">Insieme</button>
+            <button class="am-filter-btn" id="am-vista-neg" onclick="setAmVista('negozi')">Per negozio</button>
+          </span>
           <button class="az-xls" onclick="openExportDialog('andamento')" style="flex-shrink:0;white-space:nowrap;background:#2563eb;color:#fff;border:0;border-radius:8px;padding:8px 12px;font:700 12px Nunito;cursor:pointer">⬇ Esporta XLS</button>
         </div>
         <div class="tempo-compare">

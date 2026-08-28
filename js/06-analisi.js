@@ -153,6 +153,14 @@ function toggleCompare(which, el){
   if(el) el.classList.toggle('on');
   renderTempo();
 }
+// Insieme ↔ Per negozio. L'espansione (amExpanded) NON viene toccata: si
+// cambia vista sullo stesso periodo aperto, e tornando indietro si ritrova
+// dov'era.
+function setAmVista(v){
+  if(amVista===v) return;
+  amVista=v;
+  renderTempo();
+}
 
 // ── FILTRI ANALISI CONDIVISI E PERSISTENTI ──────────────────────────────
 // Andamento (tempo) e KPI vivono sotto la stessa tab "Analisi": quando
@@ -399,6 +407,160 @@ function dayAggregates(dateISO){
   }
   return {net, tgt, py};
 }
+// Albero anno → mese → giorno a partire da una tabella { dateISO: {net,tgt} }.
+// Estratto da renderTempo() perché ora viene costruito più volte: una per
+// l'aggregato e una per ogni negozio della vista "Per negozio". Le date le
+// decide chi chiama, non la tabella: passandogli sempre le stesse, gli alberi
+// dei singoli negozi restano allineati riga per riga con quello del totale.
+function _amAlbero(sums, dates, todayISO){
+  const years = {};
+  for(const dateISO of dates){
+    const yr = dateISO.slice(0,4);
+    const mo = dateISO.slice(0,7);
+    if(!years[yr]) years[yr] = { yr, months:{}, netPast:0, tgtPast:0, tgtAll:0, daysPast:0, daysFuture:0, daysPending:0 };
+    if(!years[yr].months[mo]) years[yr].months[mo] = { mo, days:[], netPast:0, tgtPast:0, tgtAll:0, daysPast:0, daysFuture:0, daysPending:0 };
+    const d = sums[dateISO] || { net:0, tgt:0 };
+    const isFuture = dateISO > todayISO;
+    const isToday  = dateISO === todayISO;
+    const dayObj = { dateISO, isFuture, isToday, net: d.net, tgt: d.tgt };
+    const m = years[yr].months[mo];
+    m.days.push(dayObj);
+    m.tgtAll += d.tgt;
+    years[yr].tgtAll += d.tgt;
+    if(!isFuture){
+      // Un giorno trascorso entra nei CONFRONTI (vs TGT / vs PY) solo se ha
+      // consuntivi (net > 0). Oggi prima delle chiusure serali — o un giorno
+      // con dati mancanti — resta "in corso": senza questo filtro il suo
+      // target pieno finiva nel denominatore contro un incasso vuoto,
+      // schiacciando artificialmente i badge del periodo corrente.
+      if(d.net > 0){
+        m.netPast += d.net;
+        m.tgtPast += d.tgt;
+        m.daysPast++;
+        years[yr].netPast += d.net;
+        years[yr].tgtPast += d.tgt;
+        years[yr].daysPast++;
+      } else {
+        m.daysPending++;
+        years[yr].daysPending++;
+      }
+    } else {
+      m.daysFuture++;
+      years[yr].daysFuture++;
+    }
+  }
+  return years;
+}
+
+// Tabella della vista "Per negozio": le stesse righe dell'albero (anno → mesi
+// → giorni, con la stessa espansione), ma una colonna per negozio accanto a
+// quella del totale.
+//
+// Perché una tabella e non tre alberi affiancati: il confronto che serve è
+// SULLA RIGA. Su "mar 25" si legge in un colpo se quel martedì è andato male
+// dappertutto — un fatto sul giorno — o solo in un negozio. Saltando fra tre
+// schermate quella cosa non si vede.
+//
+// Periodo e totale restano fermi mentre le colonne dei negozi scorrono di
+// lato: senza il nome della riga, il totale da solo non dice su cosa sei.
+//
+// ctx porta dentro gli helper che vivono in renderTempo() (fmt, badgeCls,
+// pyAlignedDelta…): sono chiusure sui filtri attivi, ricrearle qui vorrebbe
+// dire duplicare le regole di calcolo in due posti.
+function _amTabellaHtml(ctx){
+  const {colonne, years, todayISO, curMonthISO, fmt, fmtPctSign, badgeCls,
+         periodStatus, pyAlignedDelta, DAYS_IT, compareTgt, comparePy} = ctx;
+  const MESI_T = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno',
+                  'Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+  const scarto = (dlt, tag) => dlt === null || !isFinite(dlt) ? ''
+    : `<span class="amc-d ${badgeCls(dlt)}">${fmtPctSign(dlt)}<i>${tag}</i></span>`;
+
+  // Cella di un periodo (anno o mese). `p` manca quando quel negozio non ha
+  // nessun dato in quel periodo: cella vuota, non uno zero — non aver venduto
+  // e non essere nei dati sono due cose diverse.
+  const cellaPeriodo = (p, sums, parziale, cls) => {
+    const c = cls ? ' ' + cls : '';
+    if(!p) return `<td class="amc-no${c}">—</td>`;
+    const st = periodStatus(p.daysPast, p.daysFuture);
+    if(st === 'future') return `<td class="${cls||''}"><span class="amc-v fut">tgt ${fmt(p.tgtAll)}</span></td>`;
+    let h = `<span class="amc-v">${fmt(p.netPast)}</span>`;
+    if(compareTgt && p.tgtPast > 0) h += scarto((p.netPast - p.tgtPast) / p.tgtPast * 100, 'tgt');
+    if(comparePy){
+      const gg = Object.keys(p.months || {}).length
+        ? Object.values(p.months).flatMap(mo => mo.days)
+        : (p.days || []);
+      h += scarto(pyAlignedDelta(gg, sums), parziale ? 'py*' : 'py');
+    }
+    return `<td class="${cls||''}">${h}</td>`;
+  };
+  // Cella di un giorno.
+  const cellaGiorno = (d, sums, cls) => {
+    const c = cls ? ' ' + cls : '';
+    if(!d) return `<td class="amc-no${c}">—</td>`;
+    if(d.isFuture) return `<td class="${cls||''}"><span class="amc-v fut">tgt ${fmt(d.tgt)}</span></td>`;
+    if(!(d.net > 0)) return `<td class="amc-no${c}">—</td>`;
+    let h = `<span class="amc-v">${fmt(d.net)}</span>`;
+    if(compareTgt && d.tgt > 0) h += scarto((d.net - d.tgt) / d.tgt * 100, 'tgt');
+    if(comparePy) h += scarto(pyAlignedDelta([d], sums), 'py');
+    return `<td class="${cls||''}">${h}</td>`;
+  };
+  const perCella = (liv, nome, sub, key, aperto) => {
+    const chev = key ? `<span class="am-chev ${aperto ? 'open' : ''}">▶</span>` : '<span class="am-chev vuota"></span>';
+    return `<td class="amc-per l${liv}">${chev}<span class="amc-nome">${nome}</span>${
+      sub ? `<span class="amc-sub">${sub}</span>` : ''}</td>`;
+  };
+
+  let corpo = '';
+  for(const yr of Object.keys(years).sort().reverse()){
+    const y = years[yr];
+    const yKey = 'y' + yr, yOpen = amExpanded.has(yKey);
+    corpo += `<tr class="amc-r amc-l0" onclick="toggleAmRow('${yKey}')">`
+      + perCella(0, yr, periodStatus(y.daysPast, y.daysFuture) === 'current' ? 'in corso' : '', yKey, yOpen)
+      + cellaPeriodo(y, null, yr >= todayISO.slice(0,4), 'amc-tot')
+      + colonne.map(c => cellaPeriodo(c.years[yr], c.sums, yr >= todayISO.slice(0,4))).join('')
+      + '</tr>';
+    if(!yOpen) continue;
+    for(const mk of Object.keys(y.months).sort()){
+      const m = y.months[mk];
+      const mKey = 'm' + mk, mOpen = amExpanded.has(mKey);
+      const nomeMese = MESI_T[parseInt(mk.slice(5,7), 10) - 1];
+      corpo += `<tr class="amc-r amc-l1" onclick="toggleAmRow('${mKey}')">`
+        + perCella(1, nomeMese, `${m.days.length} gg`, mKey, mOpen)
+        + cellaPeriodo(m, null, mk >= curMonthISO, 'amc-tot')
+        + colonne.map(c => cellaPeriodo(c.years[yr] && c.years[yr].months[mk], c.sums, mk >= curMonthISO)).join('')
+        + '</tr>';
+      if(!mOpen) continue;
+      const giorni = m.days.slice().sort((a,b) => a.dateISO.localeCompare(b.dateISO));
+      for(const d of giorni){
+        const jd = new Date(d.dateISO + 'T12:00:00');
+        const et = `${DAYS_IT[jd.getDay()]} ${d.dateISO.slice(8,10)}/${d.dateISO.slice(5,7)}`;
+        // Il giorno del negozio si prende per data, non per posizione: gli
+        // alberi sono costruiti sulle stesse date, ma cercarlo per chiave
+        // regge anche se un domani non lo fossero.
+        const perNeg = colonne.map(c => {
+          const mm = c.years[yr] && c.years[yr].months[mk];
+          const dd = mm && mm.days.find(x => x.dateISO === d.dateISO);
+          return cellaGiorno(dd, c.sums);
+        }).join('');
+        corpo += '<tr class="amc-r amc-l2">'
+          + perCella(2, et, '', '', false)
+          + cellaGiorno(d, null, 'amc-tot') + perNeg + '</tr>';
+      }
+    }
+  }
+
+  const teste = colonne.map(c => `<th><span class="amc-b">${_escHtml(c.info.brand || '')}</span>${
+    _escHtml(c.info.location || c.sk)}</th>`).join('');
+  return `<div class="amc-wrap"><table class="amc">
+    <thead><tr>
+      <th class="amc-per">Periodo</th>
+      <th class="amc-tot"><span class="amc-b">Totale</span>Tutti e ${colonne.length}</th>
+      ${teste}
+    </tr></thead>
+    <tbody>${corpo}</tbody>
+  </table></div>`;
+}
+
 // ── RENDER TAB ANDAMENTO (v2: gerarchica anno → mese → giorno) ──────────
 // Costruisce un albero anno → mese → giorno includendo tutti i giorni per
 // cui c'è almeno un dato (NET o target). I giorni futuri (con solo target)
@@ -451,6 +613,22 @@ function renderTempo(){
     if(!dailySums[d]) dailySums[d] = { net: 0, tgt: 0 };
     return dailySums[d];
   };
+  // La STESSA tabella, ma tenuta anche negozio per negozio: serve alla vista
+  // "Per negozio", dove ogni colonna è un negozio a sé. Il totale continua a
+  // stare in dailySums e non si ricava sommando le colonne: così la colonna
+  // "Tutti" è esattamente il numero che si legge nella vista Insieme, senza
+  // rischio che le due strade diano risultati diversi.
+  // Conta soprattutto per il "vs anno scorso": quel confronto pesca dalla
+  // tabella che gli si passa, e a un negozio va passata la SUA, altrimenti
+  // verrebbe confrontato con il totale di tutti — un numero sbagliato che
+  // sembra giusto.
+  const perStore = {};                    // sk -> { dateISO: {net,tgt} }
+  const storeInfo = {};                   // sk -> {brand, location}
+  const bucketS = (sk, d) => {
+    if(!perStore[sk]) perStore[sk] = {};
+    if(!perStore[sk][d]) perStore[sk][d] = { net: 0, tgt: 0 };
+    return perStore[sk][d];
+  };
   // 3a) NET dallo storico Excel — priorità massima.
   //     Chiave in historicalByKey: "brand|location|date" già normalizzata.
   const historicalKeys = new Set();
@@ -463,6 +641,8 @@ function renderTempo(){
     if(!def) continue;
     if(!matches(def.brand, def.location)) continue;
     bucket(dateISO).net += +historicalByKey[k] || 0;
+    bucketS(sk, dateISO).net += +historicalByKey[k] || 0;
+    storeInfo[sk] = def;
     historicalKeys.add(sk + '|' + dateISO);
   }
   // 3b) NET dai PDF GoAudits (con override già applicati lato allData).
@@ -476,6 +656,8 @@ function renderTempo(){
     if(historicalKeys.has(sk + '|' + r.dateISO)) continue;
     const net = (+r.netSales) || ((+r.corrispettivo||0)/1.22);
     bucket(r.dateISO).net += net;
+    bucketS(sk, r.dateISO).net += net;
+    if(!storeInfo[sk]) storeInfo[sk] = {brand: r.brand, location: r.location};
   }
   // 3c) Target dai targets giornalieri (targetsByKey). Stessa convenzione di chiave.
   for(const k in targetsByKey){
@@ -487,54 +669,26 @@ function renderTempo(){
     if(!def) continue;
     if(!matches(def.brand, def.location)) continue;
     bucket(dateISO).tgt += +targetsByKey[k] || 0;
+    bucketS(sk, dateISO).tgt += +targetsByKey[k] || 0;
+    if(!storeInfo[sk]) storeInfo[sk] = def;
   }
 
   // 4) Empty state: nessun giorno con dati nei filtri scelti
-  const allDates = Object.keys(dailySums);
+  // Ordinate qui una volta sola: le usano sia l'albero dell'aggregato sia
+  // quelli dei singoli negozi, e devono essere le stesse nello stesso ordine.
+  const allDates = Object.keys(dailySums).sort();
   if(allDates.length === 0){
     targetEl.innerHTML = `<div class="empty-state"><div class="empty-icon">📭</div><div class="empty-text">Nessun dato per i filtri selezionati</div></div>`;
     _azTempoHero({});   // svuota il titolo nero: senza dati non ha nulla da dire
     return;
   }
 
-  // 5) Aggrega per anno → mese → giorno. Ogni livello tiene NET passato,
-  //    target passato, target totale (per mostrare "in corso / totale").
-  const years = {};
-  for(const dateISO of allDates.sort()){
-    const yr = dateISO.slice(0,4);
-    const mo = dateISO.slice(0,7);
-    if(!years[yr]) years[yr] = { yr, months:{}, netPast:0, tgtPast:0, tgtAll:0, daysPast:0, daysFuture:0, daysPending:0 };
-    if(!years[yr].months[mo]) years[yr].months[mo] = { mo, days:[], netPast:0, tgtPast:0, tgtAll:0, daysPast:0, daysFuture:0, daysPending:0 };
-    const d = dailySums[dateISO];
-    const isFuture = dateISO > todayISO;
-    const isToday  = dateISO === todayISO;
-    const dayObj = { dateISO, isFuture, isToday, net: d.net, tgt: d.tgt };
-    const m = years[yr].months[mo];
-    m.days.push(dayObj);
-    m.tgtAll += d.tgt;
-    years[yr].tgtAll += d.tgt;
-    if(!isFuture){
-      // Un giorno trascorso entra nei CONFRONTI (vs TGT / vs PY) solo se ha
-      // consuntivi (net > 0). Oggi prima delle chiusure serali — o un giorno
-      // con dati mancanti — resta "in corso": senza questo filtro il suo
-      // target pieno finiva nel denominatore contro un incasso vuoto,
-      // schiacciando artificialmente i badge del periodo corrente.
-      if(d.net > 0){
-        m.netPast += d.net;
-        m.tgtPast += d.tgt;
-        m.daysPast++;
-        years[yr].netPast += d.net;
-        years[yr].tgtPast += d.tgt;
-        years[yr].daysPast++;
-      } else {
-        m.daysPending++;
-        years[yr].daysPending++;
-      }
-    } else {
-      m.daysFuture++;
-      years[yr].daysFuture++;
-    }
-  }
+  // 5) Aggrega per anno → mese → giorno.
+  //    Le DATE sono quelle dell'aggregato anche quando si costruisce l'albero
+  //    di un singolo negozio: così tutte le colonne della vista "Per negozio"
+  //    hanno le stesse righe, e un negozio che quel giorno non ha venduto
+  //    mostra una cella vuota invece di far slittare la tabella.
+  const years = _amAlbero(dailySums, allDates, todayISO);
 
   // 6) Helper di rendering
   const fmtPctSign = (delta) => {
@@ -559,7 +713,11 @@ function renderTempo(){
   // giorni che hanno un pari valido (>0): numeratore e denominatore coprono lo
   // stesso insieme di giorni → confronto equo, parziale-vs-parziale automatico.
   // `days` = array di dayObj {dateISO, isFuture, net}. `partial` → suffisso label.
-  const pyAlignedBadge = (days, partial) => {
+  // `sums` è la tabella da cui leggere l'anno scorso: quella dell'aggregato
+  // per la vista Insieme, quella del singolo negozio per la sua colonna.
+  // Passargli sempre dailySums confronterebbe un negozio col totale di tutti.
+  const pyAlignedBadge = (days, partial, sums) => {
+    const tab = sums || dailySums;
     let cur = 0, py = 0, n = 0;
     for(const d of days){
       if(d.isFuture) continue;            // i giorni futuri non hanno consuntivo
@@ -567,7 +725,7 @@ function renderTempo(){
                                           // prima delle chiusure serali): fuori
                                           // dal confronto, entrerà quando i
                                           // dati arrivano
-      const pv = dailySums[pyDateISO(d.dateISO)];
+      const pv = tab[pyDateISO(d.dateISO)];
       const pyNet = pv ? pv.net : 0;
       if(pyNet > 0){ cur += d.net; py += pyNet; n++; }
     }
@@ -576,8 +734,57 @@ function renderTempo(){
     const label = partial ? 'vs PY (parziale)' : 'vs PY';
     return `<span class="am-badge ${badgeCls(dlt)}" title="${n} giorni confrontati con lo stesso giorno della settimana di un anno fa · ${fmt(cur)} vs ${fmt(py)}">${fmtPctSign(dlt)} ${label}</span>`;
   };
+  // Lo stesso calcolo, ma restituisce il solo numero: nelle celle della
+  // tabella per negozio non c'è spazio per la dicitura per esteso.
+  const pyAlignedDelta = (days, sums) => {
+    const tab = sums || dailySums;
+    let cur = 0, py = 0;
+    for(const d of days){
+      if(d.isFuture || !(d.net > 0)) continue;
+      const pv = tab[pyDateISO(d.dateISO)];
+      const pyNet = pv ? pv.net : 0;
+      if(pyNet > 0){ cur += d.net; py += pyNet; }
+    }
+    return py > 0 ? (cur - py) / py * 100 : null;
+  };
   const curYearISO = todayISO.slice(0,4);
   const curMonthISO = todayISO.slice(0,7);
+
+  // 6c) VISTA PER NEGOZIO
+  // Una colonna per negozio, in ordine di fatturato decrescente, accanto alla
+  // colonna del totale. Ogni negozio ha il SUO albero, costruito sulle stesse
+  // date dell'aggregato: le righe restano allineate e un negozio senza vendite
+  // in un giorno lascia la cella vuota invece di far slittare la tabella.
+  // Il selettore compare solo da due negozi in su: con uno le due viste
+  // mostrerebbero lo stesso numero due volte.
+  const skTutti = Object.keys(perStore);
+  const vistaEl = document.getElementById('am-vista');
+  if(vistaEl) vistaEl.style.display = skTutti.length >= 2 ? '' : 'none';
+  const perNegozio = amVista === 'negozi' && skTutti.length >= 2;
+  const bIns = document.getElementById('am-vista-ins');
+  const bNeg = document.getElementById('am-vista-neg');
+  // `has-sel` è la classe con cui si accendono le pillole dei filtri (nera nel
+  // tema azzurro): la stessa, così il selettore non sembra un pezzo a parte.
+  if(bIns) bIns.classList.toggle('has-sel', !perNegozio);
+  if(bNeg) bNeg.classList.toggle('has-sel', perNegozio);
+
+  if(perNegozio){
+    // Un albero per negozio, in ordine di fatturato decrescente. Costruiti qui
+    // e non prima: nella vista Insieme sarebbero 33 alberi buttati via a ogni
+    // render, uno per negozio, per niente.
+    const colonne = skTutti.map(sk => {
+      const yy = _amAlbero(perStore[sk], allDates, todayISO);
+      let tot = 0; for(const k in yy) tot += yy[k].netPast;
+      return { sk, info: storeInfo[sk] || {}, sums: perStore[sk], years: yy, tot };
+    }).sort((a, b) => b.tot - a.tot);
+    targetEl.innerHTML = _amTabellaHtml({
+      colonne, years, allDates, todayISO, curYearISO, curMonthISO,
+      fmt, fmtPctSign, badgeCls, periodStatus, pyAlignedDelta, DAYS_IT,
+      compareTgt, comparePy
+    });
+    _azTempoHero(years);   // il nero resta il totale della selezione
+    return;
+  }
 
   // 7) Render
   let html = '';

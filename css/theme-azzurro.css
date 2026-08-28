@@ -1743,3 +1743,96 @@ html.az .az-xls{
   html.az #tempo-hero .az-hero-claim .az-claim-sep,
   html.az #kpi-hero .az-hero-claim .az-claim-sep{display:none}
 }
+
+/* ───────────────────────────────────────────────────────────────────────────
+   ANDAMENTO · VISTA PER NEGOZIO
+   ───────────────────────────────────────────────────────────────────────────
+   Le due colonne di sinistra — il periodo e il totale — restano ferme mentre
+   quelle dei negozi scorrono di lato. Il totale da solo non basterebbe: senza
+   il nome della riga non si sa più su quale periodo si sta leggendo, quindi i
+   due viaggiano insieme.
+
+   Le larghezze sono fisse e non a contenuto: `left` della seconda colonna
+   dev'essere esattamente la larghezza della prima, e un valore calcolato dal
+   testo non si può scrivere in un foglio di stile. */
+html.az{
+  --amc-per:150px;   /* colonna del periodo */
+  --amc-tot:132px;   /* colonna del totale  */
+}
+html.az .amc-wrap{
+  margin:14px 16px 0;
+  background:var(--s1);
+  border:none;border-radius:var(--radius-card);
+  box-shadow:var(--shadow);
+  overflow-x:auto;
+}
+html.az .amc th{
+  font-family:var(--label);
+  font-size:var(--fs-lab-s);font-weight:500;
+  letter-spacing:.1em;text-transform:uppercase;
+  color:var(--label-ink);
+  padding:14px 14px 10px;
+  border-bottom:1px solid var(--bd);
+  background:var(--s1);
+  vertical-align:bottom;
+}
+html.az .amc td{
+  padding:11px 14px;
+  border-bottom:1px solid var(--div);
+  font-size:13px;font-weight:800;
+  background:var(--s1);
+}
+html.az .amc tbody tr:last-child td{border-bottom:none}
+html.az .amc-per,
+html.az .amc-tot{position:sticky;z-index:2}
+html.az .amc-per{left:0;width:var(--amc-per);min-width:var(--amc-per);max-width:var(--amc-per)}
+html.az .amc-tot{left:var(--amc-per);width:var(--amc-tot);min-width:var(--amc-tot)}
+/* Le colonne dei negozi non si stringono: con sei o sette negozi selezionati
+   si schiaccerebbero fino a mandare a capo le cifre. Meglio che la tabella
+   scorra — è il motivo per cui le prime due stanno ferme. */
+html.az .amc th:not(.amc-per):not(.amc-tot),
+html.az .amc td:not(.amc-per):not(.amc-tot){min-width:118px}
+/* Il filo che separa la parte ferma da quella che scorre: senza, scorrendo
+   sembra che le colonne si infilino sotto al testo. */
+html.az .amc-tot{border-right:1px solid var(--bd)}
+html.az thead .amc-per,
+html.az thead .amc-tot{z-index:3}
+html.az .amc-nome{font-size:14px;font-weight:900;text-transform:uppercase;letter-spacing:-.01em}
+html.az .amc-sub,
+html.az .amc-b{
+  display:block;
+  font-family:var(--label);
+  font-size:var(--fs-lab-xs);font-weight:500;
+  letter-spacing:.1em;text-transform:uppercase;
+  color:var(--label-ink);
+  margin-top:3px;
+}
+html.az .amc-b{margin:0 0 3px}
+html.az .amc-v{font-variant-numeric:tabular-nums}
+html.az .amc-v.fut{color:var(--t3);font-weight:700}
+html.az .amc-d{
+  display:block;margin-top:3px;
+  font-family:var(--label);
+  font-size:var(--fs-lab-xs);font-weight:700;letter-spacing:.06em;
+  font-variant-numeric:tabular-nums;
+}
+html.az .amc-d i{font-style:normal;opacity:.55;margin-left:4px}
+html.az .amc-d.green{color:var(--green-dk)}
+html.az .amc-d.yellow{color:var(--orange)}
+html.az .amc-d.red{color:var(--red)}
+html.az .amc-no{color:var(--faint);font-weight:400}
+/* Gerarchia: l'anno pieno, il mese rientrato, il giorno più rientrato e su
+   fondo tenue — le stesse tre profondità dell'albero della vista Insieme. */
+html.az .amc-l1 .amc-per{padding-left:30px}
+html.az .amc-l2 .amc-per{padding-left:48px}
+html.az .amc-l2 td{background:var(--div2)}
+html.az .amc-l2 .amc-nome{font-size:12.5px;font-weight:800}
+html.az .amc-r{cursor:pointer}
+html.az .amc-l2{cursor:default}
+html.az .amc-r:not(.amc-l2):hover td{background:var(--s2)}
+html.az .amc .am-chev{margin-right:8px}
+html.az .amc .am-chev.vuota{visibility:hidden}
+/* Il selettore Insieme / Per negozio sta fra i filtri: due pillole, non un
+   interruttore a parte, perché dice COSA guardi come Brand e Punto vendita —
+   mentre "vs target" e "vs anno scorso" dicono con cosa lo confronti. */
+html.az .am-vista{display:inline-flex;gap:8px}

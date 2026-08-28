@@ -53,6 +53,11 @@ let amExpanded = new Set();
 // comportamento già esistente dopo l'introduzione del badge target),
 // anno-scorso OFF (l'utente lo attiva quando vuole vedere il delta YoY).
 let compareTgt=true, comparePy=false;
+// Vista della tab Andamento: 'insieme' (i negozi selezionati sommati, com'è
+// sempre stato) oppure 'negozi' (una colonna per negozio accanto al totale).
+// Ha senso solo con 2+ negozi nella selezione: sotto quella soglia il
+// selettore non compare e questo valore viene ignorato.
+let amVista='insieme';
 // Incassi storici (2025 completo + Jan-Apr 2026 per il pre-GoAudits):
 // dict {storeKey|date: netSales}. Stesso formato di targetsByKey, lookup O(1).
 // Sorgente di verità per il confronto anno-su-anno e per riempire la timeline

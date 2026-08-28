@@ -1622,3 +1622,16 @@ body{display:flex;flex-direction:column}
 .bs-pohq{font-size:16px;font-weight:800;line-height:1;letter-spacing:-.02em}
 .bs-pohq.bs-zero{color:var(--bs-red)}
 .bs-thead .bs-c-ohq{text-align:right}
+
+/* Vista "Per negozio" della tab Andamento: tabella con una colonna per
+   negozio. Fuori dal tema azzurro resta leggibile, senza pretese. */
+.amc-wrap{margin:12px 16px;overflow-x:auto;background:var(--s1);border:1px solid var(--bd);border-radius:12px}
+.amc{border-collapse:separate;border-spacing:0;width:100%}
+.amc th,.amc td{padding:11px 14px;text-align:right;white-space:nowrap;font-size:13px}
+.amc th{font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.06em}
+.amc .amc-per{text-align:left}
+.amc-r{cursor:pointer}
+.amc-nome{font-weight:800}
+.amc-sub,.amc-b{display:block;font-size:10px;color:var(--t3);text-transform:uppercase;letter-spacing:.06em}
+.amc-d{display:block;font-size:10.5px;font-weight:700;margin-top:2px}
+.amc-no{color:var(--t3)}
