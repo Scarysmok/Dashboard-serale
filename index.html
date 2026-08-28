@@ -238,6 +238,10 @@
       <button class="date-range-pill" id="date-range-pill" onclick="openCalendar()">
         <span class="drp-icon az-em">📅</span>
         <span class="drp-text" id="drp-text">Tutte le date</span>
+        <!-- La pillola non sembra un comando: dice cosa filtra, non che si può
+             toccare. Il suggerimento sta in un elemento a parte perché
+             _updateDatePill() riscrive #drp-text a ogni cambio di intervallo. -->
+        <span class="drp-hint">clicca per modificare</span>
         <span class="drp-reset" id="drp-reset" onclick="event.stopPropagation();resetStoreRange()">×</span>
       </button>
     </div>

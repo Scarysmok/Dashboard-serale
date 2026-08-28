@@ -1170,7 +1170,10 @@ html.az .sc-badge{
    nero non ci può stare senza sfondare: il blocco nero è alto 226px in tutte le
    sezioni e la barra da sola ne chiede 56, che è più dei 46px di sormonto. */
 html.az .stores-date-bar{
-  padding:18px 16px 2px;   /* 18px come lo stacco del selettore di ogni altra sezione */
+  /* 18px sopra come lo stacco del selettore di ogni altra sezione, 14 sotto
+     come lo stacco fra selettore e primo contenuto: i blocchi dei brand non
+     hanno margine sopra, quindi lo spazio lo mette la barra o non c'è. */
+  padding:18px 16px 14px;
 }
 /* Stesse misure e stessa scrittura del selettore delle altre sezioni: bordo
    --bd2 (non --bd, più chiaro), peso 900, spaziatura .1em. Erano quattro
@@ -1189,6 +1192,20 @@ html.az .date-range-pill .drp-text{
   font-size:10.5px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;
 }
 html.az .date-range-pill .drp-reset{color:var(--t3)}
+/* Il suggerimento si legge dopo il valore, non prima: più piccolo e non in
+   grassetto. Il colore resta --label-ink e non --faint: a questo corpo --faint
+   fa 2,26:1, sotto ogni soglia (vedi la nota sui token in cima al file). */
+html.az .drp-hint{
+  font-family:var(--label);
+  font-size:var(--fs-lab-s);font-weight:500;
+  letter-spacing:.1em;text-transform:uppercase;
+  color:var(--label-ink);
+}
+/* Sul telefono la pillola non ha spazio per il valore E il suggerimento:
+   resta il valore, che è l'informazione. */
+@media(max-width:560px){
+  html.az .drp-hint{display:none}
+}
 /* Il filtro attivo si deve vedere: `html.az .date-range-pill` batte per
    specificità `.date-range-pill.rng-active` di styles.css, quindi lo sfondo
    dell'accento va ridichiarato qui o il pulsante resta bianco anche con un
