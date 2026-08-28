@@ -817,7 +817,22 @@ html.az .tgt-bar-lbl{
    ─────────────────────────────────────────────────────────────────────────── */
 
 /* Il pannello a due celle che sborda sul nero (Net YTD · vs target) */
-html.az #tempo-hero .az-lift{margin-left:16px;margin-right:16px}
+/* Le due viste di Analisi devono avere l'intestazione nera ALTA UGUALE:
+   cambiando vista lo switcher non si deve spostare, altrimenti per tornare
+   indietro bisogna rincorrerlo. Misurato prima: 87px di scarto su schermo
+   largo, 74 sul telefono.
+
+   Due cause, tutte e due qui sotto:
+   1) il fondo. La vista Vendite teneva lo spazio per la tessera che sormontava
+      il nero; quella tessera ora sta sotto lo switcher, quindi lo spazio non
+      serve più e si allinea ai 24px della vista KPI.
+   2) il titolo. "ANDAMENTO 2026" va a capo (l'anno sotto), "KPI NEGOZIO" no:
+      una riga di differenza, 48px. Invece di forzarli sulla stessa forma —
+      che sul telefono si romperebbe comunque — si riservano DUE righe a
+      entrambi. In `em`, così segue la dimensione del carattere che è a clamp. */
+html.az #tempo-hero .az-hero{padding-bottom:24px}
+html.az #tempo-hero .az-h1,
+html.az #kpi-hero .az-h1{min-height:1.68em}
 html.az .az-duo{
   display:grid;grid-template-columns:1fr 1fr;gap:1px;
   background:var(--bd);
