@@ -835,10 +835,20 @@ html.az .tgt-bar-lbl{
       entrambi. In `em`, così segue la dimensione del carattere che è a clamp. */
 html.az #tempo-hero .az-hero,
 html.az #negozi-hero .az-hero,
+html.az #settings-hero .az-hero,
 html.az #storecheck-content > .az-hero{padding-bottom:24px}
+/* Dashboard e Negozi hanno un elemento che SALE sopra il nero (il pannello del
+   corrispettivo, la pillola delle date): lì il fondo deve tenere lo spazio per
+   la sovrapposizione, più gli stessi 24px degli altri. Così la parte di nero
+   che si VEDE è alta uguale in tutte le sezioni, che è quello che conta. */
+html.az #oggi-content > .az-hero,
+html.az #stores-hero .az-hero{padding-bottom:calc(var(--az-overlap) + 24px)}
 html.az #tempo-hero .az-h1,
 html.az #kpi-hero .az-h1,
 html.az #negozi-hero .az-h1,
+html.az #stores-hero .az-h1,
+html.az #settings-hero .az-h1,
+html.az #oggi-content > .az-hero .az-h1,
 html.az #storecheck-content > .az-hero .az-h1{min-height:1.68em}
 html.az .az-duo{
   display:grid;grid-template-columns:1fr 1fr;gap:1px;
