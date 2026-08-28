@@ -869,7 +869,17 @@ html.az .az-duo-sotto > div{
 }
 html.az .az-duo-sotto .az-duo-v{margin-top:9px;font-size:22px}
 
-html.az .tempo-wrap{padding-top:18px}
+/* Stesso stacco fra il nero e il banner nelle due viste di Analisi: .tempo-wrap
+   aveva 18px in cima e .kpi-wrap zero, e col margine del banner facevano 30
+   contro 12. Si vedeva passando da una all'altra. */
+html.az .tempo-wrap,
+html.az .kpi-wrap{padding-top:18px}
+/* E stesso stacco fra il banner e lo switcher: .tempo-wrap ha `gap:12px` fra i
+   suoi figli, .kpi-wrap no, e lo switcher restava 12px più in alto. Si mette il
+   margine solo a quello della vista KPI invece di dare il `gap` a tutta la
+   colonna: il `gap` cambierebbe anche tutte le altre distanze di quella vista,
+   che non c'entrano niente. */
+html.az .kpi-wrap > .seg-wrap{margin-top:12px}
 html.az .analisi-asof{
   border-radius:var(--radius-card);
   background:var(--s1)!important;
