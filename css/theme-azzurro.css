@@ -842,12 +842,12 @@ html.az .tgt-bar-lbl{
 html.az #tempo-hero .az-hero,
 html.az #negozi-hero .az-hero,
 html.az #settings-hero .az-hero,
+html.az #stores-hero .az-hero,
 html.az #storecheck-content > .az-hero{padding-bottom:24px}
 /* Dashboard e Negozi hanno un elemento che SALE sopra il nero (il pannello del
    corrispettivo, la pillola delle date): lì il fondo deve tenere lo spazio per
    la sovrapposizione, più gli stessi 24px degli altri. Così la parte di nero
    che si VEDE è alta uguale in tutte le sezioni, che è quello che conta. */
-html.az #stores-hero .az-hero{padding-bottom:calc(var(--az-overlap) + 24px)}
 /* La Dashboard toglie anche il gap: .oggi-wrap è flex, e fra il nero e il
    pannello che gli sale sopra il gap si somma al margine negativo. Il sormonto
    che si vede è 46-14=32px, non 46. Senza questa sottrazione il nero della
@@ -1135,28 +1135,38 @@ html.az .sc-badge{
    10. NEGOZI (sezione 1e)
    ─────────────────────────────────────────────────────────────────────────── */
 
-/* La barra della data sale sul nero */
+/* La barra della data sta SOTTO il nero, dov'è il selettore di tutte le altre
+   sezioni (stesso rientro, stessa distanza dall'intestazione).
+
+   Prima saliva sul nero, ed è per quello che questa sezione aveva il nero più
+   alto di tutte: la pillola è trasparente, quindi il nero non veniva coperto e
+   continuava per altri 56px oltre l'intestazione (282 invece di 226). Sopra il
+   nero non ci può stare senza sfondare: il blocco nero è alto 226px in tutte le
+   sezioni e la barra da sola ne chiede 56, che è più dei 46px di sormonto. */
 html.az .stores-date-bar{
-  margin-top:calc(-1 * var(--az-overlap));
-  position:relative;z-index:3;
-  padding:0 16px 14px;
+  padding:10px 16px 2px;
 }
 html.az .date-range-pill{
   border-radius:var(--radius-pill);
-  border:1px solid rgba(255,255,255,.26);
-  background:transparent;
-  color:rgba(255,255,255,.85);
+  border:1px solid var(--bd);
+  background:var(--s1);
+  color:var(--t1);
   font-family:var(--label);
   font-size:var(--fs-lab);letter-spacing:.14em;text-transform:uppercase;
   height:42px;
 }
-/* .drp-text ha color:var(--t1), cioè nero: sulla pillola che sta sul nero
-   restava invisibile. Deve ereditare il bianco dal bottone. */
 html.az .date-range-pill .drp-text{
   color:inherit;
   font-size:var(--fs-lab);font-weight:500;letter-spacing:.14em;text-transform:uppercase;
 }
-html.az .date-range-pill .drp-reset{color:rgba(255,255,255,.6)}
+html.az .date-range-pill .drp-reset{color:var(--t3)}
+/* Il filtro attivo si deve vedere: `html.az .date-range-pill` batte per
+   specificità `.date-range-pill.rng-active` di styles.css, quindi lo sfondo
+   dell'accento va ridichiarato qui o il pulsante resta bianco anche con un
+   intervallo selezionato. */
+html.az .date-range-pill.rng-active{
+  border-color:var(--acc);background:var(--acc-bg);color:var(--acc);
+}
 html.az .stores-brand-block{
   border:none;border-radius:var(--radius-card);
   box-shadow:var(--shadow);
