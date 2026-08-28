@@ -1045,8 +1045,14 @@ html.az .am-chev{color:var(--faint);font-size:10px}
    `!important` perché nel markup quella .seg-wrap ha uno style inline
    (margin:10px 16px 6px) che altrimenti vincerebbe; lo stile inline resta,
    così fuori dal tema azzurro il layout è quello di prima. */
+/* I 14px sotto: qui il selettore era appiccicato alla prima scheda, perché
+   subito dopo vengono le .sc-hi-card (o le .sc-row) che non hanno margine
+   sopra. Nelle altre sezioni quello stacco c'è, ma lo dà il contenuto:
+   .kpi-scroll in Chiusure ha 16px di padding, le due tessere di Analisi 14.
+   Qui non c'è un contenitore da cui prenderlo, quindi lo mette lo switcher —
+   e vale per tutte e due le viste, "Da sistemare" e "Tutte". */
 html.az #storecheck-content > .seg-wrap{
-  margin:18px 16px 0!important;
+  margin:18px 16px 14px!important;
 }
 html.az .seg-count{
   background:var(--red);color:#fff;
