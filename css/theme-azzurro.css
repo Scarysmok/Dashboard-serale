@@ -1764,7 +1764,10 @@ html.az .amc-wrap{
   background:var(--s1);
   border:none;border-radius:var(--radius-card);
   box-shadow:var(--shadow);
-  overflow-x:auto;
+  /* Scorre in tutte e due le direzioni: i negozi di lato, i giorni in giù.
+     L'altezza la mette _amFitTabella() in js/06-analisi.js — dipende da quanto
+     sta sopra alla tabella e non si può scrivere qui. */
+  overflow:auto;
 }
 html.az .amc th{
   font-family:var(--label);
@@ -1795,8 +1798,12 @@ html.az .amc td:not(.amc-per):not(.amc-tot){min-width:118px}
 /* Il filo che separa la parte ferma da quella che scorre: senza, scorrendo
    sembra che le colonne si infilino sotto al testo. */
 html.az .amc-tot{border-right:1px solid var(--bd)}
-html.az thead .amc-per,
-html.az thead .amc-tot{z-index:3}
+/* I nomi dei negozi restano in cima mentre si scende. */
+html.az .amc thead th{position:sticky;top:0;z-index:3}
+/* L'angolo in alto a sinistra è fermo in tutte e due le direzioni, quindi sta
+   sopra a entrambe le altre. */
+html.az .amc thead .amc-per,
+html.az .amc thead .amc-tot{z-index:4}
 html.az .amc-nome{font-size:14px;font-weight:900;text-transform:uppercase;letter-spacing:-.01em}
 html.az .amc-sub,
 html.az .amc-b{

@@ -561,6 +561,34 @@ function _amTabellaHtml(ctx){
   </table></div>`;
 }
 
+// La tabella per negozio scorre DENTRO di sé, e i nomi dei negozi restano in
+// cima mentre si scende. Deve essere così: `overflow-x:auto` sul contenitore
+// lo rende un'area di scorrimento anche in verticale, e da quel momento
+// `position:sticky` dell'intestazione si riferisce a lui, non alla pagina —
+// quindi scrollando la pagina l'intestazione se ne andrebbe su comunque.
+//
+// L'altezza non si può scrivere nel CSS: dipende da quanto le sta sopra
+// (l'intestazione nera, il selettore, le due tessere, i filtri), che cambia
+// con la larghezza dello schermo. Qui si misura e si allunga fino in fondo
+// alla schermata; scendendo, la tabella cresce fino a riempirla e da lì in poi
+// scorre al suo interno. Il massimo è l'altezza della finestra, quindi non
+// c'è modo che si rincorra all'infinito.
+function _amFitTabella(){
+  const w = document.querySelector('#tempo-content .amc-wrap');
+  if(!w) return;
+  const sa = w.closest('.scroll-area');
+  if(!sa) return;
+  const fondo = sa.getBoundingClientRect().bottom;
+  const cima  = Math.max(w.getBoundingClientRect().top, sa.getBoundingClientRect().top);
+  w.style.maxHeight = Math.max(280, Math.round(fondo - cima - 14)) + 'px';
+}
+let _amFitAtteso = false;
+function _amFitDaScroll(){
+  if(_amFitAtteso) return;              // una volta per fotogramma, non a ogni pixel
+  _amFitAtteso = true;
+  requestAnimationFrame(() => { _amFitAtteso = false; _amFitTabella(); });
+}
+
 // ── RENDER TAB ANDAMENTO (v2: gerarchica anno → mese → giorno) ──────────
 // Costruisce un albero anno → mese → giorno includendo tutti i giorni per
 // cui c'è almeno un dato (NET o target). I giorni futuri (con solo target)
@@ -783,6 +811,14 @@ function renderTempo(){
       compareTgt, comparePy
     });
     _azTempoHero(years);   // il nero resta il totale della selezione
+    _amFitTabella();
+    // Registrati una volta sola: il render passa di qui a ogni apri/chiudi.
+    if(!renderTempo._amAgganciato){
+      renderTempo._amAgganciato = true;
+      const sa = document.getElementById('tab-tempo');
+      if(sa) sa.addEventListener('scroll', _amFitDaScroll, {passive:true});
+      window.addEventListener('resize', _amFitDaScroll);
+    }
     return;
   }
 
