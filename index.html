@@ -250,11 +250,15 @@
          (js/06-analisi.js). Vuota fuori dal tema azzurro. -->
     <div id="tempo-hero"></div>
     <div class="tempo-wrap">
-      <div class="analisi-asof" id="asof-tempo"></div>
+      <!-- Lo switcher sta SOPRA il banner: subito sotto l'intestazione nera,
+           come nella tab Chiusure/Aperture. È navigazione, il banner è
+           un'informazione — e così il selettore cade allo stesso punto in
+           tutte le sezioni, anche dove il banner non c'è. -->
       <div class="seg-wrap">
         <button class="seg-btn on" onclick="switchTab('tempo')"><i class="az-em">📈 </i>Vendite</button>
         <button class="seg-btn" onclick="switchTab('kpi')"><i class="az-em">📊 </i>KPI negozio</button>
       </div>
+      <div class="analisi-asof" id="asof-tempo"></div>
       <!-- Net YTD e scostamento dal target: riempito da _azTempoHero()
            (js/06-analisi.js). Sta QUI, sotto lo switcher, nella stessa
            posizione in cui la tab KPI ha Ingressi/CR/UPT. -->
@@ -313,11 +317,11 @@
     <div id="kpi-hero"></div>
     <div class="kpi-wrap">
 
-      <div class="analisi-asof" id="asof-kpi"></div>
       <div class="seg-wrap">
         <button class="seg-btn" onclick="switchTab('tempo')"><i class="az-em">📈 </i>Vendite</button>
         <button class="seg-btn on" onclick="switchTab('kpi')"><i class="az-em">📊 </i>KPI negozio</button>
       </div>
+      <div class="analisi-asof" id="asof-kpi"></div>
 
       <!-- Hero + selettore KPI -->
       <div class="kpi-tabs" id="kpi-tabs">

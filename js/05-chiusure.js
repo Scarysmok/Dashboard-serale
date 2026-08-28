@@ -604,11 +604,22 @@ function _azNegoziHero(){
   const c=ap?_apConteggi(aperturaDate):null;
   const miss=ap?(c?c.mancanti:0):(filterDate?getMissingStores(filterDate).length:0);
   const chiusi=ap?(c?c.chiusi:0):(filterDate?getClosedStores(filterDate).length:0);
+  // La riga sotto il titolo c'è SEMPRE, così l'intestazione non cambia altezza
+  // da un giorno all'altro (36px di differenza fra un giorno con mancanti e uno
+  // senza). Quando non c'è niente da segnalare non si lascia bianca: si dice
+  // quante ne sono arrivate, che è comunque un'informazione.
+  const dataSel = ap ? aperturaDate : filterDate;
+  const attesi = ap ? (c?c.attesi:0) : (dataSel ? n+miss : 0);
+  const arrivate = ap ? (c?c.ricevute:0) : n;
   box.innerHTML=azHero({
     kicker,
     h1:String(n),
     accent:ap?'aperture':'chiusure',
     inline:true,
+    // Solo quando non c'è un avviso: con l'avviso la riga è già occupata, e
+    // "28 su 29 ricevute · 1 chiusura non ricevuta" direbbe due volte la stessa
+    // cosa.
+    claim:(!miss && dataSel && attesi)?`${arrivate} su ${attesi} ricevute`:'',
     // I negozi chiusi non sono un problema: vanno in coda, in grigio, non
     // nell'avviso rosso, altrimenti il rosso smette di significare "guarda qui".
     note:chiusi?`${chiusi} negoz${chiusi===1?'io':'i'} chius${chiusi===1?'o':'i'}`:'',
