@@ -206,10 +206,11 @@ function renderAperture(){
   if((filtroAperture==='mancanti' && !missing)
    ||(filtroAperture==='chiusi'   && !closed)
    ||(filtroAperture==='segnal'   && !segnal)) filtroAperture='all';
-  html=`<div style="margin:2px 16px 10px;font-size:12.5px;color:var(--t2);font-weight:600">${
-    received} su ${cnt.attesi} aperture ricevute${
-    closed?` · ${closed} negoz${closed===1?'io':'i'} chius${closed===1?'o':'i'}`:''}</div>`
-    + _apFilterBarHTML({tutti:items.length, mancanti:missing, chiusi:closed, segnal});
+  // Niente riepilogo sotto la data: lo stesso conteggio sta già nell'intestazione
+  // nera, in cima alla vista. Ripeterlo a due centimetri di distanza non aggiunge
+  // niente e allontana la lista.
+  // `cnt` resta perché i numeri servono ai contatori dei filtri qui sotto.
+  html = _apFilterBarHTML({tutti:items.length, mancanti:missing, chiusi:closed, segnal});
   for(const it of items){
     if(!_apPassaFiltro(it)) continue;
     const bc=brandColor(it.brand);
