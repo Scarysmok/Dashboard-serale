@@ -834,6 +834,26 @@ html.az .az-duo-v{
 }
 html.az .az-duo-v.down{color:var(--red)}
 
+/* Net YTD e vs target sotto lo switcher, come DUE TESSERE separate: le stesse
+   misure dei tre riquadri della vista KPI (stesso rientro, stesso spazio fra
+   loro, stesso raggio e stessa ombra), così le due viste della stessa sezione
+   si somigliano invece di avere ognuna la sua forma.
+   Prima era un pannello unico diviso da una linea, agganciato sopra
+   l'intestazione nera con un margine negativo: quello serviva quando la
+   tessera sormontava il nero, cosa che qui non fa più. */
+html.az .az-duo-sotto{
+  display:grid;grid-template-columns:1fr 1fr;
+  gap:10px;background:none;
+  padding:14px 16px 10px;margin:0;
+}
+html.az .az-duo-sotto > div{
+  background:var(--s1);
+  border-radius:var(--radius-card);
+  box-shadow:var(--shadow);
+  padding:16px 14px;
+}
+html.az .az-duo-sotto .az-duo-v{margin-top:9px;font-size:22px}
+
 html.az .tempo-wrap{padding-top:18px}
 html.az .analisi-asof{
   border-radius:var(--radius-card);

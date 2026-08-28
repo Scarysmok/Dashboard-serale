@@ -255,6 +255,10 @@
         <button class="seg-btn on" onclick="switchTab('tempo')"><i class="az-em">📈 </i>Vendite</button>
         <button class="seg-btn" onclick="switchTab('kpi')"><i class="az-em">📊 </i>KPI negozio</button>
       </div>
+      <!-- Net YTD e scostamento dal target: riempito da _azTempoHero()
+           (js/06-analisi.js). Sta QUI, sotto lo switcher, nella stessa
+           posizione in cui la tab KPI ha Ingressi/CR/UPT. -->
+      <div id="tempo-duo"></div>
       <!-- Filtri: Brand multi-select + Punto Vendita multi-select + toggle.
            Il pannello dei filtri viene popolato da renderAmFilterPanels()
            subito dopo il fetch dei dati, così riflette esattamente quello

@@ -696,8 +696,11 @@ function renderTempo(){
   _azTempoHero(years);
 }
 
-// Intestazione nera della tab Analisi (sezione 1c del restyle) + pannello
-// bianco che le sale sopra con Net YTD e scostamento dal target.
+// Intestazione nera della tab Analisi (sezione 1c del restyle) e, a parte, il
+// pannello con Net YTD e lo scostamento dal target.
+// Il pannello NON sta più agganciato all'intestazione ma sotto lo switcher
+// Vendite/KPI, dove la tab KPI ha i suoi tre riquadri: le due viste della
+// stessa sezione mostravano i propri numeri in due posti diversi.
 // Prende l'anno più recente fra quelli aggregati da renderTempo, che è quello
 // di cui il titolo parla ("ANDAMENTO 2026").
 function _azTempoHero(years){
@@ -716,7 +719,9 @@ function _azTempoHero(years){
     h1: 'Andamento',
     accent: yr,
     claim: `${y.daysPast} giorni consuntivati${y.daysPending?` · ${y.daysPending} in corso`:''}`
-  }) + `<div class="az-lift az-duo">
+  });
+  const duo = document.getElementById('tempo-duo');
+  if(duo) duo.innerHTML = `<div class="az-duo az-duo-sotto">
     <div><div class="az-duo-l">Net ${inCorso?'YTD':yr}</div><div class="az-duo-v">${fmt(y.netPast)}</div></div>
     <div><div class="az-duo-l">vs target</div><div class="az-duo-v${delta!==null&&delta<0?' down':''}">${dTxt}</div></div>
   </div>`;
