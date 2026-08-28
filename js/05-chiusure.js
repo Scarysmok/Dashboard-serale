@@ -126,6 +126,31 @@ function _apFilterBarHTML(n){
   </div>`;
 }
 
+// Quante aperture si aspettano, quante ne sono arrivate, quante mancano e
+// quanti negozi erano chiusi, per un giorno.
+//
+// Uno solo, usato sia dall'intestazione nera sia dalla lista: erano due conti
+// separati e sulla stessa schermata potevano dire numeri diversi.
+//
+// Da un negozio chiuso quel giorno NON ci si aspetta l'apertura: esce dal
+// denominatore e si conta a parte, altrimenti ogni domenica sembrerebbe che
+// manchi una checklist.
+function _apConteggi(dateISO){
+  const recs=allAperture.filter(a=>a.dateISO===dateISO);
+  // Stesso negozio con più PDF nello stesso giorno (checklist ricaricata):
+  // vale una volta sola, altrimenti si contano i PDF e non i negozi.
+  const got=new Set(recs.map(a=>storeKey(a.brand,a.location)));
+  let attesi=0, chiusi=0, ricevute=0;
+  for(const st of ALL_STORES){
+    if(!isStoreMonitoredOn(st.brand,st.location,dateISO)) continue;
+    const k=storeKey(st.brand,st.location);
+    if(got.has(k)){ attesi++; ricevute++; continue; }
+    if(isStoreClosedOn(st.brand,st.location,dateISO)) chiusi++;
+    else attesi++;
+  }
+  return {attesi, ricevute, chiusi, mancanti: attesi-ricevute};
+}
+
 function renderAperture(){
   const list=document.getElementById('aperture-list');
   const chip=document.getElementById('apertura-date-chip');
@@ -169,9 +194,8 @@ function renderAperture(){
   items.sort((x,y)=>(x.brand+x.location).localeCompare(y.brand+y.location));
 
   let html='';
-  const received=items.filter(i=>i.rec).length;
-  const closed=items.filter(i=>i.closed).length;
-  const missing=items.length-received-closed;
+  const cnt=_apConteggi(aperturaDate);
+  const received=cnt.ricevute, closed=cnt.chiusi, missing=cnt.mancanti;
   // Da un negozio chiuso non ci si aspetta l'apertura: esce dal denominatore e
   // viene detto a parte. Contarlo fra gli attesi faceva sembrare che mancasse
   // una checklist ogni domenica.
@@ -183,7 +207,7 @@ function renderAperture(){
    ||(filtroAperture==='chiusi'   && !closed)
    ||(filtroAperture==='segnal'   && !segnal)) filtroAperture='all';
   html=`<div style="margin:2px 16px 10px;font-size:12.5px;color:var(--t2);font-weight:600">${
-    received} su ${items.length-closed} aperture ricevute${
+    received} su ${cnt.attesi} aperture ricevute${
     closed?` · ${closed} negoz${closed===1?'io':'i'} chius${closed===1?'o':'i'}`:''}</div>`
     + _apFilterBarHTML({tutti:items.length, mancanti:missing, chiusi:closed, segnal});
   for(const it of items){
@@ -574,8 +598,11 @@ function _azNegoziHero(){
     n=getFilteredData().length;
     if(filterDate) kicker=filterDate.split('-').reverse().join('/');
   }
-  const miss=(!ap&&filterDate)?getMissingStores(filterDate).length:0;
-  const chiusi=(!ap&&filterDate)?getClosedStores(filterDate).length:0;
+  // Stessa costruzione per le due viste: in rosso ciò su cui agire, in grigio
+  // i negozi chiusi, che non sono un problema.
+  const c=ap?_apConteggi(aperturaDate):null;
+  const miss=ap?(c?c.mancanti:0):(filterDate?getMissingStores(filterDate).length:0);
+  const chiusi=ap?(c?c.chiusi:0):(filterDate?getClosedStores(filterDate).length:0);
   box.innerHTML=azHero({
     kicker,
     h1:String(n),
@@ -585,11 +612,12 @@ function _azNegoziHero(){
     // nell'avviso rosso, altrimenti il rosso smette di significare "guarda qui".
     note:chiusi?`${chiusi} negoz${chiusi===1?'io':'i'} chius${chiusi===1?'o':'i'}`:'',
     // In rosso e da solo: è l'unica cosa su cui agire (vedi alert in azHero).
-    alert:miss?`${miss} chiusur${miss===1?'a':'e'} non ricevut${miss===1?'a':'e'}`:'',
+    alert:miss?(ap?`${miss} apertur${miss===1?'a':'e'} non ricevut${miss===1?'a':'e'}`
+                  :`${miss} chiusur${miss===1?'a':'e'} non ricevut${miss===1?'a':'e'}`):'',
     // Qui siamo già nella tab giusta: basta accendere il filtro "Mancanti",
     // senza passare da oggiGoChiusure, che riallineerebbe la data a quella
     // della Dashboard e farebbe saltare il giorno che si sta guardando.
-    alertGo:miss?'azVaiMancanti()':''
+    alertGo:miss?(ap?"setFiltroAperture('mancanti')":'azVaiMancanti()'):''
   });
 }
 // Accende il filtro "Mancanti" sul giorno già selezionato. setChip esce da solo
