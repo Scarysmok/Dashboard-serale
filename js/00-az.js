@@ -42,6 +42,18 @@ var AZ = document.documentElement.classList.contains('az');
 //           attributo onclick e non viene filtrata.
 //   inline  true → accento sulla stessa riga del titolo, non a capo
 //           (serve per "28 CHIUSURE", dove il numero è il titolo)
+//   claimShort  versione corta del claim, usata al posto sua sotto i 560px.
+//           Il claim sta su UNA riga: se va a capo l'intestazione nera cresce
+//           e non è più alta uguale a quella delle altre sezioni, che è la cosa
+//           che la tiene ferma quando si cambia vista. Sul telefono lo spazio
+//           utile è 358px, e "237 giorni consuntivati · 3 in corso · aggiornato
+//           al 27/08/2026" ne misura 572: serve una forma corta.
+//   tail    HTML GIÀ PRONTO da appendere in coda al claim. A differenza di
+//           tutto il resto NON passa da _escHtml: chi lo passa se ne assume la
+//           responsabilità (oggi solo _asofTail() in 06-analisi.js, che ci
+//           mette la data dei consuntivi e il bottone Importa). Sta in un
+//           <span class="az-tail"> così chi lo ha scritto può riaggiornarlo da
+//           solo senza rigenerare tutta l'intestazione.
 //
 // I testi passano da _escHtml: arrivano da nomi di negozio e date, non da
 // stringhe letterali, quindi meglio non fidarsi.
@@ -56,13 +68,15 @@ function azHero(o){
       ${o.kicker?`<div class="az-hero-kicker">${esc(o.kicker)}</div>`:'<span></span>'}
     </div>
     <h1 class="az-h1">${h1}${sep}${acc}</h1>
-    ${(o.claim||o.alert||o.note)?`<div class="az-hero-claim">${o.claim?esc(o.claim):''}${
+    ${(o.claim||o.alert||o.note||o.tail)?`<div class="az-hero-claim">${o.claim?`<span class="az-cnt">${
+      o.claimShort?`<span class="az-l">${esc(o.claim)}</span><span class="az-s">${esc(o.claimShort)}</span>`
+                  :esc(o.claim)}</span>`:''}${
       o.alert?`${o.claim?'<i class="az-claim-sep"></i>':''}<b class="bad${
         o.alertGo?' az-go':''}"${o.alertGo?` onclick="${o.alertGo}"`:''}>${esc(o.alert)}${
         o.alertGo?' &rarr;':''}</b>`:''
     }${
       o.note?`${(o.claim||o.alert)?'<i class="az-claim-sep"></i>':''}<span>${esc(o.note)}</span>`:''
-    }</div>`:''}
+    }${o.tail?`<span class="az-tail">${o.tail}</span>`:''}</div>`:''}
   </div>`;
 }
 

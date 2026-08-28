@@ -282,6 +282,30 @@ function lastConsuntivoISO(){
   }
   return max;
 }
+// Coda del claim dell'intestazione nera: "· aggiornato al 27/08/2026 [Importa]".
+// È lo stesso contenuto del banner bianco, che nel markup resta ma che il tema
+// azzurro nasconde: togliendo class="az" dal tag <html> torna il banner e
+// questa coda sparisce, come per tutto il resto del restyle.
+//
+// Perché nel nero e non più in un riquadro suo: la riga sotto il titolo dice
+// già "237 giorni consuntivati", cioè fin dove arrivano i dati. La data diceva
+// la stessa cosa in un altro modo, una tessera più in basso.
+//
+// Due forme, lunga e corta: sul telefono per esteso non ci sta (misurate tutte
+// le abbreviazioni, la più stretta sfora comunque di 4px) e andando a capo
+// l'intestazione crescerebbe di 50px solo qui.
+function _asofTail(){
+  const iso=lastConsuntivoISO();
+  const isAdmin=auth&&auth.user&&auth.user.role==='admin';
+  // La classe .asof-import-btn resta: è quella con cui
+  // importConsuntiviFromDriveManual() ritrova i bottoni per disabilitarli.
+  const btn=isAdmin?`<button class="asof-import-btn az-imp" onclick="importConsuntiviFromDriveManual()" title="Importa l'ultimo file consuntivi dalla cartella Google Drive">📥 <span class="az-l">Importa</span></button>`:'';
+  if(!iso) return `<i class="az-claim-sep"></i><b class="bad">Nessun consuntivo caricato</b>${btn}`;
+  const [a,m,g]=iso.split('-');
+  return `<i class="az-claim-sep"></i><span class="az-asof">`
+       + `<span class="az-l">Aggiornato al <b>${g}/${m}/${a}</b></span>`
+       + `<span class="az-s">Agg. <b>${g}/${m}</b></span></span>${btn}`;
+}
 // Aggiorna la riga "Consuntivi aggiornati al…" in cima alla sezione Analisi
 // (presente sia nella vista Vendite sia in KPI).
 function updateConsuntivoLabel(){
@@ -298,6 +322,12 @@ function updateConsuntivoLabel(){
     const el=document.getElementById(id);
     if(el){ el.className=cls; el.innerHTML=html; }
   });
+  // Sotto il tema azzurro il banner qui sopra è nascosto e la stessa cosa si
+  // legge in coda al claim dell'intestazione nera. Va riscritta anche lì —
+  // dopo un import la data cambia, e questa funzione è il punto in cui tutti
+  // sanno di doverla rileggere.
+  document.querySelectorAll('#tempo-hero .az-tail, #kpi-hero .az-tail')
+    .forEach(el=>{ el.innerHTML=_asofTail(); });
 }
 // Aggregato anno-su-anno per un gruppo di record.
 // Restituisce {pct, totCur, totPy} oppure null se nessun record ha un PY
@@ -718,7 +748,9 @@ function _azTempoHero(years){
     kicker: inCorso ? 'Anno in corso' : 'Anno chiuso',
     h1: 'Andamento',
     accent: yr,
-    claim: `${y.daysPast} giorni consuntivati${y.daysPending?` · ${y.daysPending} in corso`:''}`
+    claim: `${y.daysPast} giorni consuntivati${y.daysPending?` · ${y.daysPending} in corso`:''}`,
+    claimShort: `${y.daysPast} giorni${y.daysPending?` · ${y.daysPending} in corso`:''}`,
+    tail: _asofTail()
   });
   const duo = document.getElementById('tempo-duo');
   if(duo) duo.innerHTML = `<div class="az-duo az-duo-sotto">
@@ -1715,7 +1747,9 @@ function _azKpiHero(){
     h1: 'KPI',
     accent: 'negozio',
     inline: true,
-    claim: `${kpiLabel(kpiState.kpi)} · ${nStore} negoz${nStore===1?'io':'i'}`
+    claim: `${kpiLabel(kpiState.kpi)} · ${nStore} negoz${nStore===1?'io':'i'}`,
+    claimShort: `${nStore} negoz${nStore===1?'io':'i'}`,
+    tail: _asofTail()
   });
 }
 

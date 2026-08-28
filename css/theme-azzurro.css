@@ -914,17 +914,39 @@ html.az #tab-kpi .kpi-wrap > .seg-wrap{margin-top:0}
 /* Lo switcher è il PRIMO figlio del contenitore in tutte e due le viste di
    Analisi: lo stacco dal nero glielo dà il padding-top del contenitore, uguale
    per entrambe, e non serve nessun margine di compensazione. */
-html.az .analisi-asof{
-  border-radius:var(--radius-card);
-  background:var(--s1)!important;
-  color:var(--t2)!important;
-  box-shadow:var(--shadow);
-  font-family:var(--label);
-  font-size:var(--fs-lab);letter-spacing:.14em;text-transform:uppercase;
-  font-weight:400;
+/* Il banner bianco "Consuntivi aggiornati al…" non si vede più: la stessa cosa
+   sta in coda alla riga sotto il titolo, dentro il nero (vedi _asofTail() in
+   js/06-analisi.js). Resta nel markup e continua a essere riempito, così
+   togliendo class="az" dal tag <html> l'app torna com'era, banner compreso.
+   Sparendo, le due tessere Net YTD / vs target salgono di 89px. */
+html.az .analisi-asof{display:none}
+
+/* Coda del claim: la data dei consuntivi e il bottone Importa.
+
+   L'altezza è BLOCCATA a una riga di testo (1.7em, la stessa che avrebbe col
+   solo testo, vedi line-height di .az-hero-claim). Il bottone è alto 24px e
+   senza questo vincolo allargherebbe la riga, e con lei tutta l'intestazione:
+   229px invece di 226, cioè l'Analisi più alta di ogni altra sezione. Bloccata
+   così, il bottone sborda di un paio di pixel dentro il fondo dell'intestazione
+   — invisibili — e il conto torna a qualunque larghezza, senza doverli
+   ricompensare a mano schermo per schermo. */
+html.az #tempo-hero .az-hero-claim,
+html.az #kpi-hero .az-hero-claim{
+  display:flex;align-items:center;gap:0 8px;white-space:nowrap;
+  height:1.7em;
 }
-html.az .analisi-asof b{font-weight:700;color:var(--t1)}
-html.az .analisi-asof.none{color:var(--red)!important}
+html.az .az-asof b{color:rgba(255,255,255,.92);font-weight:700;margin-left:5px}
+html.az .az-imp{
+  display:inline-flex;align-items:center;gap:5px;
+  height:24px;padding:0 11px;
+  border:1px solid rgba(255,255,255,.3);border-radius:var(--radius-pill);
+  background:transparent;color:rgba(255,255,255,.92);
+  font-family:var(--label);font-size:10px;font-weight:700;
+  letter-spacing:.1em;text-transform:uppercase;cursor:pointer;flex-shrink:0;
+}
+html.az .az-imp:disabled{width:auto;padding:0 11px;opacity:.55;cursor:default}
+/* La forma corta esiste solo sul telefono, quella lunga solo altrove. */
+html.az .az-s{display:none}
 
 /* Filtri: pillole, nere quando selezionate */
 html.az .am-filter-btn,
@@ -1664,4 +1686,39 @@ html.az .az-xls{
   font:900 10.5px var(--font)!important;
   letter-spacing:.1em!important;
   text-transform:uppercase!important;
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   SCHERMI STRETTI — la riga sotto il titolo dell'Analisi
+   ───────────────────────────────────────────────────────────────────────────
+   Quella riga sta su UNA riga sola e non va mai a capo: se cresce, cresce
+   l'intestazione nera, e smette di essere alta uguale a quella delle altre
+   sezioni — che è la cosa che la tiene ferma quando si cambia vista.
+
+   La soglia non è a caso: per esteso il contenuto misura 531px, più i 2x20
+   di rientro fanno 571. Sotto quella larghezza deborda (non va a capo: è un
+   flex in nowrap, quindi sborda e basta). 600px lascia un po' di margine. */
+@media(max-width:600px){
+  html.az .az-l{display:none}
+  html.az .az-s{display:inline}
+  /* Il bottone resta, ma della sola icona: "Importa" scritto non ci sta.
+     Mentre importa torna largo, perché il testo diventa "⏳ Importo…". */
+  html.az .az-imp{padding:0;width:24px;justify-content:center;font-size:11px;gap:0}
+  html.az .az-imp:disabled{width:auto;padding:0 11px}
+  /* Se manca il consuntivo, sul telefono il conteggio dei giorni si toglie di
+     mezzo: davanti c'è una cosa che non va, ed è quella che deve leggersi. */
+  html.az #tempo-hero .az-hero-claim:has(.bad) .az-cnt,
+  html.az #kpi-hero .az-hero-claim:has(.bad) .az-cnt,
+  /* e con lui il puntino che lo separava: da solo, in testa alla riga, sembra
+     un elenco puntato */
+  html.az #tempo-hero .az-hero-claim:has(.bad) .az-claim-sep,
+  html.az #kpi-hero .az-hero-claim:has(.bad) .az-claim-sep{display:none}
+}
+/* Sotto i 360px non ci sta nemmeno la forma corta intera: resta la data, che
+   è la ragione per cui questa riga è stata spostata qui. */
+@media(max-width:360px){
+  html.az #tempo-hero .az-hero-claim .az-cnt,
+  html.az #kpi-hero .az-hero-claim .az-cnt,
+  html.az #tempo-hero .az-hero-claim .az-claim-sep,
+  html.az #kpi-hero .az-hero-claim .az-claim-sep{display:none}
 }
