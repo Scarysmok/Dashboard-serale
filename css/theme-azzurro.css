@@ -98,12 +98,6 @@ html.az{
      tiene conto del gap di .oggi-wrap: 46 - 14 = 32px di sormonto effettivo,
      come nel mockup. */
   --az-overlap:46px;
-  /* Lo spazio fra le tessere della Dashboard. Sta qui, e non scritto a mano
-     dentro .oggi-wrap, perché il fondo dell'intestazione nera deve toglierlo:
-     è flex, quindi il gap RESTITUISCE al nero parte del margine negativo del
-     pannello che gli sale sopra. Scritto in due posti i due valori scappano,
-     ed è già successo (14px di nero in più nella sola Dashboard). */
-  --az-oggi-gap:14px;
 }
 
 html.az body{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
@@ -372,12 +366,20 @@ html.az .date-arrow{
 /* ───────────────────────────────────────────────────────────────────────────
    6. DASHBOARD (sezione 1a)
    ─────────────────────────────────────────────────────────────────────────── */
-html.az .oggi-wrap{gap:var(--az-oggi-gap)}
+html.az .oggi-wrap{gap:14px}
 
-/* Il pannello bianco unico: corrispettivo + confronti + tris net/contanti/anomalie */
+/* Il pannello bianco unico: corrispettivo + confronti + tris net/contanti/anomalie.
+
+   NON sale più sul nero. Saliva di 46px, e sotto a quel pannello il nero
+   continuava lungo i fianchi: la Dashboard era l'unica sezione in cui una
+   tessera stava a cavallo dell'intestazione, e il nero sembrava più grande che
+   altrove. Ora finisce dove finisce, e il pannello comincia sotto — come lo
+   switcher di tutte le altre sezioni.
+
+   I 4px di margine servono a fare 18 con il gap da 14 di .oggi-wrap: 18px è lo
+   stacco fra il nero e il primo elemento in ogni sezione. */
 html.az .oggi-top{
-  margin-top:calc(-1 * var(--az-overlap));
-  position:relative;z-index:3;
+  margin-top:4px;
   background:var(--s1);
   border-radius:20px;
   box-shadow:var(--shadow-lift);
@@ -843,18 +845,14 @@ html.az #tempo-hero .az-hero,
 html.az #negozi-hero .az-hero,
 html.az #settings-hero .az-hero,
 html.az #stores-hero .az-hero,
+html.az #oggi-content > .az-hero,
 html.az #storecheck-content > .az-hero{padding-bottom:24px}
 /* Dashboard e Negozi hanno un elemento che SALE sopra il nero (il pannello del
    corrispettivo, la pillola delle date): lì il fondo deve tenere lo spazio per
    la sovrapposizione, più gli stessi 24px degli altri. Così la parte di nero
    che si VEDE è alta uguale in tutte le sezioni, che è quello che conta. */
-/* La Dashboard toglie anche il gap: .oggi-wrap è flex, e fra il nero e il
-   pannello che gli sale sopra il gap si somma al margine negativo. Il sormonto
-   che si vede è 46-14=32px, non 46. Senza questa sottrazione il nero della
-   Dashboard resta 14px più alto di tutti gli altri — che era il difetto. */
-html.az #oggi-content > .az-hero{
-  padding-bottom:calc(var(--az-overlap) + 24px - var(--az-oggi-gap));
-}
+/* Il pannello del corrispettivo non sale più sul nero (vedi .oggi-top), quindi
+   qui non c'è più spazio da riservare al sormonto: 24px come tutti. */
 html.az #tempo-hero .az-h1,
 html.az #kpi-hero .az-h1,
 html.az #negozi-hero .az-h1,
