@@ -1144,20 +1144,23 @@ html.az .sc-badge{
    nero non ci può stare senza sfondare: il blocco nero è alto 226px in tutte le
    sezioni e la barra da sola ne chiede 56, che è più dei 46px di sormonto. */
 html.az .stores-date-bar{
-  padding:10px 16px 2px;
+  padding:18px 16px 2px;   /* 18px come lo stacco del selettore di ogni altra sezione */
 }
+/* Stesse misure e stessa scrittura del selettore delle altre sezioni: bordo
+   --bd2 (non --bd, più chiaro), peso 900, spaziatura .1em. Erano quattro
+   piccole differenze e messe insieme si vedevano. */
 html.az .date-range-pill{
   border-radius:var(--radius-pill);
-  border:1px solid var(--bd);
+  border:1px solid var(--bd2);
   background:var(--s1);
   color:var(--t1);
   font-family:var(--label);
-  font-size:var(--fs-lab);letter-spacing:.14em;text-transform:uppercase;
+  font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;
   height:42px;
 }
 html.az .date-range-pill .drp-text{
   color:inherit;
-  font-size:var(--fs-lab);font-weight:500;letter-spacing:.14em;text-transform:uppercase;
+  font-size:10.5px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;
 }
 html.az .date-range-pill .drp-reset{color:var(--t3)}
 /* Il filtro attivo si deve vedere: `html.az .date-range-pill` batte per
