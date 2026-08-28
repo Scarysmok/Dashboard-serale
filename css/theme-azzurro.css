@@ -834,10 +834,12 @@ html.az .tgt-bar-lbl{
       che sul telefono si romperebbe comunque — si riservano DUE righe a
       entrambi. In `em`, così segue la dimensione del carattere che è a clamp. */
 html.az #tempo-hero .az-hero,
-html.az #negozi-hero .az-hero{padding-bottom:24px}
+html.az #negozi-hero .az-hero,
+html.az #storecheck-content > .az-hero{padding-bottom:24px}
 html.az #tempo-hero .az-h1,
 html.az #kpi-hero .az-h1,
-html.az #negozi-hero .az-h1{min-height:1.68em}
+html.az #negozi-hero .az-h1,
+html.az #storecheck-content > .az-hero .az-h1{min-height:1.68em}
 html.az .az-duo{
   display:grid;grid-template-columns:1fr 1fr;gap:1px;
   background:var(--bd);
@@ -996,15 +998,14 @@ html.az .am-chev{color:var(--faint);font-size:10px}
    9. STORE CHECK (sezione 1d)
    ─────────────────────────────────────────────────────────────────────────── */
 
-/* Il toggle "Da sistemare / Tutte" sale sul nero, come in Aperture/Chiusure */
+/* Il toggle "Da sistemare / Tutte" NON sale più sul nero: sta sotto, come tutti
+   gli altri selettori di vista dell'app, ed è la stessa pillola chiara.
+   `!important` perché nel markup quella .seg-wrap ha uno style inline
+   (margin:10px 16px 6px) che altrimenti vincerebbe; lo stile inline resta,
+   così fuori dal tema azzurro il layout è quello di prima. */
 html.az #storecheck-content > .seg-wrap{
-  margin-top:calc(-1 * var(--az-overlap))!important;
-  position:relative;z-index:3;
-  background:transparent;
-  border-color:rgba(255,255,255,.26);
+  margin:18px 16px 0!important;
 }
-html.az #storecheck-content > .seg-wrap .seg-btn{color:rgba(255,255,255,.78)}
-html.az #storecheck-content > .seg-wrap .seg-btn.on{background:#fff;color:#0d0d0d}
 html.az .seg-count{
   background:var(--red);color:#fff;
   font-family:var(--label);font-size:var(--fs-lab-xs);font-weight:700;
