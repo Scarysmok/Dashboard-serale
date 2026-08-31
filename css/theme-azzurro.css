@@ -1843,3 +1843,26 @@ html.az .amc .am-chev.vuota{visibility:hidden}
    interruttore a parte, perché dice COSA guardi come Brand e Punto vendita —
    mentre "vs target" e "vs anno scorso" dicono con cosa lo confronti. */
 html.az .am-vista{display:inline-flex;gap:8px}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   SCHERMI STRETTI — i filtri di Analisi non devono far scorrere la pagina
+   ───────────────────────────────────────────────────────────────────────────
+   Due cose sfondavano di lato, e una pagina che scorre in orizzontale non è
+   un difetto estetico: si perde il contenuto sotto il bordo e non si capisce
+   perché.
+
+   1. La riga dei pulsanti ha `flex-wrap:nowrap` scritto nel markup. Con Brand,
+      Punto vendita, Insieme, Per negozio ed Esporta in fila non ci sta più —
+      "Esporta XLS" usciva dallo schermo già prima che si aggiungesse il
+      selettore di vista. Sul telefono va a capo.
+   2. Il pannello del filtro negozi è largo almeno 240px e parte 120px a destra
+      del suo pulsante: da solo basta a sfondare. Il suo riferimento è il
+      contenitore del pulsante, che è stretto; togliendogli `position` il
+      riferimento diventa la riga intera dei filtri, e il pannello può
+      allargarsi da bordo a bordo. */
+@media(max-width:600px){
+  html.az .tempo-filters > div,
+  html.az .kpi-filters{flex-wrap:wrap!important;row-gap:8px}
+  html.az .am-filter-slot{position:static!important}
+  html.az .am-filter-panel{left:0!important;right:0;min-width:0;width:auto}
+}

@@ -273,7 +273,7 @@
            che è disponibile (30 negozi mappati). -->
       <div class="tempo-filters">
         <div style="display:flex;gap:8px;align-items:center;flex:1 1 100%;flex-wrap:nowrap;min-width:0">
-          <div style="position:relative;flex-shrink:0">
+          <div class="am-filter-slot" style="position:relative;flex-shrink:0">
             <button class="am-filter-btn" id="am-btn-brand" onclick="toggleAmPanel('brand')">
               <span>Brand</span><span class="am-count" id="am-cnt-brand">tutti</span><span class="am-arrow">▾</span>
             </button>
@@ -286,7 +286,7 @@
               </div>
             </div>
           </div>
-          <div style="position:relative;flex-shrink:0">
+          <div class="am-filter-slot" style="position:relative;flex-shrink:0">
             <button class="am-filter-btn" id="am-btn-store" onclick="toggleAmPanel('store')">
               <span>Punto vendita</span><span class="am-count" id="am-cnt-store">tutti</span><span class="am-arrow">▾</span>
             </button>
@@ -355,13 +355,13 @@
 
       <!-- Filtri Brand + Store -->
       <div class="kpi-filters" style="flex-wrap:nowrap">
-        <div style="position:relative;flex-shrink:0">
+        <div class="am-filter-slot" style="position:relative;flex-shrink:0">
           <button class="kfbtn" id="kfb-brand" onclick="toggleKpiPanel('brand')">
             <span>Brand</span><span class="kfcnt" id="kfcnt-brand">tutti</span><span class="kfarrow">▾</span>
           </button>
           <div class="kfpanel" id="kfp-brand"></div>
         </div>
-        <div style="position:relative;flex-shrink:0">
+        <div class="am-filter-slot" style="position:relative;flex-shrink:0">
           <button class="kfbtn" id="kfb-store" onclick="toggleKpiPanel('store')">
             <span>Punto vendita</span><span class="kfcnt" id="kfcnt-store">tutti</span><span class="kfarrow">▾</span>
           </button>
