@@ -1428,6 +1428,31 @@ function kpiRenderHero(){
 //      quando l'admin ha caricato il file con le nuove colonne KPI
 // Senza la sorgente 2, la linea grigia "vs PY" era sempre vuota per il 2026
 // (perché nel 2025 non c'era GoAudits). Dedup gestito da kpiSyntheticFromHistorical.
+// Record del PERIODO PRECEDENTE: stessa lunghezza del periodo scelto, attaccato
+// prima del suo inizio, con gli stessi filtri brand/negozio.
+// Era scritto dentro al disegno del grafico; estratto perché adesso lo legge
+// anche la classifica, e due definizioni di "periodo precedente" che si
+// separano darebbero due numeri diversi per la stessa cosa nella stessa
+// schermata.
+// Nota: guarda solo allData (GoAudits), non i sintetici dallo storico Excel —
+// è quello che faceva il grafico e non lo cambio di nascosto. Dove il periodo
+// precedente non è coperto, la classifica mostra un trattino.
+function kpiPrevFiltered(){
+  const [s,e] = kpiDateRange(kpiState.range);
+  const span = e - s;
+  const prevStart = new Date(s.getTime() - span - 24*3600*1000);
+  const prevEnd = new Date(s.getTime() - 24*3600*1000);
+  const psIso = kpiFmtDateISO(prevStart), peIso = kpiFmtDateISO(prevEnd);
+  const brandF = kpiState.brands.size ? kpiState.brands : null;
+  const storeF = kpiState.stores.size ? kpiState.stores : null;
+  return allData.filter(r => {
+    if(!r.dateISO) return false;
+    if(r.dateISO < psIso || r.dateISO > peIso) return false;
+    if(brandF && !brandF.has(r.brand)) return false;
+    if(storeF && !storeF.has(`${r.brand}|${r.location}`)) return false;
+    return true;
+  });
+}
 function kpiPyShiftedFiltered(){
   const [s,e] = kpiDateRange(kpiState.range);
   // Finestra PY = finestra corrente spostata indietro di 52 settimane esatte
@@ -1557,20 +1582,7 @@ function kpiRenderChart(){
 
   // vs Periodo precedente: stesso filtro brand/store ma range shiftato indietro
   if(kpiState.compare.has('prev')){
-    const [s,e] = kpiDateRange(kpiState.range);
-    const span = e - s;
-    const prevStart = new Date(s.getTime() - span - 24*3600*1000);
-    const prevEnd = new Date(s.getTime() - 24*3600*1000);
-    const psIso = kpiFmtDateISO(prevStart), peIso = kpiFmtDateISO(prevEnd);
-    const brandF = kpiState.brands.size ? kpiState.brands : null;
-    const storeF = kpiState.stores.size ? kpiState.stores : null;
-    const prevRecs = allData.filter(r => {
-      if(!r.dateISO) return false;
-      if(r.dateISO < psIso || r.dateISO > peIso) return false;
-      if(brandF && !brandF.has(r.brand)) return false;
-      if(storeF && !storeF.has(`${r.brand}|${r.location}`)) return false;
-      return true;
-    });
+    const prevRecs = kpiPrevFiltered();
     const prevSeries = kpiAggregateByBucket(prevRecs, kpi, kpiState.gran);
     const prevData = series.map((_,i) => prevSeries[i] ? +prevSeries[i].value.toFixed(2) : null);
     datasets.push({
@@ -1643,7 +1655,23 @@ function kpiRenderChart(){
 function kpiRenderRanking(){
   const recs = kpiFiltered();
   const stores = kpiAggregateByStore(recs, kpiState.kpi);
-  // Media brand per il delta di ogni riga
+
+  // Gli scostamenti mostrati sono quelli ACCESI con i tre pulsanti sopra il
+  // grafico. Prima la classifica mostrava sempre e solo la media brand, anche
+  // quando quel pulsante era spento: un pezzo di schermata che non dava retta
+  // ai suoi comandi. L'ordine è fisso, così le colonne non ballano quando se
+  // ne accende una.
+  const COL = [{k:'py', lab:'A-1'}, {k:'brand', lab:'Brand'}, {k:'prev', lab:'Prec.'}]
+    .filter(c => kpiState.compare.has(c.k));
+
+  const perNegozio = rr => new Map(
+    kpiAggregateByStore(rr, kpiState.kpi).map(s => [s.brand + '|' + s.location, s.value]));
+  const pyVal   = COL.some(c => c.k === 'py')   ? perNegozio(kpiPyShiftedFiltered()) : null;
+  const prevVal = COL.some(c => c.k === 'prev') ? perNegozio(kpiPrevFiltered())      : null;
+
+  // Media brand per il delta di ogni riga. Con un negozio solo NON si calcola:
+  // sarebbe il confronto di un negozio con sé stesso, cioè zero per forza —
+  // uno zero che sembra un'informazione e non lo è.
   const brandAvg = new Map();
   const brandAgg = new Map();
   for(const s of stores){
@@ -1652,7 +1680,7 @@ function kpiRenderRanking(){
     b.vals.push(s.value);
   }
   for(const [k,b] of brandAgg){
-    brandAvg.set(k, b.vals.reduce((x,y)=>x+y,0)/b.vals.length);
+    brandAvg.set(k, b.vals.length > 1 ? b.vals.reduce((x,y)=>x+y,0)/b.vals.length : null);
   }
   stores.sort((a,b) => kpiState.sort === 'name'
     ? (a.brand+a.location).localeCompare(b.brand+b.location,'it')
@@ -1663,9 +1691,30 @@ function kpiRenderRanking(){
     list.innerHTML = '<div class="kpi-rank-empty">Nessun dato per i filtri selezionati</div>';
     return;
   }
-  list.innerHTML = stores.map((s,i) => {
-    const brandM = brandAvg.get(s.brand);
-    const d = kpiDelta(s.value, brandM);
+  // Intestazione delle colonne: senza, i tre numeri in fila non dicono contro
+  // cosa sono. Compare solo se c'è almeno un confronto acceso.
+  const testa = COL.length ? `<div class="kpi-rank-head">
+      <div class="kpi-rank-pos"></div>
+      <div class="kpi-rank-name"></div>
+      <div class="kpi-rank-spark"></div>
+      <div class="kpi-rank-val">${
+        // kpiLabel() per esteso ("CR (Conversion Rate)") in una colonna larga
+        // 50px non ci sta: qui serve il nome corto.
+        {ingressi:'Ingressi', cr:'CR', upt:'UPT'}[kpiState.kpi] || ''}</div>
+      ${COL.map(c => `<div class="kpi-rank-delta">${c.lab}</div>`).join('')}
+    </div>` : '';
+
+  list.innerHTML = testa + stores.map((s,i) => {
+    const sk = s.brand + '|' + s.location;
+    const base = {
+      py:    pyVal   ? pyVal.get(sk)   : null,
+      brand: brandAvg.get(s.brand),
+      prev:  prevVal ? prevVal.get(sk) : null,
+    };
+    const celle = COL.map(c => {
+      const d = kpiDelta(s.value, base[c.k] == null ? null : base[c.k]);
+      return `<div class="kpi-rank-delta ${d.cls}" title="vs ${attrEsc(c.lab)}">${d.text}</div>`;
+    }).join('');
     const spark = kpiSparkline(s.daily.map(x => x.v), 56, 24);
     const payload = JSON.stringify({brand:s.brand, location:s.location});
     return `<div class="kpi-rank-row" onclick='openKpiDrill(${JSON.stringify(payload)})'>
@@ -1676,7 +1725,7 @@ function kpiRenderRanking(){
       </div>
       <div class="kpi-rank-spark">${spark}</div>
       <div class="kpi-rank-val">${kpiFmt(s.value, kpiState.kpi)}</div>
-      <div class="kpi-rank-delta ${d.cls}">${d.text}</div>
+      ${celle}
     </div>`;
   }).join('');
 }
@@ -1957,8 +2006,10 @@ function kpiBindEvents(){
       if(kpiState.compare.has(k)) kpiState.compare.delete(k);
       else kpiState.compare.add(k);
       b.classList.toggle('on');
-      // Solo il grafico cambia: niente bisogno di ricalcolare hero/heatmap
+      // Grafico e classifica: da qui in poi anche le colonne degli scostamenti
+      // seguono questi pulsanti. Hero e heatmap non c'entrano.
       if(kpiState.view === 'chart') kpiRenderChart();
+      kpiRenderRanking();
     };
   });
   document.querySelectorAll('#tab-kpi .kpi-vtab').forEach(b => {

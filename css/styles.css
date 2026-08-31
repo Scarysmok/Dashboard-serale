@@ -1638,3 +1638,7 @@ body{display:flex;flex-direction:column}
 /* Avviso "ruota il telefono" della vista Per negozio: nascosto ovunque tranne
    sul telefono in verticale (regola nel tema azzurro). */
 .amc-ruota{display:none}
+/* Intestazione delle colonne degli scostamenti nella classifica KPI. Stessa
+   struttura della riga, così le colonne cadono incolonnate. */
+.kpi-rank-head{display:flex;align-items:flex-end;gap:10px;padding:2px 14px 8px;font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.5px}
+.kpi-rank-head .kpi-rank-val,.kpi-rank-head .kpi-rank-delta{font-family:var(--font);font-size:10px;font-weight:700;color:var(--t3)}
