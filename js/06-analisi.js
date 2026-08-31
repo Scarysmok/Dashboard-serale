@@ -1630,7 +1630,34 @@ function kpiRenderChart(){
         maintainAspectRatio: false,
         interaction: {mode:'index', intersect:false},
         plugins: {
-          legend: {display:true, position:'bottom', labels:{font:{family:AZC.font,size:10}, boxWidth:10, boxHeight:10, padding:8}},
+          legend: {
+            display:true, position:'bottom',
+            labels:{
+              font:{family:AZC.font,size:10}, padding:8,
+              usePointStyle:true, pointStyle:'circle', boxWidth:8, boxHeight:8,
+              // "Anno scorso" e "Periodo prec." sono linee TRATTEGGIATE, e
+              // Chart.js riporta il tratteggio anche nel segno della legenda:
+              // in 10px un tratteggio non si legge come tratteggio, si legge
+              // come una macchia sfrangiata. Nella legenda serve solo
+              // riconoscere il colore, quindi qui i segni sono pallini pieni e
+              // il tratteggio resta dov'è utile, cioè sul grafico.
+              // Le voci sono costruite a mano invece di ritoccare quelle
+              // predefinite: datasetIndex e hidden vanno passati comunque,
+              // altrimenti il clic sulla legenda smette di accendere e
+              // spegnere la serie.
+              generateLabels: chart => chart.data.datasets.map((ds, i) => {
+                const c = ds.borderColor || ds.backgroundColor;
+                return {
+                  text: ds.label,
+                  fillStyle: c, strokeStyle: c,
+                  lineWidth: 0, lineDash: [],
+                  pointStyle: 'circle',
+                  hidden: !chart.isDatasetVisible(i),
+                  datasetIndex: i
+                };
+              })
+            }
+          },
           tooltip: {
             callbacks: {
               label: function(ctx){
