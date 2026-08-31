@@ -57,9 +57,14 @@ var _ora  = [rec('Adidas','Bariblu',100), rec('Adidas','Taranto',60), rec('Yamam
 var _py   = [rec('Adidas','Bariblu',80),  rec('Adidas','Taranto',60), rec('Yamamay','Trani',50)];
 // Periodo precedente: solo Bariblu, 50 (+100%). Gli altri non hanno un pari.
 var _prev = [rec('Adidas','Bariblu',50)];
+// Media brand: su TUTTI i negozi del brand, non solo sui selezionati — è il
+// criterio del grafico (kpiBrandAvg). Adidas 80, Yamamay ha un negozio solo e
+// quindi non ha una media.
+var _brandAvg = new Map([['Adidas', 80], ['Yamamay', null]]);
 function kpiFiltered(){ return _ora; }
 function kpiPyShiftedFiltered(){ return _py; }
 function kpiPrevFiltered(){ return _prev; }
+function kpiBrandAvg(){ return _brandAvg; }
 
 let ko = 0;
 function check(cosa, atteso, ottenuto){
@@ -110,15 +115,21 @@ check('Taranto senza periodo precedente: trattino', ['• 0.0%', '▼ 25.0%', '�
       scostamenti('Taranto'));
 
 // ── 4. Un negozio solo nel suo brand ────────────────────────────────────
-// Trani è l'unico Yamamay: la "media del brand" sarebbe lui stesso.
+// Trani è l'unico Yamamay: la "media del brand" sarebbe lui stesso, e allora
+// non si mostra.
 console.log('\nBrand con un negozio solo:');
 check('media brand: trattino, non 0,0%', '—', scostamenti('Trani')[1]);
 
-// ── 5. Un solo negozio selezionato in tutto ─────────────────────────────
-console.log('\nUn solo negozio selezionato:');
+// ── 5. Un solo negozio SELEZIONATO ──────────────────────────────────────
+// Diverso dal caso sopra: il brand ha i suoi negozi, è l'utente ad averne
+// filtrato uno. La media brand deve comparire lo stesso, calcolata su tutti —
+// è la domanda "questo negozio come va rispetto ai suoi pari", che con un solo
+// negozio selezionato è anzi quella più interessante. Prima spariva, mentre il
+// grafico due centimetri sopra la mostrava: era quella l'incoerenza.
+console.log('\nUn solo negozio selezionato (ma il brand ne ha altri):');
 _ora = [rec('Adidas','Bariblu',100)];
 kpiState.compare = new Set(['brand']);
 kpiRenderRanking();
-check('niente confronto con sé stesso', ['—'], scostamenti('Bariblu'));
+check('la media brand c\'è: 100 contro gli 80 del brand', ['▲ 25.0%'], scostamenti('Bariblu'));
 
 console.log(ko ? '\nFALLITI: ' + ko : '\nTutto a posto.');

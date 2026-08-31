@@ -1437,6 +1437,36 @@ function kpiRenderHero(){
 // Nota: guarda solo allData (GoAudits), non i sintetici dallo storico Excel —
 // è quello che faceva il grafico e non lo cambio di nascosto. Dove il periodo
 // precedente non è coperto, la classifica mostra un trattino.
+// Media del brand, un valore per brand, sul periodo scelto.
+// Il criterio è quello del GRAFICO: la media si fa su TUTTI i negozi del brand,
+// non solo su quelli selezionati. È la differenza fra "quanto vale questo
+// negozio rispetto ai suoi pari" — che ha senso anche selezionandone uno solo —
+// e "quanto vale rispetto a quelli che ho selezionato", che con un negozio solo
+// è il confronto con sé stesso. Il grafico faceva già il primo, la classifica
+// il secondo: due numeri diversi per la stessa cosa nella stessa schermata.
+// Come il grafico, guarda solo allData e non i sintetici dallo storico.
+// Resta null per i brand con un negozio solo: lì la media È quel negozio.
+function kpiBrandAvg(kpi){
+  const [s,e] = kpiDateRange(kpiState.range);
+  const sIso = kpiFmtDateISO(s), eIso = kpiFmtDateISO(e);
+  const brands = new Set();
+  if(kpiState.stores.size)      for(const k of kpiState.stores) brands.add(k.split('|')[0]);
+  else if(kpiState.brands.size) kpiState.brands.forEach(b => brands.add(b));
+  else                          ALL_STORES.forEach(st => brands.add(st.brand));
+  const recs = allData.filter(r =>
+    r.dateISO && r.dateISO >= sIso && r.dateISO <= eIso && brands.has(r.brand));
+  const agg = new Map();
+  for(const st of kpiAggregateByStore(recs, kpi)){
+    let b = agg.get(st.brand);
+    if(!b){ b = []; agg.set(st.brand, b); }
+    b.push(st.value);
+  }
+  const out = new Map();
+  for(const [k, vals] of agg){
+    out.set(k, vals.length > 1 ? vals.reduce((x,y) => x+y, 0) / vals.length : null);
+  }
+  return out;
+}
 function kpiPrevFiltered(){
   const [s,e] = kpiDateRange(kpiState.range);
   const span = e - s;
@@ -1696,19 +1726,11 @@ function kpiRenderRanking(){
   const pyVal   = COL.some(c => c.k === 'py')   ? perNegozio(kpiPyShiftedFiltered()) : null;
   const prevVal = COL.some(c => c.k === 'prev') ? perNegozio(kpiPrevFiltered())      : null;
 
-  // Media brand per il delta di ogni riga. Con un negozio solo NON si calcola:
-  // sarebbe il confronto di un negozio con sé stesso, cioè zero per forza —
-  // uno zero che sembra un'informazione e non lo è.
-  const brandAvg = new Map();
-  const brandAgg = new Map();
-  for(const s of stores){
-    let b = brandAgg.get(s.brand);
-    if(!b){ b = {vals:[]}; brandAgg.set(s.brand, b); }
-    b.vals.push(s.value);
-  }
-  for(const [k,b] of brandAgg){
-    brandAvg.set(k, b.vals.length > 1 ? b.vals.reduce((x,y)=>x+y,0)/b.vals.length : null);
-  }
+  // Media brand: la stessa del grafico, cioè su tutti i negozi del brand e non
+  // solo su quelli selezionati (vedi kpiBrandAvg). Prima la classifica la
+  // faceva sui soli selezionati, e con un negozio solo spariva — mentre il
+  // grafico, due centimetri sopra, la mostrava eccome.
+  const brandAvg = COL.some(c => c.k === 'brand') ? kpiBrandAvg(kpiState.kpi) : new Map();
   stores.sort((a,b) => kpiState.sort === 'name'
     ? (a.brand+a.location).localeCompare(b.brand+b.location,'it')
     : b.value - a.value);
