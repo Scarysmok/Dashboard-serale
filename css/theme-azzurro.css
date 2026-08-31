@@ -1844,6 +1844,37 @@ html.az .amc .am-chev.vuota{visibility:hidden}
    mentre "vs target" e "vs anno scorso" dicono con cosa lo confronti. */
 html.az .am-vista{display:inline-flex;gap:8px}
 
+/* L'avviso "ruota il telefono": galleggia SOPRA la tabella, non sopra la sua
+   intestazione — i nomi dei negozi devono restare leggibili dietro, altrimenti
+   l'avviso nasconde proprio la cosa di cui parla.
+
+   Se ne va da solo appena il telefono gira: la larghezza supera i 600px e la
+   regola smette di valere. Da computer non compare mai, perché la condizione è
+   la larghezza E il formato verticale, che su una finestra da scrivania non
+   capitano insieme. */
+html.az .amc-ruota{display:none}
+@media(max-width:600px) and (orientation:portrait){
+  html.az .amc-box{position:relative}
+  html.az .amc-ruota{
+    display:block;
+    position:absolute;left:30px;right:30px;top:78px;z-index:6;
+    padding:14px 16px;
+    background:#0d0d0d;color:#fff;
+    border-radius:var(--radius-card);
+    box-shadow:0 10px 30px rgba(20,23,28,.28);
+    font-family:var(--label);
+    font-size:var(--fs-lab);font-weight:700;
+    letter-spacing:.12em;text-transform:uppercase;
+    text-align:center;cursor:pointer;
+  }
+  html.az .amc-ruota span{
+    display:block;margin-top:6px;
+    font-size:var(--fs-lab-xs);font-weight:500;
+    color:rgba(255,255,255,.6);
+  }
+  html.az .amc-ruota.via{display:none}
+}
+
 /* ───────────────────────────────────────────────────────────────────────────
    SCHERMI STRETTI — i filtri di Analisi non devono far scorrere la pagina
    ───────────────────────────────────────────────────────────────────────────

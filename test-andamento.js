@@ -37,6 +37,7 @@ eval(estrai('_amAlbero'));
 eval(estrai('_amTabellaHtml'));
 
 var amExpanded = new Set();
+var amRuotaVia = false;      // avviso "ruota il telefono" non ancora chiuso
 function _escHtml(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
 let ko = 0;
@@ -129,5 +130,17 @@ check('aperto il mese, compaiono i giorni', true, tutto.includes('Mar 25'));
 // venduto e non essere nei dati sono due cose diverse, e uno zero direbbe la
 // prima quando è vera la seconda.
 check('giorni senza dati: trattino, non zero', true, tutto.includes('amc-no'));
+
+// ── 4. L'avviso "ruota il telefono" ─────────────────────────────────────
+// Chi decide SE mostrarlo è il CSS (telefono, in verticale). Qui si controlla
+// solo che una volta chiuso resti chiuso: la tabella si ridisegna a ogni mese
+// che si apre, e senza la variabile l'avviso tornerebbe a ogni tocco.
+console.log('\nAvviso "ruota il telefono":');
+amRuotaVia = false;
+check('c\'è', true, _amTabellaHtml(ctx).includes('class="amc-ruota"'));
+amRuotaVia = true;
+check('chiuso, resta chiuso anche dopo un nuovo disegno', true,
+      _amTabellaHtml(ctx).includes('amc-ruota via'));
+amRuotaVia = false;
 
 console.log(ko ? '\nFALLITI: ' + ko : '\nTutto a posto.');

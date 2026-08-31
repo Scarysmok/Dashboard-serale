@@ -551,14 +551,32 @@ function _amTabellaHtml(ctx){
 
   const teste = colonne.map(c => `<th><span class="amc-b">${_escHtml(c.info.brand || '')}</span>${
     _escHtml(c.info.location || c.sk)}</th>`).join('');
-  return `<div class="amc-wrap"><table class="amc">
+  // In verticale sul telefono restano visibili il periodo e il totale, e del
+  // primo negozio si vede una fetta: la tabella funziona, ma non è come va
+  // guardata. L'avviso galleggia SOPRA la tabella, sotto l'intestazione, così
+  // i nomi dei negozi restano leggibili dietro. Se ne va da solo appena il
+  // telefono gira — è il CSS a deciderlo — e si può togliere con un tocco.
+  // Da computer non compare mai.
+  return `<div class="amc-box">
+  <div class="amc-ruota${amRuotaVia ? ' via' : ''}" onclick="amChiudiRuota(this)">
+    Ruota il telefono<span>per vedere i negozi · tocca per chiudere</span>
+  </div>
+  <div class="amc-wrap"><table class="amc">
     <thead><tr>
       <th class="amc-per">Periodo</th>
       <th class="amc-tot"><span class="amc-b">Totale</span>Tutti e ${colonne.length}</th>
       ${teste}
     </tr></thead>
     <tbody>${corpo}</tbody>
-  </table></div>`;
+  </table></div></div>`;
+}
+// Chiude l'avviso "ruota il telefono". Lo stato sta in una variabile e non solo
+// nel DOM: la tabella si ridisegna a ogni mese che si apre, e senza questo
+// l'avviso tornerebbe ogni volta dopo essere stato tolto.
+let amRuotaVia = false;
+function amChiudiRuota(el){
+  amRuotaVia = true;
+  if(el) el.classList.add('via');
 }
 
 // La tabella per negozio scorre DENTRO di sé, e i nomi dei negozi restano in
