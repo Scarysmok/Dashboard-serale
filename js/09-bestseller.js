@@ -42,6 +42,13 @@ const BS = {
   // volta — la scheda ne mostra uno — e si chiede solo aprendo la scheda:
   // dentro la classifica sarebbero centinaia di articoli scaricati per niente.
   tgNeg: null,
+  // Riassortimento: il file di disponibilità letto, il perimetro scelto e la
+  // proposta ricevuta. null = la schermata non è aperta.
+  //   righe     [{code, nome, taglia, ean, qty}] dal file
+  //   negozi    elenco "marchio|negozio" su cui distribuire (vuoto = tutti)
+  //   obiettivo settimane di copertura da raggiungere
+  //   esito     la risposta del server, oppure null se non ancora chiesta
+  riass: null,
   busy: false,
   log: [],
   // Selezione a spunta: `pending` = ci sono spunte non ancora applicate (si
@@ -521,7 +528,8 @@ function bsPaint(){
   </section>
   ${bsFooter()}
   <button class="bs-up" id="bs-up" aria-label="Torna all'inizio della classifica">↑</button>
-  ${BS.detail?bsModal(BS.detail):''}`;
+  ${BS.detail?bsModal(BS.detail):''}
+  ${BS.riass?bsRiassView():''}`;
   bsBind();
   bsAncoraX();
   bsTornaSu();
@@ -1127,6 +1135,10 @@ function bsAdminChips(d){
       ${BS.busy?'⏳ Importo…':'📥 Importa Excel'}</button>
     <input type="file" id="bs-flagfile" accept=".xlsx,.xls" style="display:none">
     <button class="bs-chip-btn" id="bs-flags"${BS.busy?' disabled':''}>🏷 Importa saldi e CO</button>
+    <input type="file" id="bs-dispfile" accept=".xlsx,.xls" style="display:none">
+    <button class="bs-chip-btn" id="bs-riass"${BS.busy?' disabled':''}
+      title="File di disponibilità del fornitore (articolo, taglia, EAN, quantità):&#10;dice quanti pezzi mandare in quale negozio, in base a quello che&#10;ogni negozio ha venduto e a quello che ha in giacenza.">
+      🚚 Riassortimento</button>
     <button class="bs-chip-btn" id="bs-xls"${BS.busy?' disabled':''}>📊 Scarica Excel</button>
     <button class="bs-chip-btn" id="bs-photos"${BS.busy?' disabled':''}>🖼 Aggiorna foto</button>
     <button class="bs-chip-btn" id="bs-codes"${BS.busy?' disabled':''}>⬇ Codici senza foto</button>
@@ -1197,6 +1209,232 @@ function bsTgLabel(t){
 // Ha senso chiedere la ripartizione per negozio? Solo quando si sta guardando
 // più di un negozio: sulla scheda di un negozio singolo direbbe una riga con
 // dentro il negozio che si sta già guardando.
+// ── RIASSORTIMENTO ──────────────────────────────────────────────────────
+// Dal file di disponibilità del fornitore alla proposta "quanti pezzi a quale
+// negozio". Il file si legge qui e il calcolo lo fa il server, che ha venduto
+// e giacenza per negozio e per taglia.
+
+// Le intestazioni del file NON si cercano per nome esatto. Lo stesso file è
+// arrivato con la quantità scritta "qty" e con "Giacenza al 07.09": cercare
+// una parola esatta vorrebbe dire rifiutare il prossimo file per un'intestazione
+// rinominata. Attenzione a "Material Description", che contiene "material" ma
+// non è il codice: le colonne più specifiche si riconoscono prima.
+function bsRiassCols(testa){
+  const h = testa.map(x => String(x == null ? '' : x).trim().toLowerCase());
+  const trova = (...prove) => {
+    for(const p of prove){
+      const i = h.findIndex(x => p instanceof RegExp ? p.test(x) : x === p);
+      if(i > -1) return i;
+    }
+    return -1;
+  };
+  return {
+    nome: trova('material description', /descriz/, /description/),
+    code: trova('material', 'articolo', 'codice', /^cod/, /articol/),
+    tg:   trova('grid value', 'taglia', 'size', /grid/, /taglia/),
+    ean:  trova('ean', 'barcode', /ean/, /barcod/),
+    qty:  trova('qty', 'quantita', 'quantità', /disponib/, /giacenz/, /quantit/, /pezzi/, /^q$/),
+  };
+}
+// Righe utilizzabili dal file. Torna {righe, scartate, foglio}.
+function bsParseDisp(rows, foglio){
+  const righe = [];
+  let scartate = 0, c = null;
+  for(const r of (rows || [])){
+    if(!r || !r.length) continue;
+    if(!c){
+      const prova = bsRiassCols(r);
+      // La riga delle intestazioni è quella in cui si riconoscono almeno il
+      // codice, la taglia e la quantità: così un file con righe di titolo
+      // sopra la tabella non manda tutto in scarto.
+      if(prova.code > -1 && prova.tg > -1 && prova.qty > -1){ c = prova; continue; }
+      continue;
+    }
+    const code = String(r[c.code] == null ? '' : r[c.code]).trim();
+    const qty  = Math.round(Number(String(r[c.qty] == null ? '' : r[c.qty]).replace(',', '.')) || 0);
+    // Una riga di totali in fondo non ha codice articolo: cade qui, senza
+    // bisogno di riconoscerla. Le quantità a zero non sono un errore: sono
+    // taglie senza disponibilità, e non c'è niente da distribuire.
+    if(!code || !(qty > 0)){ if(code || r[c.qty] != null) scartate++; continue; }
+    righe.push({
+      code,
+      nome: c.nome > -1 ? String(r[c.nome] == null ? '' : r[c.nome]).trim() : '',
+      taglia: String(r[c.tg] == null ? '' : r[c.tg]).trim(),
+      ean: c.ean > -1 ? String(r[c.ean] == null ? '' : r[c.ean]).trim() : '',
+      qty,
+    });
+  }
+  return {righe, scartate, foglio, intestazioni: !!c};
+}
+// Apre la schermata: legge il file e mostra il perimetro da scegliere.
+async function bsApriRiass(file){
+  try{
+    const {rows, foglio} = bsRows(await file.arrayBuffer());
+    const d = bsParseDisp(rows, foglio);
+    if(!d.intestazioni){
+      bsLog('⚠️ Nel file non trovo le colonne articolo, taglia e quantità.');
+      return;
+    }
+    if(!d.righe.length){
+      bsLog('⚠️ Nessuna riga con disponibilità nel file.');
+      return;
+    }
+    const pezzi = d.righe.reduce((s, r) => s + r.qty, 0);
+    const art = [...new Set(d.righe.map(r => r.code))];
+    bsLog(`📦 ${file.name}: ${art.length} articol${art.length===1?'o':'i'} · `
+      + `${d.righe.length} taglie · ${pezzi} pezzi`
+      + (d.scartate ? ` · ${d.scartate} righe scartate` : ''));
+    BS.riass = {righe: d.righe, negozi: [], obiettivo: BS.wos, esito: null,
+                file: file.name, busy: false};
+    bsPaint();
+  }catch(e){
+    bsLog('⚠️ File di disponibilità non leggibile: ' + (e.message || e));
+  }
+}
+// La schermata: perimetro sopra, proposta sotto. Un pannello solo, perché
+// scegliere i negozi e leggere il risultato sono due momenti della stessa
+// domanda — e cambiando perimetro si vuole vedere subito com'è cambiata la
+// risposta, senza tornare indietro.
+function bsRiassView(){
+  const R = BS.riass;
+  if(!R) return '';
+  const disp = R.righe.reduce((s, r) => s + r.qty, 0);
+  const art = [...new Set(R.righe.map(r => r.code))];
+  // I negozi fra cui scegliere sono quelli della settimana selezionata: la
+  // proposta si misura sul venduto di quelle settimane, e un negozio che in
+  // quel periodo non c'era non ha numeri con cui essere giudicato.
+  const disponibili = bsStoresIn(bsPeriodsOf(BS.cur || {})).map(bsStoreKey);
+  const scelti = R.negozi.length ? R.negozi : disponibili;
+  return `<div class="bs-backdrop" id="bs-riass-back"><div class="bs-modal bs-riass">
+    <button class="bs-x" id="bs-riass-x">✕</button>
+    <div class="bs-ri-head">
+      <div class="bs-mrank">Riassortimento</div>
+      <div class="bs-mname">${bsEsc(R.file)}</div>
+      <div class="bs-mmeta">${art.length} articol${art.length===1?'o':'i'} ·
+        ${R.righe.length} taglie · ${disp} pezzi disponibili</div>
+    </div>
+
+    <div class="bs-ri-sez">
+      <div class="bs-gtitle">Dove distribuire</div>
+      <div class="bs-ri-neg">
+        ${disponibili.map(k => `<label class="bs-ri-chk">
+          <input type="checkbox" data-riass-neg="${bsEsc(k)}"
+            ${scelti.indexOf(k) > -1 ? 'checked' : ''}>
+          <span>${bsEsc(k.split('|')[1] || k)}</span></label>`).join('')}
+      </div>
+      <div class="bs-ri-riga">
+        <span class="bs-ri-lab">Copertura da raggiungere</span>
+        ${BS_WOS_SETT.map(n => `<button class="bs-chip-btn${n===R.obiettivo?' bs-sel':''}"
+          data-riass-obb="${n}">${n} sett.</button>`).join('')}
+        <div style="flex:1"></div>
+        <button class="bs-btn" id="bs-riass-go"${R.busy?' disabled':''}>
+          ${R.busy ? '⏳ Calcolo…' : 'Calcola'}</button>
+      </div>
+    </div>
+
+    ${R.esito ? bsRiassEsito(R.esito) : `<div class="bs-ri-vuoto">
+      Scegli i negozi e premi Calcola.</div>`}
+  </div></div>`;
+}
+// Il risultato: un blocco per articolo, dentro una riga per taglia.
+function bsRiassEsito(e){
+  const art = (e.articoli || []).map(a => {
+    const taglie = (a.taglie || []).map(t => {
+      const righe = (t.righe || []).map(r => `<div class="bs-ri-r">
+        <span class="bs-ri-n">${bsEsc(String(r.negozio).split('|')[1] || r.negozio)}</span>
+        <b class="bs-ri-pz">${r.pezzi}</b>
+        <span class="bs-ri-why">${bsEsc(r.motivo)}</span>
+        <span class="bs-ri-num">ven ${r.venduto} · gia ${r.giacenza}${
+          r.copertura == null ? '' : ' · cop ' + bsFmt(r.copertura, 'n')}${
+          r.ordinato_articolo ? ' · <i>' + r.ordinato_articolo + ' in arrivo</i>' : ''}</span>
+      </div>`).join('');
+      return `<div class="bs-ri-tg">
+        <div class="bs-ri-tgh">
+          <b>${bsEsc(bsTgLabel(t.taglia))}</b>
+          <span>${t.disponibili} pz</span>
+          ${t.resto ? `<i class="bs-ri-resto">${t.resto} non assegnat${t.resto===1?'o':'i'}</i>` : ''}
+        </div>
+        ${righe || '<div class="bs-ri-nessuno">Nessun negozio da servire</div>'}
+      </div>`;
+    }).join('');
+    return `<div class="bs-ri-art">
+      <div class="bs-gtitle">${bsEsc(a.code)}${a.nome ? ' · ' + bsEsc(a.nome) : ''}</div>
+      ${taglie}</div>`;
+  }).join('');
+  return `<div class="bs-ri-sez">
+    <div class="bs-ri-tot">
+      <span><b>${e.assegnati}</b> assegnati</span>
+      <span><b>${e.disponibili}</b> disponibili</span>
+      ${e.resto ? `<span class="bs-ri-resto"><b>${e.resto}</b> restano in mano</span>` : ''}
+      <div style="flex:1"></div>
+      <span class="bs-ri-lab">venduto su ${e.settimane} settiman${e.settimane===1?'a':'e'} ·
+        obiettivo ${e.obiettivo} sett.</span>
+      <button class="bs-btn bs-ghost" id="bs-riass-xls">📊 Excel</button>
+    </div>
+    ${e.resto ? `<div class="bs-ri-nota">I pezzi che restano non hanno un negozio
+      che ne abbia bisogno: sono pezzi da non ordinare.</div>` : ''}
+    ${art}
+    <div class="bs-ri-nota">${bsEsc(e.nota_ordinato || '')}</div>
+  </div>`;
+}
+// Excel della proposta: una riga per articolo × taglia × negozio, come la
+// vuole chi poi deve ordinare — non come si legge a schermo.
+function bsRiassXls(){
+  const e = BS.riass && BS.riass.esito;
+  if(!e || typeof XLSX === 'undefined') return;
+  const aoa = [['Articolo', 'Descrizione', 'Taglia', 'Disponibili', 'Negozio',
+                'Pezzi', 'Motivo', 'Venduto', 'Giacenza', 'Copertura',
+                'In arrivo (articolo)']];
+  for(const a of (e.articoli || [])){
+    for(const t of (a.taglie || [])){
+      for(const r of (t.righe || [])){
+        aoa.push([a.code, a.nome, bsTgLabel(t.taglia), t.disponibili,
+                  String(r.negozio).split('|')[1] || r.negozio, r.pezzi, r.motivo,
+                  r.venduto, r.giacenza, r.copertura == null ? '' : r.copertura,
+                  r.ordinato_articolo || 0]);
+      }
+      // Anche le taglie senza destinatario finiscono nel file: chi ordina deve
+      // vedere che quella taglia è stata considerata e scartata, non trovarla
+      // semplicemente assente.
+      if(!(t.righe || []).length){
+        aoa.push([a.code, a.nome, bsTgLabel(t.taglia), t.disponibili,
+                  '— nessun negozio', 0, 'nessuno ne ha bisogno', '', '', '', '']);
+      }
+    }
+  }
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Riassortimento');
+  XLSX.writeFile(wb, 'Riassortimento_' + (BS.riass.file || 'proposta').replace(/\.[^.]+$/, '') + '.xlsx');
+}
+
+// Chiede al server la proposta.
+async function bsCalcolaRiass(){
+  const R = BS.riass;
+  if(!R || R.busy) return;
+  R.busy = true; R.esito = null; bsPaint();
+  try{
+    const r = await bsApi('/bestseller/riassortimento', {
+      method: 'POST',
+      body: JSON.stringify({
+        periods: bsPeriodsOf(BS.cur || {}),
+        stores: R.negozi,
+        obiettivo: R.obiettivo,
+        righe: R.righe,
+      }),
+    });
+    if(!r.ok){
+      const t = await r.text().catch(() => '');
+      throw new Error('errore ' + r.status + (t ? ' · ' + t.slice(0, 200) : ''));
+    }
+    R.esito = await r.json();
+  }catch(e){
+    bsLog('⚠️ Riassortimento non calcolato: ' + (e.message || e));
+  }finally{
+    R.busy = false;
+    bsPaint();
+  }
+}
+
 function bsTgNegServe(){
   if(BS.public) return !!(BS.data && BS.data.aggregate && (BS.data.store_count||0) > 1);
   return !!(BS.cur && BS.cur.aggregate);
@@ -2468,6 +2706,41 @@ function bsBind(){
     e.target.value = '';
     if(f) bsImportFlags(f);
   });
+  on('bs-riass','click', () => { const f=document.getElementById('bs-dispfile'); if(f) f.click(); });
+  on('bs-dispfile','change', e => {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if(f) bsApriRiass(f);
+  });
+  on('bs-riass-x','click', () => { BS.riass = null; bsPaint(); });
+  const rb = document.getElementById('bs-riass-back');
+  if(rb) rb.addEventListener('click', e => {
+    if(e.target === rb){ BS.riass = null; bsPaint(); }
+  });
+  on('bs-riass-go','click', bsCalcolaRiass);
+  on('bs-riass-xls','click', bsRiassXls);
+  document.querySelectorAll('#bs-root [data-riass-obb]').forEach(b =>
+    b.addEventListener('click', () => {
+      if(!BS.riass) return;
+      BS.riass.obiettivo = +b.dataset.riassObb;
+      // La proposta di prima non vale più: cambiare l'obiettivo cambia i
+      // fabbisogni, e lasciarla a schermo con un altro numero in testa
+      // sarebbe il modo migliore per far ordinare la merce sbagliata.
+      BS.riass.esito = null;
+      bsPaint();
+    }));
+  document.querySelectorAll('#bs-root [data-riass-neg]').forEach(c =>
+    c.addEventListener('change', () => {
+      if(!BS.riass) return;
+      const tutti = bsStoresIn(bsPeriodsOf(BS.cur || {})).map(bsStoreKey);
+      const on = [...document.querySelectorAll('#bs-root [data-riass-neg]')]
+        .filter(x => x.checked).map(x => x.dataset.riassNeg);
+      // Tutti spuntati = nessun filtro, una forma sola per la stessa cosa
+      // (come per i selettori della classifica).
+      BS.riass.negozi = on.length === tutti.length ? [] : on;
+      BS.riass.esito = null;
+      bsPaint();
+    }));
   on('bs-xls','click', bsDownloadXls);
   on('bs-photos','click', bsRefreshPhotos);
   on('bs-codes','click', bsDownloadCodes);
