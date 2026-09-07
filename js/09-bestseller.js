@@ -1284,7 +1284,10 @@ async function bsApriRiass(file){
     bsLog(`📦 ${file.name}: ${art.length} articol${art.length===1?'o':'i'} · `
       + `${d.righe.length} taglie · ${pezzi} pezzi`
       + (d.scartate ? ` · ${d.scartate} righe scartate` : ''));
-    BS.riass = {righe: d.righe, negozi: [], obiettivo: BS.wos, esito: null,
+    // negozi: null = tutti quelli disponibili, elenco = esattamente quelli.
+    // Servono due cose diverse per "tutti" e "nessuno": un elenco vuoto che
+    // valga "tutti" rende impossibile togliere l'ultima spunta.
+    BS.riass = {righe: d.righe, negozi: null, obiettivo: BS.wos, esito: null,
                 file: file.name, busy: false};
     bsPaint();
   }catch(e){
@@ -1304,39 +1307,59 @@ function bsRiassView(){
   // proposta si misura sul venduto di quelle settimane, e un negozio che in
   // quel periodo non c'era non ha numeri con cui essere giudicato.
   const disponibili = bsStoresIn(bsPeriodsOf(BS.cur || {})).map(bsStoreKey);
-  const scelti = R.negozi.length ? R.negozi : disponibili;
+  const scelti = R.negozi === null ? disponibili : R.negozi;
+  const tutti = scelti.length === disponibili.length;
   return `<div class="bs-backdrop" id="bs-riass-back"><div class="bs-modal bs-riass">
     <button class="bs-x" id="bs-riass-x">✕</button>
-    <div class="bs-ri-head">
-      <div class="bs-mrank">Riassortimento</div>
-      <div class="bs-mname">${bsEsc(R.file)}</div>
-      <div class="bs-mmeta">${art.length} articol${art.length===1?'o':'i'} ·
-        ${R.righe.length} taglie · ${disp} pezzi disponibili</div>
+
+    <div class="bs-ri-top">
+      <div class="bs-ri-kick">Riassortimento</div>
+      <!-- In cima va la SOSTANZA, non il nome del file: quanti pezzi ci sono
+           da distribuire. Il nome del file serve a sapere quale hai caricato,
+           e sta sotto, piccolo. -->
+      <div class="bs-ri-tit">${disp} pezzi da distribuire</div>
+      <div class="bs-ri-sub">${art.length} articol${art.length===1?'o':'i'}
+        · ${R.righe.length} taglie · ${bsEsc(R.file)}</div>
     </div>
 
-    <div class="bs-ri-sez">
-      <div class="bs-gtitle">Dove distribuire</div>
-      <div class="bs-ri-neg">
-        ${disponibili.map(k => `<label class="bs-ri-chk">
-          <input type="checkbox" data-riass-neg="${bsEsc(k)}"
-            ${scelti.indexOf(k) > -1 ? 'checked' : ''}>
-          <span>${bsEsc(k.split('|')[1] || k)}</span></label>`).join('')}
+    <div class="bs-ri-body">
+      <div class="bs-ri-blocco">
+        <div class="bs-ri-h">
+          <span class="bs-gtitle">Dove distribuire</span>
+          <span class="bs-ri-conta">${scelti.length} su ${disponibili.length}</span>
+          <div style="flex:1"></div>
+          <button class="bs-ri-tutti" id="bs-riass-tutti">
+            ${tutti ? 'Deseleziona tutti' : 'Seleziona tutti'}</button>
+        </div>
+        <div class="bs-ri-neg">
+          ${disponibili.map(k => `<label class="bs-ri-chk">
+            <input type="checkbox" data-riass-neg="${bsEsc(k)}"
+              ${scelti.indexOf(k) > -1 ? 'checked' : ''}>
+            <span>${bsEsc(k.split('|')[1] || k)}</span></label>`).join('')}
+        </div>
       </div>
-      <div class="bs-ri-riga">
-        <span class="bs-ri-lab">Copertura da raggiungere</span>
-        ${BS_WOS_SETT.map(n => `<button class="bs-chip-btn${n===R.obiettivo?' bs-sel':''}"
-          data-riass-obb="${n}">${n} sett.</button>`).join('')}
-        <div style="flex:1"></div>
-        <button class="bs-btn" id="bs-riass-go"${R.busy?' disabled':''}>
-          ${R.busy ? '⏳ Calcolo…' : 'Calcola'}</button>
-      </div>
-    </div>
 
-    ${R.esito ? bsRiassEsito(R.esito) : `<div class="bs-ri-vuoto">
-      Scegli i negozi e premi Calcola.</div>`}
+      <div class="bs-ri-blocco">
+        <div class="bs-ri-h"><span class="bs-gtitle">Copertura da raggiungere</span></div>
+        <div class="bs-ri-riga">
+          <div class="bs-ri-opts">
+            ${BS_WOS_SETT.map(n => `<button class="bs-chip-btn${n===R.obiettivo?' bs-sel':''}"
+              data-riass-obb="${n}">${n} sett.</button>`).join('')}
+          </div>
+          <div style="flex:1"></div>
+          <button class="bs-btn" id="bs-riass-go"${(R.busy||!scelti.length)?' disabled':''}>
+            ${R.busy ? '⏳ Calcolo…' : 'Calcola'}</button>
+        </div>
+      </div>
+
+      ${R.esito ? bsRiassEsito(R.esito) : `<div class="bs-ri-vuoto">
+        ${scelti.length ? 'Premi Calcola per vedere la proposta.'
+                        : 'Scegli almeno un negozio.'}</div>`}
+    </div>
   </div></div>`;
 }
-// Il risultato: un blocco per articolo, dentro una riga per taglia.
+// Il risultato: il totale in testa, poi un blocco per articolo con dentro una
+// riga per taglia.
 function bsRiassEsito(e){
   const art = (e.articoli || []).map(a => {
     const taglie = (a.taglie || []).map(t => {
@@ -1358,23 +1381,23 @@ function bsRiassEsito(e){
       </div>`;
     }).join('');
     return `<div class="bs-ri-art">
-      <div class="bs-gtitle">${bsEsc(a.code)}${a.nome ? ' · ' + bsEsc(a.nome) : ''}</div>
+      <div class="bs-ri-arth">
+        <b>${bsEsc(a.code)}</b>${a.nome ? `<span>${bsEsc(a.nome)}</span>` : ''}
+      </div>
       ${taglie}</div>`;
   }).join('');
-  return `<div class="bs-ri-sez">
+  return `<div class="bs-ri-blocco">
     <div class="bs-ri-tot">
-      <span><b>${e.assegnati}</b> assegnati</span>
-      <span><b>${e.disponibili}</b> disponibili</span>
-      ${e.resto ? `<span class="bs-ri-resto"><b>${e.resto}</b> restano in mano</span>` : ''}
+      <span class="bs-ri-kpi"><b>${e.assegnati}</b> assegnati</span>
+      <span class="bs-ri-kpi"><b>${e.disponibili}</b> disponibili</span>
+      ${e.resto ? `<span class="bs-ri-kpi bs-ri-resto"><b>${e.resto}</b> restano</span>` : ''}
       <div style="flex:1"></div>
-      <span class="bs-ri-lab">venduto su ${e.settimane} settiman${e.settimane===1?'a':'e'} ·
-        obiettivo ${e.obiettivo} sett.</span>
       <button class="bs-btn bs-ghost" id="bs-riass-xls">📊 Excel</button>
     </div>
-    ${e.resto ? `<div class="bs-ri-nota">I pezzi che restano non hanno un negozio
-      che ne abbia bisogno: sono pezzi da non ordinare.</div>` : ''}
+    <div class="bs-ri-nota">Venduto misurato su ${e.settimane} settiman${e.settimane===1?'a':'e'},
+      obiettivo ${e.obiettivo} settimane.${e.resto ? ' I pezzi che restano non hanno un negozio che ne abbia bisogno: sono pezzi da non ordinare.' : ''}
+      ${bsEsc(e.nota_ordinato || '')}</div>
     ${art}
-    <div class="bs-ri-nota">${bsEsc(e.nota_ordinato || '')}</div>
   </div>`;
 }
 // Excel della proposta: una riga per articolo × taglia × negozio, come la
@@ -1417,7 +1440,9 @@ async function bsCalcolaRiass(){
       method: 'POST',
       body: JSON.stringify({
         periods: bsPeriodsOf(BS.cur || {}),
-        stores: R.negozi,
+        // Al server un elenco vuoto vale "tutti": con nessuno spuntato non
+        // si arriva qui, perche' Calcola e' spento.
+        stores: R.negozi || [],
         obiettivo: R.obiettivo,
         righe: R.righe,
       }),
@@ -2718,6 +2743,14 @@ function bsBind(){
     if(e.target === rb){ BS.riass = null; bsPaint(); }
   });
   on('bs-riass-go','click', bsCalcolaRiass);
+  on('bs-riass-tutti','click', () => {
+    if(!BS.riass) return;
+    const tutti = bsStoresIn(bsPeriodsOf(BS.cur || {})).map(bsStoreKey);
+    const pieni = BS.riass.negozi === null || BS.riass.negozi.length === tutti.length;
+    BS.riass.negozi = pieni ? [] : null;
+    BS.riass.esito = null;
+    bsPaint();
+  });
   on('bs-riass-xls','click', bsRiassXls);
   document.querySelectorAll('#bs-root [data-riass-obb]').forEach(b =>
     b.addEventListener('click', () => {
@@ -2737,7 +2770,7 @@ function bsBind(){
         .filter(x => x.checked).map(x => x.dataset.riassNeg);
       // Tutti spuntati = nessun filtro, una forma sola per la stessa cosa
       // (come per i selettori della classifica).
-      BS.riass.negozi = on.length === tutti.length ? [] : on;
+      BS.riass.negozi = on.length === tutti.length ? null : on;
       BS.riass.esito = null;
       bsPaint();
     }));
