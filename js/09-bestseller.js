@@ -1212,22 +1212,30 @@ async function bsCaricaTgNeg(code){
   const chiave = bsCacheKey(c) + '|' + code;
   if(BS.tgNeg && BS.tgNeg.chiave === chiave) return;   // già in memoria
   try{
-    let d;
+    // api() e bsApi() tornano la RISPOSTA, non il suo contenuto: il .json() va
+    // fatto qui. Dimenticarlo non dà errore — si legge `.venduto` da un
+    // oggetto Response, esce undefined, e i riquadri non compaiono senza che
+    // niente si lamenti. È esattamente come si è rotto la prima volta.
+    let r;
     if(BS.public){
-      const r = await fetch(API_BASE + '/public/bestseller/taglie-negozi?t='
+      r = await fetch(API_BASE + '/public/bestseller/taglie-negozi?t='
         + encodeURIComponent(BS.token || '') + '&code=' + encodeURIComponent(code));
-      if(!r.ok) return;
-      d = await r.json();
     }else{
-      d = await bsApi('/bestseller/taglie-negozi?code=' + encodeURIComponent(code)
+      r = await bsApi('/bestseller/taglie-negozi?code=' + encodeURIComponent(code)
         + '&periods=' + encodeURIComponent(bsPeriodsOf(c).join(','))
         + (c.stores || []).map(s => '&stores=' + encodeURIComponent(s)).join(''));
     }
+    if(!r.ok) return;
+    const d = await r.json();
     BS.tgNeg = {chiave, venduto: d.venduto || {}, giacenza: d.giacenza || {}};
     // Ridisegno solo se la scheda aperta è ancora quella: fra la richiesta e la
     // risposta l'utente può averla chiusa o averne aperta un'altra.
     if(BS.detail && BS.detail.code === code) bsPaint();
-  }catch(_){ /* niente riquadro, nient'altro */ }
+  }catch(e){
+    // Il riquadro è un dettaglio in più: se non arriva, la scheda resta quella
+    // di prima. Ma non in silenzio — sbagliarlo non si vede a schermo.
+    console.warn('taglie per negozio non caricate:', e);
+  }
 }
 // Contenuto del riquadro: i negozi di una taglia, con pezzi e percentuale.
 function bsTgPopHtml(tg, quale){
@@ -1298,9 +1306,11 @@ function bsTgStrip(righe, titolo, scala, cls, quale){
       // La barra è interrogabile solo se per quella taglia c'è qualcosa da
       // ripartire. Su una taglia a zero non c'è nessun negozio da elencare.
       const hai = quale && n && bsTgPopHtml(t, quale);
+      // Il suggerimento del browser resta solo dove NON c'è il riquadro:
+      // altrimenti, passando sopra, comparirebbero entrambi uno sull'altro.
       return `<div class="bs-tg-i${n<0?' bs-tg-neg':''}${n?'':' bs-tg-vuota'}${hai?' bs-tg-hai':''}"
-        ${hai?`data-tgpop="${bsEsc(String(t))}" tabindex="0"`:''}
-        title="${bsEsc(lab)}: ${n}">
+        ${hai?`data-tgpop="${bsEsc(String(t))}" tabindex="0"`
+             :`title="${bsEsc(lab)}: ${n}"`}>
         <div class="bs-tg-t">${bsEsc(lab)}</div>
         <div class="bs-tg-bar">${h?`<i style="height:${h}%"></i>`:''}</div>
         <div class="bs-tg-n">${bsFmt(n,'i')}</div>

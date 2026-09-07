@@ -22,8 +22,12 @@ const src = $.NSString.stringWithContentsOfFileEncodingError(SRC, $.NSUTF8String
 if(!src) throw new Error('non leggo ' + SRC + ' — lanciami dalla cartella Dashboard-serale');
 
 function estrai(nome){
-  const i = src.indexOf('function ' + nome + '(');
+  let i = src.indexOf('function ' + nome + '(');
   if(i < 0) throw new Error('non trovo ' + nome + ' in ' + SRC);
+  // `async` sta PRIMA di `function`: senza portarselo dietro la funzione
+  // estratta non è più asincrona e ogni `await` dentro diventa un errore di
+  // sintassi. È il primo modo in cui questo banco di prova si è rotto.
+  if(src.slice(Math.max(0, i-6), i) === 'async ') i -= 6;
   let g = 0, visto = false;
   for(let k = i; k < src.length; k++){
     if(src[k] === '{'){ g++; visto = true; }
@@ -34,6 +38,7 @@ function estrai(nome){
 eval(estrai('bsTgNegServe'));
 eval(estrai('bsTgPopHtml'));
 eval(estrai('bsTgLabel'));
+eval(estrai('bsCaricaTgNeg'));
 
 var BS = {public:false, cur:null, data:null, tgNeg:null};
 function bsEsc(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
@@ -98,4 +103,49 @@ BS.tgNeg = {giacenza:{'-10': [['Adidas|Bariblu', 4]]}, venduto:{}};
 check('l\'intestazione usa la scrittura delle barre', true,
       bsTgPopHtml('-10', 'giacenza').includes('10-'));
 
-console.log(ko ? '\nFALLITI: ' + ko : '\nTutto a posto.');
+// ── 3. La risposta va aperta ────────────────────────────────────────────
+// Qui il modulo si è già rotto una volta, il 31/08, e senza un solo errore a
+// schermo: api() e bsApi() tornano la RISPOSTA, non il suo contenuto. Leggendo
+// `.venduto` da un oggetto Response esce undefined, le due mappe restano
+// vuote, e i riquadri non compaiono mai — mentre tutto sembra funzionare.
+console.log('\nLa risposta del server va aperta con .json():');
+var _chiamate = [];
+var _risposta = null;
+var API_BASE = '';
+function bsCacheKey(){ return 'chiave'; }
+function bsPeriodsOf(){ return ['2026-08-24']; }
+function bsPaint(){ _chiamate.push('bsPaint'); }
+function bsApi(path){ _chiamate.push(path); return Promise.resolve(_risposta); }
+
+BS.public = false;
+BS.cur = {aggregate:true, periods:['2026-08-24'], stores:[]};
+BS.detail = {code:'IC9707'};
+BS.tgNeg = null;
+// Una Response finta: `ok` e `json()`, come quella vera.
+_risposta = {ok:true, json: () => Promise.resolve({
+  venduto:{'OSFM':[['Adidas|Bariblu', 6]]}, giacenza:{}})};
+
+var fatto = false;
+bsCaricaTgNeg('IC9707').then(() => { fatto = true; });
+// JavaScriptCore non ha un ciclo di eventi da far girare: le promesse già
+// risolte si sbrogliano da sole prima della prossima riga sincrona solo se le
+// si aspetta. Qui basta accodarsi in fondo alla catena.
+Promise.resolve().then(() => {}).then(() => {}).then(() => {}).then(() => {
+  check('ha chiesto al server', true, _chiamate.some(x => /taglie-negozi/.test(x)));
+  check('la ripartizione è arrivata nello stato', [['Adidas|Bariblu', 6]],
+        (BS.tgNeg && BS.tgNeg.venduto || {})['OSFM']);
+  check('e il riquadro ora ha contenuto', true,
+        bsTgPopHtml('OSFM', 'venduto').includes('Bariblu'));
+  check('ha ridisegnato la scheda', true, _chiamate.includes('bsPaint'));
+
+  // Una risposta non ok non deve lasciare mezzi dati nello stato.
+  BS.tgNeg = null;
+  _chiamate = [];
+  _risposta = {ok:false, status:500, json: () => Promise.reject(new Error('mai'))};
+  bsCaricaTgNeg('IC9707');
+  Promise.resolve().then(() => {}).then(() => {
+    check('errore dal server: lo stato resta vuoto', null, BS.tgNeg);
+    check('e non ridisegna', false, _chiamate.includes('bsPaint'));
+    console.log(ko ? '\nFALLITI: ' + ko : '\nTutto a posto.');
+  });
+});
