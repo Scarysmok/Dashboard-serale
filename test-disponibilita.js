@@ -139,4 +139,67 @@ d = bsParseDisp([
 ], 'Foglio1');
 check('tre righe lette', [3, 2, 4], d.righe.map(r => r.qty));
 
+// ── 7. Lo specchietto per negozio ───────────────────────────────────────
+// Il secondo foglio dell'Excel: negozi in riga, taglie in colonna. È come si
+// prepara una spedizione — un negozio per volta, con davanti tutte le sue
+// taglie — mentre il primo foglio serve a capire PERCHÉ un pezzo va lì.
+eval(estrai('bsRiassPivot'));
+eval(estrai('bsTgCmp'));
+eval(estrai('bsTgOrd'));
+eval(estrai('bsTgLabel'));
+var BS_TG_LETTERE = ['3XS','2XS','XXS','XS','S','M','L','LT','XL','1X',
+                     'XXL','2XL','2X','XXXL','3XL','3X','4XL','4X','5XL'];
+
+function tg(taglia, righe){ return {taglia, disponibili:9, resto:0, righe}; }
+function ass(neg, pezzi){ return {negozio:'Adidas|'+neg, pezzi, motivo:'x',
+                                  venduto:1, giacenza:0, copertura:0}; }
+const ESITO = {assegnati: 12, articoli: [
+  {code:'KZ7203', nome:'XLG VAGRME', taglie:[
+    tg('10',  [ass('Taranto',1), ass('Foggia',2)]),
+    tg('-10', [ass('Foggia',1)]),
+    tg('4',   [ass('Taranto',3)]),
+    tg('-5',  [ass('Bariblu',1)]),
+    tg('12',  [])]},                          // taglia senza destinatario
+  {code:'KZ7205', nome:'XLG WONWHI', taglie:[
+    tg('5',   [ass('Bariblu',2), ass('Taranto',1)]),
+    tg('9',   [ass('Foggia',1)])]},
+]};
+
+console.log('\nSpecchietto per negozio:');
+const pv = bsRiassPivot(ESITO);
+// L'ordine delle taglie è quello della griglia, non alfabetico: alfabetico
+// mette il 10 prima del 4 e la 5- lontano dalla 5.
+check('taglie in ordine di taglia', ['4','5','5-','9','10','10-'],
+      pv[0].slice(3, -1));
+check('intestazioni', ['Negozio','Articolo','Descrizione'], pv[0].slice(0, 3));
+check('ultima colonna', 'Totale', pv[0][pv[0].length-1]);
+
+// Una riga per negozio × articolo, negozi in ordine alfabetico.
+const negozi = pv.slice(1, -1).map(r => r[0]);
+check('negozi in ordine, uno per articolo servito',
+      ['Bariblu','Bariblu','Foggia','Foggia','Taranto','Taranto'], negozi);
+
+const bariblu5 = pv.find(r => r[0] === 'Bariblu' && r[1] === 'KZ7205');
+check('Bariblu KZ7205: 2 pezzi sulla 5', 2, bariblu5[pv[0].indexOf('5')]);
+check('e la cella di una taglia che non lo riguarda resta VUOTA, non zero',
+      '', bariblu5[pv[0].indexOf('4')]);
+
+// L'invariante che rende il foglio fidato: la somma dello specchietto è
+// esattamente quella del dettaglio. Se si separassero, due fogli dello stesso
+// file direbbero due numeri diversi.
+const ultima = pv[pv.length-1];
+check('riga dei totali', 'Totale', ultima[0]);
+check('il totale generale è quello assegnato', ESITO.assegnati,
+      ultima[ultima.length-1]);
+const somma = pv.slice(1, -1).reduce((s, r) => s + r[r.length-1], 0);
+check('e le righe sommano allo stesso numero', ESITO.assegnati, somma);
+const perCol = pv[0].slice(3, -1)
+  .map((_, i) => pv.slice(1, -1).reduce((s, r) => s + (+r[3+i] || 0), 0));
+check('anche i totali di colonna tornano', perCol,
+      ultima.slice(3, -1).map(v => +v || 0));
+
+// La taglia 12 non ha destinatari: nel dettaglio c'è (con "nessuno ne ha
+// bisogno"), qui no — una colonna tutta vuota non aiuta a spedire.
+check('una taglia senza destinatari non fa colonna', -1, pv[0].indexOf('12'));
+
 console.log(ko ? '\nFALLITI: ' + ko : '\nTutto a posto.');

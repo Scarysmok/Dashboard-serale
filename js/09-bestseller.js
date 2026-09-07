@@ -1400,11 +1400,19 @@ function bsRiassEsito(e){
     ${art}
   </div>`;
 }
-// Excel della proposta: una riga per articolo × taglia × negozio, come la
-// vuole chi poi deve ordinare — non come si legge a schermo.
+// Excel della proposta. DUE fogli, perché servono a due cose diverse:
+//   "Riassortimento"  una riga per articolo × taglia × negozio, con il motivo
+//                     e i numeri: è la traccia di perché ogni pezzo va lì.
+//   "Per negozio"     la stessa cosa incrociata — negozi in riga, taglie in
+//                     colonna — che è come si prepara una spedizione: un
+//                     negozio per volta, con davanti tutte le sue taglie.
+// La seconda l'utente se la costruiva a mano con una tabella pivot.
 function bsRiassXls(){
   const e = BS.riass && BS.riass.esito;
   if(!e || typeof XLSX === 'undefined') return;
+  const wb = XLSX.utils.book_new();
+
+  // ── Foglio 1: il dettaglio, una riga per assegnazione ──────────────────
   const aoa = [['Articolo', 'Descrizione', 'Taglia', 'Disponibili', 'Negozio',
                 'Pezzi', 'Motivo', 'Venduto', 'Giacenza', 'Copertura',
                 'In arrivo (articolo)']];
@@ -1425,39 +1433,54 @@ function bsRiassXls(){
       }
     }
   }
-  const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(aoa), 'Riassortimento');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(bsRiassPivot(e)), 'Per negozio');
+
   XLSX.writeFile(wb, 'Riassortimento_' + (BS.riass.file || 'proposta').replace(/\.[^.]+$/, '') + '.xlsx');
 }
-
-// Chiede al server la proposta.
-async function bsCalcolaRiass(){
-  const R = BS.riass;
-  if(!R || R.busy) return;
-  R.busy = true; R.esito = null; bsPaint();
-  try{
-    const r = await bsApi('/bestseller/riassortimento', {
-      method: 'POST',
-      body: JSON.stringify({
-        periods: bsPeriodsOf(BS.cur || {}),
-        // Al server un elenco vuoto vale "tutti": con nessuno spuntato non
-        // si arriva qui, perche' Calcola e' spento.
-        stores: R.negozi || [],
-        obiettivo: R.obiettivo,
-        righe: R.righe,
-      }),
-    });
-    if(!r.ok){
-      const t = await r.text().catch(() => '');
-      throw new Error('errore ' + r.status + (t ? ' · ' + t.slice(0, 200) : ''));
+// La tabella incrociata: negozio × articolo in riga, taglie in colonna.
+// Le taglie sono in ORDINE DI TAGLIA e non alfabetico — alfabetico mette il 10
+// prima del 4 e la 5- lontano dalla 5, che su una griglia di scarpe rende la
+// tabella inutilizzabile.
+// Le celle vuote restano vuote e non a zero: uno zero in una griglia di taglie
+// si legge come "ne serve zero", il vuoto come "questa taglia non lo riguarda".
+function bsRiassPivot(e){
+  const scala = [], perNeg = new Map(), descr = new Map();
+  for(const a of (e.articoli || [])){
+    descr.set(a.code, a.nome || '');
+    for(const t of (a.taglie || [])){
+      if(!(t.righe || []).length) continue;
+      if(scala.indexOf(t.taglia) < 0) scala.push(t.taglia);
+      for(const r of (t.righe || [])){
+        const neg = String(r.negozio).split('|')[1] || r.negozio;
+        if(!perNeg.has(neg)) perNeg.set(neg, new Map());
+        const perArt = perNeg.get(neg);
+        if(!perArt.has(a.code)) perArt.set(a.code, new Map());
+        const m = perArt.get(a.code);
+        m.set(t.taglia, (m.get(t.taglia) || 0) + r.pezzi);
+      }
     }
-    R.esito = await r.json();
-  }catch(e){
-    bsLog('⚠️ Riassortimento non calcolato: ' + (e.message || e));
-  }finally{
-    R.busy = false;
-    bsPaint();
   }
+  scala.sort(bsTgCmp);
+  const aoa = [['Negozio', 'Articolo', 'Descrizione',
+                ...scala.map(bsTgLabel), 'Totale']];
+  const colTot = new Array(scala.length).fill(0);
+  let gran = 0;
+  for(const neg of [...perNeg.keys()].sort((x, y) => x.localeCompare(y, 'it'))){
+    for(const code of [...perNeg.get(neg).keys()].sort()){
+      const m = perNeg.get(neg).get(code);
+      let tot = 0;
+      const celle = scala.map((tg, i) => {
+        const v = m.get(tg) || 0;
+        if(v){ tot += v; colTot[i] += v; }
+        return v || '';
+      });
+      gran += tot;
+      aoa.push([neg, code, descr.get(code) || '', ...celle, tot]);
+    }
+  }
+  aoa.push(['Totale', '', '', ...colTot.map(v => v || ''), gran]);
+  return aoa;
 }
 
 function bsTgNegServe(){
