@@ -37,6 +37,11 @@ const BS = {
   // sono 'si' e 'no': spuntarli entrambi equivale a non filtrare.
   f: {div: [], gen: [], cat: [], sea: [], sale: [], carry: [], stock: []},
   detail: null,     // prodotto aperto nella scheda
+  // Ripartizione per negozio delle taglie dell'articolo aperto:
+  // {chiave, venduto:{taglia:[[negozio,pezzi]]}, giacenza:{...}}. Uno per
+  // volta — la scheda ne mostra uno — e si chiede solo aprendo la scheda:
+  // dentro la classifica sarebbero centinaia di articoli scaricati per niente.
+  tgNeg: null,
   busy: false,
   log: [],
   // Selezione a spunta: `pending` = ci sono spunte non ancora applicate (si
@@ -1189,11 +1194,95 @@ function bsTgLabel(t){
 // naturale. `scala` allinea le due strisce (venduto e giacenza) sulle STESSE
 // colonne: senza, la taglia 8 del venduto finirebbe sopra la 10 della giacenza
 // e il confronto — che è tutto il punto — sarebbe una trappola.
-function bsTgStrip(righe, titolo, scala, cls){
+// Ha senso chiedere la ripartizione per negozio? Solo quando si sta guardando
+// più di un negozio: sulla scheda di un negozio singolo direbbe una riga con
+// dentro il negozio che si sta già guardando.
+function bsTgNegServe(){
+  if(BS.public) return !!(BS.data && BS.data.aggregate && (BS.data.store_count||0) > 1);
+  return !!(BS.cur && BS.cur.aggregate);
+}
+// Chiede al server chi ha venduto e chi ha in giacenza ogni taglia
+// dell'articolo aperto, e ridisegna la scheda quando arriva. Se non arriva —
+// rete, token scaduto, articolo senza dettaglio — i riquadri non compaiono e
+// la scheda resta quella di prima: è un dettaglio in più, non un pezzo di cui
+// la scheda ha bisogno per stare in piedi.
+async function bsCaricaTgNeg(code){
+  if(!code || !bsTgNegServe()) return;
+  const c = BS.cur || {};
+  const chiave = bsCacheKey(c) + '|' + code;
+  if(BS.tgNeg && BS.tgNeg.chiave === chiave) return;   // già in memoria
+  try{
+    let d;
+    if(BS.public){
+      const r = await fetch(API_BASE + '/public/bestseller/taglie-negozi?t='
+        + encodeURIComponent(BS.token || '') + '&code=' + encodeURIComponent(code));
+      if(!r.ok) return;
+      d = await r.json();
+    }else{
+      d = await bsApi('/bestseller/taglie-negozi?code=' + encodeURIComponent(code)
+        + '&periods=' + encodeURIComponent(bsPeriodsOf(c).join(','))
+        + (c.stores || []).map(s => '&stores=' + encodeURIComponent(s)).join(''));
+    }
+    BS.tgNeg = {chiave, venduto: d.venduto || {}, giacenza: d.giacenza || {}};
+    // Ridisegno solo se la scheda aperta è ancora quella: fra la richiesta e la
+    // risposta l'utente può averla chiusa o averne aperta un'altra.
+    if(BS.detail && BS.detail.code === code) bsPaint();
+  }catch(_){ /* niente riquadro, nient'altro */ }
+}
+// Contenuto del riquadro: i negozi di una taglia, con pezzi e percentuale.
+function bsTgPopHtml(tg, quale){
+  const m = BS.tgNeg && BS.tgNeg[quale];
+  const righe = m && m[String(tg)];
+  if(!righe || !righe.length) return '';
+  const tot = righe.reduce((s, r) => s + r[1], 0) || 1;
+  return `<div class="bs-tg-pop-h">${bsEsc(bsTgLabel(tg))}</div>`
+    + righe.map(([neg, pz]) => {
+        const loc = String(neg).split('|')[1] || neg;
+        return `<div class="bs-tg-pop-r"><span>${bsEsc(loc)}</span>`
+             + `<b>${bsFmt(pz,'i')}</b>`
+             + `<i>${Math.round(pz / tot * 100)}%</i></div>`;
+      }).join('');
+}
+// Il riquadro è UNO per striscia e vive fuori dalla lista che scorre: dentro
+// una barra sarebbe tagliato dall'`overflow-x` della striscia, e per non
+// tagliarlo bisognerebbe togliere lo scorrimento — che sulle scale lunghe
+// delle calzature serve. Quindi sta nel riquadro esterno e lo si posiziona.
+function bsTgPopMostra(el, fisso){
+  const strip = el.closest('.bs-tg');
+  const pop = strip && strip.querySelector('.bs-tg-pop');
+  if(!pop) return;
+  const html = bsTgPopHtml(el.dataset.tgpop, strip.dataset.quale || '');
+  if(!html) return;
+  pop.innerHTML = html;
+  pop.classList.add('bs-on');
+  if(fisso) pop.dataset.fisso = '1'; else delete pop.dataset.fisso;
+  // Posizione presa dai rettangoli veri: così segue la barra anche quando la
+  // striscia è scorsa di lato, senza tenere conto dello scorrimento a mano.
+  const rs = strip.getBoundingClientRect(), rb = el.getBoundingClientRect();
+  pop.style.top = Math.round(rb.bottom - rs.top + 6) + 'px';
+  const mezzo = rb.left - rs.left + rb.width / 2;
+  const larg = pop.offsetWidth;
+  // Centrato sulla barra, ma senza uscire dai bordi del riquadro.
+  pop.style.left = Math.round(
+    Math.max(8, Math.min(mezzo - larg / 2, rs.width - larg - 8))) + 'px';
+}
+function bsTgPopVia(el, anche_fisso){
+  const strip = el ? el.closest('.bs-tg') : null;
+  const pops = strip ? [strip.querySelector('.bs-tg-pop')]
+                     : [...document.querySelectorAll('#bs-root .bs-tg-pop')];
+  pops.forEach(p => {
+    if(!p) return;
+    if(p.dataset.fisso && !anche_fisso) return;   // aperto col tocco: resta
+    p.classList.remove('bs-on');
+    delete p.dataset.fisso;
+  });
+}
+
+function bsTgStrip(righe, titolo, scala, cls, quale){
   const q = new Map(righe.map(r => [String(r[0]), r[1]]));
   const max = Math.max(...scala.map(t => Math.abs(q.get(t) || 0)), 1);
   const tot = scala.reduce((s,t) => s + Math.abs(q.get(t) || 0), 0) || 1;
-  return `<div class="bs-tg${cls ? ' '+cls : ''}">
+  return `<div class="bs-tg${cls ? ' '+cls : ''}"${quale ? ` data-quale="${quale}"` : ''}>
     <div class="bs-tg-h">${bsEsc(titolo)}</div>
     <div class="bs-tg-list">${scala.map(t => {
       // Una taglia che in questa striscia non compare vale ZERO e si scrive
@@ -1206,14 +1295,18 @@ function bsTgStrip(righe, titolo, scala, cls){
       // sola e le barre restano libere, invece di essere separate dai numeri.
       // Sotto la barra restano quantità e percentuale.
       const h = n ? Math.max(3, Math.round(Math.abs(n) / max * 100)) : 0;
-      return `<div class="bs-tg-i${n<0?' bs-tg-neg':''}${n?'':' bs-tg-vuota'}"
+      // La barra è interrogabile solo se per quella taglia c'è qualcosa da
+      // ripartire. Su una taglia a zero non c'è nessun negozio da elencare.
+      const hai = quale && n && bsTgPopHtml(t, quale);
+      return `<div class="bs-tg-i${n<0?' bs-tg-neg':''}${n?'':' bs-tg-vuota'}${hai?' bs-tg-hai':''}"
+        ${hai?`data-tgpop="${bsEsc(String(t))}" tabindex="0"`:''}
         title="${bsEsc(lab)}: ${n}">
         <div class="bs-tg-t">${bsEsc(lab)}</div>
         <div class="bs-tg-bar">${h?`<i style="height:${h}%"></i>`:''}</div>
         <div class="bs-tg-n">${bsFmt(n,'i')}</div>
         <div class="bs-tg-p">${Math.round(n/tot*100)}%</div>
       </div>`;
-    }).join('')}</div></div>`;
+    }).join('')}</div>${quale ? '<div class="bs-tg-pop"></div>' : ''}</div>`;
 }
 
 function bsTaglie(p){
@@ -1231,8 +1324,12 @@ function bsTaglie(p){
   const scala = [...new Set([...vend.map(t=>String(t[0])), ...gia.map(t=>String(t[0]))])]
                   .sort(bsTgCmp);
   const pzV = vend.reduce((s,t)=>s+t[1],0), pzG = gia.reduce((s,t)=>s+t[1],0);
-  return (vend.length ? bsTgStrip(vend, `Venduto per taglia · ${bsFmt(pzV,'i')} pz`, scala) : '')
-       + (gia.length  ? bsTgStrip(gia,  `Giacenza per taglia · ${bsFmt(pzG,'i')} pz`, scala, 'bs-tg-gia') : '');
+  // L'ultimo argomento dice quale ripartizione per negozio agganciare alle
+  // barre. Vuoto quando si guarda un negozio solo: lì non c'è niente da
+  // ripartire (vedi bsTgNegServe).
+  const q = bsTgNegServe();
+  return (vend.length ? bsTgStrip(vend, `Venduto per taglia · ${bsFmt(pzV,'i')} pz`, scala, '', q ? 'venduto' : '') : '')
+       + (gia.length  ? bsTgStrip(gia,  `Giacenza per taglia · ${bsFmt(pzG,'i')} pz`, scala, 'bs-tg-gia', q ? 'giacenza' : '') : '');
 }
 
 function bsModal(p){
@@ -2319,7 +2416,30 @@ function bsBind(){
     b.addEventListener('click', () => {
       BS.detail = (BS.data.products||[]).find(p => p.code === b.dataset.open) || null;
       bsPaint();
+      // Dopo il disegno, non prima: la scheda si apre subito e i riquadri per
+      // negozio compaiono quando arrivano, senza far attendere l'apertura.
+      if(BS.detail) bsCaricaTgNeg(BS.detail.code);
     }));
+
+  // Barre di taglia: il riquadro dei negozi. Col mouse basta passarci sopra;
+  // sul telefono il passaggio del mouse non esiste, quindi il tocco lo apre e
+  // lo tiene aperto (`fisso`) finché non si tocca altrove.
+  document.querySelectorAll('#bs-root [data-tgpop]').forEach(el => {
+    el.addEventListener('mouseenter', () => bsTgPopMostra(el, false));
+    el.addEventListener('mouseleave', () => bsTgPopVia(el, false));
+    el.addEventListener('focus',      () => bsTgPopMostra(el, false));
+    el.addEventListener('blur',       () => bsTgPopVia(el, false));
+    el.addEventListener('click', e => {
+      e.stopPropagation();     // altrimenti il clic chiude tutti i riquadri
+      const p = el.closest('.bs-tg').querySelector('.bs-tg-pop');
+      const gia = p && p.classList.contains('bs-on') && p.dataset.fisso;
+      bsTgPopVia(null, true);
+      if(!gia) bsTgPopMostra(el, true);
+    });
+  });
+  // Un tocco fuori dalle barre chiude i riquadri rimasti aperti.
+  const modale = document.querySelector('#bs-root .bs-modal');
+  if(modale) modale.addEventListener('click', () => bsTgPopVia(null, true));
 
   on('bs-close','click', () => { BS.detail=null; bsPaint(); });
   const bd = document.getElementById('bs-backdrop');

@@ -1292,6 +1292,37 @@ body{display:flex;flex-direction:column}
 .bs-tg-vuota{opacity:.35}
 .bs-tg-vuota .bs-tg-n{color:var(--bs-muted,#8a8782);font-weight:400}
 .bs-tg-no{margin-top:14px;font-size:11.5px;line-height:1.5;color:var(--bs-muted)}
+/* ── Chi ha venduto / chi ha in giacenza quella taglia ────────────────────
+   Il riquadro è UNO per striscia e sta FUORI dalla lista che scorre: dentro
+   una barra lo taglierebbe l'`overflow-x` della lista, e per non tagliarlo
+   bisognerebbe togliere lo scorrimento — che sulle scale lunghe delle
+   calzature serve. La posizione la mette bsTgPopMostra() misurando la barra,
+   così segue anche quando la striscia è scorsa di lato.
+   Col mouse basta passare sopra la barra; sul telefono il tocco lo apre e lo
+   tiene aperto finché non si tocca altrove (vedi bsBind). */
+.bs-tg{position:relative}
+.bs-tg-hai{cursor:pointer}
+.bs-tg-hai .bs-tg-bar>i{outline:0 solid transparent}
+.bs-tg-hai:hover .bs-tg-t,.bs-tg-hai:focus-visible .bs-tg-t{color:var(--bs-ink)}
+.bs-tg-pop{
+  display:none;position:absolute;z-index:30;
+  min-width:150px;max-width:230px;
+  padding:9px 11px;text-align:left;
+  background:var(--bs-ink,#0d0d0d);color:#fff;
+  border-radius:10px;box-shadow:0 10px 26px rgba(0,0,0,.3);
+  font-family:'JetBrains Mono',monospace;
+  pointer-events:none;   /* non deve rubare il passaggio del mouse alla barra */
+}
+.bs-tg-pop.bs-on{display:block}
+.bs-tg-pop-h{
+  font-size:9px;letter-spacing:.16em;text-transform:uppercase;
+  opacity:.55;padding-bottom:6px;margin-bottom:5px;
+  border-bottom:1px solid rgba(255,255,255,.18);
+}
+.bs-tg-pop-r{display:flex;align-items:baseline;gap:8px;padding:3px 0;font-size:11px;white-space:nowrap}
+.bs-tg-pop-r span{flex:1;overflow:hidden;text-overflow:ellipsis}
+.bs-tg-pop-r b{font-weight:700}
+.bs-tg-pop-r i{font-style:normal;font-size:9px;opacity:.5;min-width:30px;text-align:right}
 
 .bs-groups{padding:0 clamp(20px,3vw,38px) clamp(24px,3vw,38px);display:grid;
   grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:clamp(18px,2.5vw,34px)}
