@@ -1298,6 +1298,36 @@ async function bsApriRiass(file){
 // scegliere i negozi e leggere il risultato sono due momenti della stessa
 // domanda — e cambiando perimetro si vuole vedere subito com'è cambiata la
 // risposta, senza tornare indietro.
+// Chiede al server la proposta.
+async function bsCalcolaRiass(){
+  const R = BS.riass;
+  if(!R || R.busy) return;
+  R.busy = true; R.esito = null; bsPaint();
+  try{
+    const r = await bsApi('/bestseller/riassortimento', {
+      method: 'POST',
+      body: JSON.stringify({
+        periods: bsPeriodsOf(BS.cur || {}),
+        // Al server un elenco vuoto vale "tutti": con nessuno spuntato non si
+        // arriva qui, perché Calcola è spento.
+        stores: R.negozi || [],
+        obiettivo: R.obiettivo,
+        righe: R.righe,
+      }),
+    });
+    if(!r.ok){
+      const t = await r.text().catch(() => '');
+      throw new Error('errore ' + r.status + (t ? ' · ' + t.slice(0, 200) : ''));
+    }
+    R.esito = await r.json();
+  }catch(e){
+    bsLog('⚠️ Riassortimento non calcolato: ' + (e.message || e), true);
+  }finally{
+    R.busy = false;
+    bsPaint();
+  }
+}
+
 function bsRiassView(){
   const R = BS.riass;
   if(!R) return '';
